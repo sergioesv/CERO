@@ -1,6 +1,7 @@
 var PDFDocument = require('pdfkit');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
+var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
 async function generarPDF(sesion) {
   return new Promise(function(resolve, reject) {
@@ -16,27 +17,35 @@ async function generarPDF(sesion) {
       var hora = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
       // ===== ENCABEZADO =====
-      doc.rect(0, 0, 612, 85).fill('#1a237e');
+      doc.rect(0, 0, 612, 90).fill('#1a237e');
+
+      // Logo
+      try {
+        var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
+        doc.image(logoBuffer, 30, 8, { width: 75, height: 75 });
+      } catch (e) {
+        console.error('Error cargando logo:', e);
+      }
 
       doc.fill('#ffffff')
-        .fontSize(18)
+        .fontSize(16)
         .font('Helvetica-Bold')
-        .text('INSPECCION PREOPERACIONAL DE VEHICULO', 50, 15, { align: 'center' });
+        .text('INSPECCION PREOPERACIONAL DE VEHICULO', 115, 12, { width: 480, align: 'center' });
 
       doc.fontSize(9)
         .font('Helvetica')
-        .text('CERO - Sistema de Gestion de Operaciones de Campo', 50, 38, { align: 'center' });
+        .text('CERO - Sistema de Gestion de Operaciones de Campo', 115, 34, { width: 480, align: 'center' });
 
       doc.fontSize(8)
-        .text('Basado en formato I-GL-001-F04 Rev 05 | Codigo de prueba: CERO-PRE-001', 50, 52, { align: 'center' });
+        .text('Basado en formato I-GL-001-F04 Rev 05 | Codigo de prueba: CERO-PRE-001', 115, 50, { width: 480, align: 'center' });
 
       doc.fontSize(8)
-        .text('Resolucion 40595 de 2022 - Plan Estrategico de Seguridad Vial', 50, 66, { align: 'center' });
+        .text('Resolucion 40595 de 2022 - Plan Estrategico de Seguridad Vial', 115, 64, { width: 480, align: 'center' });
 
       doc.fill('#000000');
 
       // ===== DATOS DEL VEHICULO =====
-      var y = 95;
+      var y = 100;
       doc.rect(50, y, 512, 22).fill('#e8eaf6');
       doc.fill('#1a237e')
         .fontSize(11)
@@ -98,7 +107,7 @@ async function generarPDF(sesion) {
       y += 25;
       doc.rect(50, y, 512, 18).fill('#f5f5f5');
       doc.fontSize(8).font('Helvetica-Bold').fill('#757575');
-      doc.text('Convenciones: Bueno = OK | Regular = Requiere atencion | Malo = Requiere accion inmediata | N/A = No aplica', 60, y + 5);
+      doc.text('Estado especifico por item: Niveles (OK/Bajo/Vacio) | Electricos (Funciona/No funciona) | Equipo (Completo/Incompleto/Falta)', 60, y + 5);
       doc.fill('#000000');
 
       // ===== RESULTADO DE LA INSPECCION =====
@@ -161,8 +170,9 @@ async function generarPDF(sesion) {
           doc.text('  ' + item.nombre, 70, y);
 
           var color = estadoColor[item.estado] || '#000000';
+          var textoEstado = item.descripcion_estado || estadoTexto[item.estado] || 'N/R';
           doc.fill(color).font('Helvetica-Bold')
-            .text(estadoTexto[item.estado] || 'N/R', 250, y);
+            .text(textoEstado, 250, y);
 
           // Find if item is critical
           var esCritico = false;
