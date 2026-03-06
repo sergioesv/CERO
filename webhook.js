@@ -23,6 +23,58 @@ function registrarWebhook(app) {
     console.log('[' + telefono + '] Estado: ' + sesion.estado + ' | Mensaje: ' + mensaje + ' | Media: ' + numMedia);
 
     try {
+      // ===== COMANDOS GLOBALES =====
+      var msgUpper = mensaje.toUpperCase();
+
+      if (msgUpper === 'CANCELAR') {
+        sesiones.eliminarSesion(telefono);
+        return utils.responderTwiml(res, 'Preoperacional cancelado. Escribe cualquier mensaje para empezar de nuevo.');
+      }
+
+      if (msgUpper === 'REINICIAR') {
+        sesiones.eliminarSesion(telefono);
+        sesion = sesiones.obtenerSesion(telefono);
+        sesion.estado = 'ESPERANDO_PLACA';
+        return utils.responderTwiml(res, 'BOT MTO - CERO\nReiniciado. Placa del vehiculo?');
+      }
+
+      if (msgUpper === 'ATRAS') {
+        if (sesion.estado === 'ESPERANDO_KILOMETRAJE') {
+          sesion.estado = 'ESPERANDO_PLACA';
+          sesion.placa = null;
+          sesion.vehiculo = null;
+          return utils.responderTwiml(res, 'Volvemos. Placa del vehiculo?');
+        }
+        if (sesion.estado === 'GRUPO' && sesion.grupoActual > 0) {
+          sesion.grupoActual--;
+          var grupoAnterior = GRUPOS[sesion.grupoActual];
+          delete sesion.respuestas[grupoAnterior.id];
+          return utils.responderTwiml(res, 'Volvemos al bloque anterior.\n' + grupoAnterior.nombre + '\n(' + grupoAnterior.abreviado + ')');
+        }
+        if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
+          sesion.estado = 'ESPERANDO_KILOMETRAJE';
+          return utils.responderTwiml(res, 'Volvemos. Kilometraje actual?');
+        }
+        if (sesion.estado === 'FOTO_VERIFICACION') {
+          sesion.grupoActual = GRUPOS.length - 1;
+          sesion.estado = 'GRUPO';
+          var ultimoGrupo = GRUPOS[sesion.grupoActual];
+          delete sesion.respuestas[ultimoGrupo.id];
+          return utils.responderTwiml(res, 'Volvemos al ultimo bloque.\n' + ultimoGrupo.nombre + '\n(' + ultimoGrupo.abreviado + ')');
+        }
+        if (sesion.estado === 'OBSERVACION') {
+          sesion.estado = 'FOTO_VERIFICACION';
+          sesion.fotos.pop();
+          return utils.responderTwiml(res, 'Volvemos. ' + sesion.fotoVerificacionDescripcion);
+        }
+        if (sesion.estado === 'CONFIRMACION') {
+          sesion.estado = 'OBSERVACION';
+          return utils.responderTwiml(res, 'Volvemos. Observacion final? Si no hay, escribe no');
+        }
+        return utils.responderTwiml(res, 'No se puede retroceder desde aqui. Escribe CANCELAR para salir o continua.');
+      }
+      
+      
       switch (sesion.estado) {
 
         // ==================== INICIO ====================
