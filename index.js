@@ -594,6 +594,10 @@ app.post('/webhook', async function(req, res) {
           return responderTwiml(res, 'Escribe solo el numero del kilometraje.');
         }
 
+        if (sesion.vehiculo.kilometraje && km < sesion.vehiculo.kilometraje) {
+          return responderTwiml(res, 'Kilometraje invalido. El ultimo registrado fue ' + sesion.vehiculo.kilometraje + ' km. El nuevo debe ser igual o mayor.');
+        }
+        
         sesion.kilometraje = km;
         sesion.grupoActual = 0;
         sesion.estado = 'GRUPO';
