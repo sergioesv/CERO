@@ -1,0 +1,60 @@
+const GRUPOS = [
+  {
+    id: 'motor_niveles',
+    nombre: 'MOTOR Y NIVELES',
+    items: [
+      { nombre: 'Aceite motor', critico: true },
+      { nombre: 'Refrigerante', critico: true },
+      { nombre: 'Liquido frenos', critico: true },
+      { nombre: 'Fugas visibles', critico: true }
+    ],
+    abreviado: 'Aceite . Refrigerante . Liq.frenos . Fugas'
+  },
+  {
+    id: 'electrico_luces',
+    nombre: 'ELECTRICO Y LUCES',
+    items: [
+      { nombre: 'Luces delanteras/traseras', critico: true },
+      { nombre: 'Stops y direccionales', critico: true },
+      { nombre: 'Pito y alarma reversa', critico: true },
+      { nombre: 'Tablero instrumentos', critico: false },
+      { nombre: 'Baterias', critico: false }
+    ],
+    abreviado: 'Luces . Stops . Pito . Tablero . Baterias'
+  },
+  {
+    id: 'frenos_direccion_llantas',
+    nombre: 'FRENOS, DIRECCION Y LLANTAS',
+    items: [
+      { nombre: 'Freno de parqueo', critico: true },
+      { nombre: 'Estado llantas', critico: true },
+      { nombre: 'Pernos de ruedas', critico: true },
+      { nombre: 'Llanta repuesto', critico: false }
+    ],
+    abreviado: 'Freno parqueo . Llantas . Pernos . Repuesto'
+  },
+  {
+    id: 'cabina_equipo',
+    nombre: 'CABINA Y EQUIPO',
+    items: [
+      { nombre: 'Cinturones seguridad', critico: true },
+      { nombre: 'Retrovisores', critico: true },
+      { nombre: 'Pedales', critico: true },
+      { nombre: 'Vidrios y limpiabrisas', critico: false },
+      { nombre: 'Aseo y elementos sueltos', critico: false },
+      { nombre: 'Aire acondicionado', critico: false },
+      { nombre: 'Equipo carretera', critico: true }
+    ],
+    abreviado: 'Cinturones . Retrovisores . Pedales . Vidrios . Aseo . Aire . Equipo carretera'
+  }
+];
+
+const FOTOS_VERIFICACION = [
+  'Tome foto del odometro mostrando el kilometraje',
+  'Tome foto del tablero encendido',
+  'Tome foto de las llantas delanteras',
+  'Tome foto de las llantas traseras',
+  'Tome foto del extintor'
+];
+
+module.exports = { GRUPOS, FOTOS_VERIFICACION };

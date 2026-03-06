@@ -1,6 +1,6 @@
 {
   "name": "cero",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Sistema de gestión de operaciones de campo por WhatsApp con IA",
   "main": "index.js",
   "scripts": {
