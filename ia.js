@@ -6,10 +6,10 @@ async function interpretarRespuesta(grupo, mensaje) {
 
     var response = await config.anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
+      max_tokens: 600,
       messages: [{
         role: 'user',
-        content: 'Eres el sistema CERO de inspeccion vehicular colombiano. El operario esta respondiendo sobre el grupo "' + grupo.nombre + '" con estos items: ' + itemsTexto + '.\n\nEl operario escribio: "' + mensaje + '"\n\nLas opciones por item son: 1=Bueno, 2=Regular, 3=Malo, 4=N/A\n\nInterpreta la respuesta del operario. Si dice "1" solo, significa TODO BUENO para todos los items. Si menciona algo especifico como "aceite bajo" o "llanta pinchada", identifica que item tiene problema. El operario puede escribir con errores de ortografia, jerga colombiana o frases incompletas - interpreta la intencion.\n\nResponde SOLO en este formato JSON exacto, sin texto adicional:\n{\n  "items": [\n    {"nombre": "nombre del item", "estado": 1, "nota": null},\n    {"nombre": "nombre del item", "estado": 3, "nota": "descripcion del problema"}\n  ],\n  "hay_novedad": false,\n  "resumen": "texto corto de confirmacion para el operario"\n}'
+        content: 'Eres el sistema CERO de inspeccion vehicular colombiano. El operario responde sobre el grupo "' + grupo.nombre + '" con estos items: ' + itemsTexto + '.\n\nEl operario escribio: "' + mensaje + '"\n\nOpciones rapidas: 1=OK, 2=Requiere atencion, 3=Critico/Malo, 4=N/A\nSi dice "1" solo, significa TODO OK para todos los items.\n\nIMPORTANTE: Interpreta segun el tipo de item:\n- Niveles de liquidos (aceite, refrigerante, frenos): OK / Bajo / Vacio\n- Fugas: Sin fugas / Con fugas\n- Llantas: OK / Desgastada / Danada / Sin presion\n- Luces y electricos: Funciona / Intermitente / No funciona\n- Frenos y pedales: Funciona / Duro o flojo / No funciona\n- Equipo carretera: Completo / Incompleto / Falta\n- Cinturones y espejos: OK / Danado / Falta\n- General: OK / Regular / Malo\n\nEl operario puede escribir con errores, jerga colombiana o frases incompletas. Ejemplos: "aceite bajito" = nivel bajo, "llanta lisa" = desgastada, "no hay extintor" = falta, "pito no suena" = no funciona.\n\nResponde SOLO en JSON:\n{\n  "items": [\n    {"nombre": "nombre del item", "estado": 1, "nota": null, "descripcion_estado": "OK"},\n    {"nombre": "nombre del item", "estado": 2, "nota": "lo que dijo el operario", "descripcion_estado": "Nivel bajo"}\n  ],\n  "hay_novedad": false,\n  "resumen": "texto corto para confirmar al operario"\n}\n\nEl campo "descripcion_estado" debe ser especifico al tipo de item, no generico. Nunca pongas "Regular" para un nivel de liquido - pon "Nivel bajo" o "Nivel OK".'
       }]
     });
 
@@ -42,7 +42,7 @@ async function validarFoto(mediaUrl, descripcionEsperada) {
           },
           {
             type: 'text',
-            text: 'Eres el validador de fotos del sistema CERO de inspeccion vehicular. Se pidio al operario: "' + descripcionEsperada + '".\n\nAnaliza la foto y responde SOLO en este formato JSON:\n{\n  "valida": true o false,\n  "descripcion": "que se ve en la foto",\n  "razon_rechazo": null o "por que no es valida"\n}'
+            text: 'Eres el validador de fotos del sistema CERO de inspeccion vehicular. Se pidio al operario: "' + descripcionEsperada + '".\n\nAnaliza la foto y responde SOLO en JSON:\n{\n  "valida": true o false,\n  "descripcion": "que se ve en la foto",\n  "razon_rechazo": null o "por que no es valida"\n}'
           }
         ]
       }]
