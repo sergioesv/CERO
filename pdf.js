@@ -1,9 +1,38 @@
 var PDFDocument = require('pdfkit');
+var https = require('https');
+var http = require('http');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
 var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
+// Download image from URL and return as Buffer
+function descargarImagen(url) {
+  return new Promise(function(resolve, reject) {
+    var client = url.startsWith('https') ? https : http;
+    client.get(url, function(response) {
+      var chunks = [];
+      response.on('data', function(chunk) { chunks.push(chunk); });
+      response.on('end', function() { resolve(Buffer.concat(chunks)); });
+      response.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
 async function generarPDF(sesion) {
+  // Download all photos first
+  var fotosDescargadas = [];
+  if (sesion.fotos && sesion.fotos.length > 0) {
+    for (var d = 0; d < sesion.fotos.length; d++) {
+      try {
+        var imgBuffer = await descargarImagen(sesion.fotos[d].url);
+        fotosDescargadas.push({ buffer: imgBuffer, info: sesion.fotos[d] });
+      } catch (e) {
+        console.error('Error descargando foto ' + d + ':', e);
+        fotosDescargadas.push({ buffer: null, info: sesion.fotos[d] });
+      }
+    }
+  }
+
   return new Promise(function(resolve, reject) {
     try {
       var doc = new PDFDocument({ size: 'LETTER', margin: 50 });
@@ -278,6 +307,72 @@ async function generarPDF(sesion) {
         y += 30;
         doc.fontSize(9).font('Helvetica').text(sesion.observacion, 60, y, { width: 492 });
         y += 25;
+      }
+
+      // ===== EVIDENCIA FOTOGRAFICA =====
+      if (fotosDescargadas.length > 0) {
+        doc.addPage();
+        y = 50;
+
+        doc.rect(50, y, 512, 22).fill('#1a237e');
+        doc.fill('#ffffff')
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text('EVIDENCIA FOTOGRAFICA', 60, y + 6);
+        doc.fill('#000000');
+
+        y += 32;
+
+        for (var fp = 0; fp < fotosDescargadas.length; fp++) {
+          var fotoData = fotosDescargadas[fp];
+          var foto = fotoData.info;
+
+          if (y > 500) {
+            doc.addPage();
+            y = 50;
+          }
+
+          // Photo header
+          var esFotoNovedad = foto.tipo === 'novedad';
+          var headerColor = esFotoNovedad ? '#ffebee' : '#e8eaf6';
+          var textColor = esFotoNovedad ? '#c62828' : '#1a237e';
+          var tipoTexto = esFotoNovedad ? 'Novedad' : 'Verificacion aleatoria';
+
+          doc.rect(55, y, 502, 18).fill(headerColor);
+          doc.fill(textColor).fontSize(9).font('Helvetica-Bold')
+            .text('FOTO ' + (fp + 1) + ' - ' + tipoTexto + ': ' + foto.descripcion, 62, y + 5);
+          doc.fill('#000000');
+
+          y += 24;
+
+          // Embed photo or show placeholder
+          if (fotoData.buffer) {
+            try {
+              doc.image(fotoData.buffer, 105, y, { width: 400, height: 250, fit: [400, 250], align: 'center' });
+              y += 260;
+            } catch (imgErr) {
+              doc.rect(105, y, 400, 80).stroke('#cccccc');
+              doc.fill('#757575').fontSize(9).font('Helvetica')
+                .text('[Foto no se pudo incrustar]', 230, y + 35);
+              doc.fill('#000000');
+              y += 90;
+            }
+          } else {
+            doc.rect(105, y, 400, 80).stroke('#cccccc');
+            doc.fill('#757575').fontSize(9).font('Helvetica')
+              .text('[Foto no disponible]', 240, y + 35);
+            doc.fill('#000000');
+            y += 90;
+          }
+
+          // Validation comment
+          var validColor = esFotoNovedad ? '#c62828' : '#2e7d32';
+          doc.fill(validColor).fontSize(8).font('Helvetica')
+            .text('Validacion: ' + (foto.validacion || 'Foto recibida'), 62, y, { width: 490 });
+          doc.fill('#000000');
+
+          y += 25;
+        }
       }
 
       // ===== FIRMA ELECTRONICA =====
