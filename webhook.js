@@ -236,14 +236,10 @@ function registrarWebhook(app) {
             fecha: ahora.toISOString().split('T')[0],
             hora: ahora.toTimeString().split(' ')[0],
             estado: 'completado',
-            llantas: sesion.respuestas.frenos_direccion_llantas || null,
-            frenos_direccion: sesion.respuestas.frenos_direccion_llantas || null,
-            niveles: sesion.respuestas.motor_niveles || null,
-            luces_pitos: sesion.respuestas.electrico_luces || null,
-            documentos: null,
-            cinturon_espejos: sesion.respuestas.cabina_equipo || null,
-            kit_carretera: sesion.respuestas.cabina_equipo || null,
-            carroceria_canasta: null,
+            motor_niveles: sesion.respuestas.motor_niveles || null,
+            electrico_luces: sesion.respuestas.electrico_luces || null,
+            frenos_direccion_llantas: sesion.respuestas.frenos_direccion_llantas || null,
+            cabina_equipo: sesion.respuestas.cabina_equipo || null,
             novedades: sesion.novedades.map(function(n) {
               var prefix = n.critico ? '[CRITICO] ' : '';
               return prefix + n.grupo + ': ' + n.item + ' - ' + (n.nota || '');
