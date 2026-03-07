@@ -5,7 +5,6 @@ var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
 var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
-// Download image from URL and return as Buffer
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
     var client = url.startsWith('https') ? https : http;
@@ -35,7 +34,7 @@ async function generarPDF(sesion) {
 
   return new Promise(function(resolve, reject) {
     try {
-      var doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+      var doc = new PDFDocument({ size: 'LETTER', margin: 45 });
       var chunks = [];
 
       doc.on('data', function(chunk) { chunks.push(chunk); });
@@ -45,267 +44,177 @@ async function generarPDF(sesion) {
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
       var hora = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
-      // ===== ENCABEZADO =====
-      doc.rect(0, 0, 612, 90).fill('#1a237e');
+      var NEGRO = '#1A1A1A';
+      var GRIS_OSCURO = '#333333';
+      var GRIS = '#666666';
+      var GRIS_CLARO = '#999999';
+      var GRIS_FONDO = '#F5F5F5';
+      var GRIS_LINEA = '#E0E0E0';
+      var VERDE = '#2E7D32';
+      var VERDE_CLARO = '#E8F5E9';
+      var ROJO = '#C62828';
+      var ROJO_CLARO = '#FFEBEE';
+      var AMARILLO = '#F9A825';
 
-      // Logo
+      // ===== THIN ACCENT BAR =====
+      doc.rect(0, 0, 612, 5).fill(NEGRO);
+
+      // ===== HEADER WITH LOGO =====
       try {
         var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
-        doc.image(logoBuffer, 30, 8, { width: 75, height: 75 });
-      } catch (e) {
-        console.error('Error cargando logo:', e);
-      }
+        doc.image(logoBuffer, 45, 12, { width: 50, height: 45 });
+      } catch (e) {}
 
-      doc.fill('#ffffff')
-        .fontSize(16)
-        .font('Helvetica-Bold')
-        .text('INSPECCION PREOPERACIONAL DE VEHICULO', 115, 12, { width: 480, align: 'center' });
+      doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold')
+        .text('EDEMSA | CERO SYSTEM', 105, 18);
+      doc.fill(GRIS_CLARO).fontSize(7).font('Helvetica')
+        .text('Inspeccion Preoperacional de Vehiculo', 105, 30);
 
-      doc.fontSize(9)
-        .font('Helvetica')
-        .text('CERO - Sistema de Gestion de Operaciones de Campo', 115, 34, { width: 480, align: 'center' });
+      // Right side
+      doc.fill(GRIS_CLARO).fontSize(7).font('Helvetica')
+        .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 });
+      doc.text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
 
-      doc.fontSize(8)
-        .text('Basado en formato I-GL-001-F04 Rev 05 | Codigo de prueba: CERO-PRE-001', 115, 50, { width: 480, align: 'center' });
+      // Separator
+      doc.moveTo(45, 62).lineTo(567, 62).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
 
-      doc.fontSize(8)
-        .text('Resolucion 40595 de 2022 - Plan Estrategico de Seguridad Vial', 115, 64, { width: 480, align: 'center' });
+      // ===== VEHICLE HERO SECTION =====
+      var y = 72;
 
-      doc.fill('#000000');
+      // Vehicle name large
+      doc.fill(NEGRO).fontSize(20).font('Helvetica-Bold')
+        .text((sesion.vehiculo.marca || '') + ' ' + (sesion.vehiculo.modelo || ''), 45, y);
+      y += 24;
 
-      // ===== DATOS DEL VEHICULO =====
-      var y = 100;
-      doc.rect(50, y, 512, 22).fill('#e8eaf6');
-      doc.fill('#1a237e')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('DATOS DEL VEHICULO', 60, y + 6);
-      doc.fill('#000000');
+      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold')
+        .text(sesion.placa, 45, y);
 
-      y += 30;
-      doc.fontSize(9).font('Helvetica');
+      // Right side vehicle info
+      doc.fill(GRIS).fontSize(8).font('Helvetica')
+        .text(sesion.vehiculo.tipo || '', 420, 74, { align: 'right', width: 147 });
+      doc.text('Anio ' + (sesion.vehiculo.anio || 'N/R'), 420, 86, { align: 'right', width: 147 });
 
-      var datosVehiculo = [
-        ['Placa', sesion.placa],
-        ['Tipo', (sesion.vehiculo.tipo || '') + ' ' + (sesion.vehiculo.marca || '') + ' ' + (sesion.vehiculo.modelo || '')],
-        ['Anio', String(sesion.vehiculo.anio || 'N/R')],
-        ['Kilometraje', sesion.kilometraje + ' km'],
-        ['Fecha', fecha],
-        ['Hora', hora]
+      y += 35;
+      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
+      y += 12;
+
+      // ===== INFO CARDS ROW =====
+      var cardW = 123;
+      var cards = [
+        { label: 'PILOTO', value: sesion.conductor ? sesion.conductor.nombre : 'N/R' },
+        { label: 'LICENCIA', value: sesion.conductor ? 'Cat. ' + (sesion.conductor.licencia_categoria || 'N/R') : 'N/R' },
+        { label: 'ODOMETRO', value: sesion.kilometraje + ' km' },
+        { label: 'FECHA', value: fecha.split(' de ').slice(0,2).join('/') }
       ];
 
-      for (var i = 0; i < datosVehiculo.length; i += 2) {
-        var izq = datosVehiculo[i];
-        var der = datosVehiculo[i + 1];
-        doc.font('Helvetica-Bold').text(izq[0] + ':', 60, y);
-        doc.font('Helvetica').text(izq[1], 150, y);
-        if (der) {
-          doc.font('Helvetica-Bold').text(der[0] + ':', 320, y);
-          doc.font('Helvetica').text(der[1], 410, y);
+      for (var ci = 0; ci < cards.length; ci++) {
+        var cx = 45 + ci * (cardW + 10);
+        doc.rect(cx, y, cardW, 35).fill(GRIS_FONDO);
+        doc.fill(GRIS_CLARO).fontSize(6).font('Helvetica-Bold')
+          .text(cards[ci].label, cx + 8, y + 6, { width: cardW - 16 });
+        doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold')
+          .text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 });
+      }
+
+      y += 48;
+
+      // ===== NOVEDADES CRITICAS (if any, show at top) =====
+      var novedadesCriticas = sesion.novedades.filter(function(n) { return n.critico; });
+
+      if (sesion.novedades.length > 0) {
+        doc.rect(45, y, 522, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(8).font('Helvetica-Bold')
+          .text('NOVEDADES CRITICAS REPORTADAS', 55, y + 5);
+        y += 25;
+
+        for (var ni = 0; ni < sesion.novedades.length; ni++) {
+          var nov = sesion.novedades[ni];
+
+          if (y > 700) { doc.addPage(); y = 50; }
+
+          // Accent bar
+          var novColor = nov.critico ? ROJO : AMARILLO;
+          doc.rect(45, y, 3, 28).fill(novColor);
+
+          // Content
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
+            .text(nov.grupo, 55, y + 2);
+
+          var estadoDesc = nov.nota || '';
+          doc.fill(novColor).fontSize(8).font('Helvetica-Bold')
+            .text(nov.item + (estadoDesc ? ' (' + estadoDesc + ')' : ''), 55, y + 14);
+
+          // Alert tag
+          if (nov.critico) {
+            doc.rect(480, y + 5, 80, 14).fill(ROJO_CLARO);
+            doc.fill(ROJO).fontSize(6).font('Helvetica-Bold')
+              .text('Alerta Supervisor', 485, y + 9);
+          }
+
+          y += 35;
         }
-        y += 16;
       }
 
-      // ===== DATOS DEL CONDUCTOR =====
-      y += 8;
-      doc.rect(50, y, 512, 22).fill('#e8eaf6');
-      doc.fill('#1a237e')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('DATOS DEL CONDUCTOR', 60, y + 6);
-      doc.fill('#000000');
-
-      y += 30;
-      doc.fontSize(9);
-
-      if (sesion.conductor) {
-        doc.font('Helvetica-Bold').text('Nombre:', 60, y);
-        doc.font('Helvetica').text(sesion.conductor.nombre, 150, y);
-        doc.font('Helvetica-Bold').text('Cedula:', 320, y);
-        doc.font('Helvetica').text(sesion.conductor.cedula, 410, y);
-        y += 16;
-        doc.font('Helvetica-Bold').text('Licencia:', 60, y);
-        doc.font('Helvetica').text(sesion.conductor.licencia_categoria || 'N/R', 150, y);
-        doc.font('Helvetica-Bold').text('Telefono:', 320, y);
-        doc.font('Helvetica').text(sesion.conductor.telefono, 410, y);
-      } else {
-        doc.font('Helvetica').text('Conductor no registrado', 60, y);
-      }
-
-      // ===== CONVENCIONES =====
-      y += 25;
-      doc.rect(50, y, 512, 18).fill('#f5f5f5');
-      doc.fontSize(8).font('Helvetica-Bold').fill('#757575');
-      doc.text('Estado especifico por item: Niveles (OK/Bajo/Vacio) | Electricos (Funciona/No funciona) | Equipo (Completo/Incompleto/Falta)', 60, y + 5);
-      doc.fill('#000000');
-
-      // ===== RESULTADO DE LA INSPECCION =====
-      y += 28;
-      doc.rect(50, y, 512, 22).fill('#e8eaf6');
-      doc.fill('#1a237e')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('RESULTADO DE LA INSPECCION', 60, y + 6);
-      doc.fill('#000000');
-
-      y += 30;
-
-      var estadoTexto = { 1: 'Bueno', 2: 'Regular', 3: 'Malo', 4: 'N/A' };
-      var estadoColor = { 1: '#2e7d32', 2: '#f9a825', 3: '#c62828', 4: '#757575' };
-
+      // ===== INSPECTION RESULTS BY BLOCK =====
       for (var g = 0; g < GRUPOS.length; g++) {
         var grupo = GRUPOS[g];
         var respuesta = sesion.respuestas[grupo.id];
         if (!respuesta) continue;
 
-        if (y > 660) {
-          doc.addPage();
-          y = 50;
-        }
+        if (y > 640) { doc.addPage(); y = 50; }
 
-        // Group header
-        doc.rect(60, y, 492, 18).fill('#e8eaf6');
-        doc.fill('#1a237e')
-          .fontSize(9)
-          .font('Helvetica-Bold')
-          .text(grupo.nombre, 65, y + 5);
-        doc.fill('#000000');
-
+        // Block header
+        doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
+          .text(grupo.nombre, 55, y + 4);
         y += 22;
 
-        // Column headers
-        doc.fontSize(7).font('Helvetica-Bold').fill('#757575');
-        doc.text('ITEM', 70, y);
-        doc.text('ESTADO', 250, y);
-        doc.text('CRITICO', 320, y);
-        doc.text('OBSERVACION', 380, y);
-        doc.fill('#000000');
-        y += 14;
-
+        // Items
         for (var j = 0; j < respuesta.items.length; j++) {
           var item = respuesta.items[j];
 
-          if (y > 700) {
-            doc.addPage();
-            y = 50;
+          if (y > 720) { doc.addPage(); y = 50; }
+
+          // Item name
+          doc.fill(NEGRO).fontSize(8).font('Helvetica')
+            .text(item.nombre, 55, y);
+
+          // Estado with contextual description
+          var estadoTexto = item.descripcion_estado || (item.estado === 1 ? 'OK' : item.estado === 2 ? 'Atencion' : item.estado === 3 ? 'Malo' : 'N/A');
+          var estadoColor = item.estado === 1 ? VERDE : item.estado === 2 ? AMARILLO : item.estado === 3 ? ROJO : GRIS_CLARO;
+
+          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold')
+            .text(estadoTexto, 350, y);
+
+          // Status indicator
+          if (item.estado === 1) {
+            doc.fill(VERDE).fontSize(8).font('Helvetica-Bold')
+              .text('OK', 520, y);
+          } else if (item.estado === 2 || item.estado === 3) {
+            // Warning icon
+            doc.rect(515, y - 1, 40, 12).fill(item.estado === 2 ? AMARILLO : ROJO);
+            doc.fill('#ffffff').fontSize(6).font('Helvetica-Bold')
+              .text(item.estado === 2 ? 'ATENCION' : 'CRITICO', 518, y + 1);
           }
 
-          // Alternate row background
-          if (j % 2 === 0) {
-            doc.rect(60, y - 2, 492, 14).fill('#fafafa');
-          }
-
-          doc.fontSize(8).font('Helvetica').fill('#000000');
-          doc.text('  ' + item.nombre, 70, y);
-
-          var color = estadoColor[item.estado] || '#000000';
-          var textoEstado = item.descripcion_estado || estadoTexto[item.estado] || 'N/R';
-          doc.fill(color).font('Helvetica-Bold')
-            .text(textoEstado, 250, y);
-
-          // Find if item is critical
-          var esCritico = false;
-          for (var k = 0; k < grupo.items.length; k++) {
-            if (grupo.items[k].nombre === item.nombre) {
-              esCritico = grupo.items[k].critico;
-              break;
-            }
-          }
-          doc.fill(esCritico ? '#c62828' : '#757575')
-            .font('Helvetica')
-            .fontSize(7)
-            .text(esCritico ? 'SI' : 'NO', 330, y);
-
-          doc.fill('#000000');
-          if (item.nota) {
-            doc.font('Helvetica').fontSize(7).fill('#c62828')
-              .text(item.nota, 380, y, { width: 170 });
-            doc.fill('#000000');
-          }
-
-          y += 14;
+          y += 4;
+          doc.moveTo(55, y).lineTo(560, y).strokeColor(GRIS_LINEA).lineWidth(0.3).stroke();
+          y += 10;
         }
-        y += 6;
-      }
-
-      // ===== NOVEDADES =====
-      if (sesion.novedades.length > 0) {
-        if (y > 620) {
-          doc.addPage();
-          y = 50;
-        }
-
-        y += 8;
-        doc.rect(50, y, 512, 22).fill('#ffebee');
-        doc.fill('#c62828')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('NOVEDADES REPORTADAS', 60, y + 6);
-        doc.fill('#000000');
-
-        y += 30;
-
-        for (var n = 0; n < sesion.novedades.length; n++) {
-          var novedad = sesion.novedades[n];
-
-          if (y > 700) {
-            doc.addPage();
-            y = 50;
-          }
-
-          // Check if critical
-          var novedadCritica = false;
-          for (var gc = 0; gc < GRUPOS.length; gc++) {
-            if (GRUPOS[gc].nombre === novedad.grupo) {
-              for (var ic = 0; ic < GRUPOS[gc].items.length; ic++) {
-                if (GRUPOS[gc].items[ic].nombre === novedad.item) {
-                  novedadCritica = GRUPOS[gc].items[ic].critico;
-                }
-              }
-            }
-          }
-
-          var prefijo = novedadCritica ? '!! CRITICO - ' : '! ';
-
-          doc.fontSize(9).font('Helvetica-Bold').fill('#c62828')
-            .text(prefijo + novedad.grupo + ' - ' + novedad.item, 70, y);
-
-          if (novedad.nota) {
-            doc.font('Helvetica').fill('#000000').fontSize(8)
-              .text('  ' + novedad.nota, 70, y + 13);
-            y += 13;
-          }
-          doc.fill('#000000');
-          y += 16;
-        }
-
-        if (novedadCritica) {
-          y += 5;
-          doc.rect(60, y, 492, 16).fill('#ffebee');
-          doc.fontSize(8).font('Helvetica-Bold').fill('#c62828')
-            .text('ALERTA: Se notifico al supervisor sobre items criticos con novedad', 70, y + 4);
-          doc.fill('#000000');
-          y += 20;
-        }
+        y += 5;
       }
 
       // ===== OBSERVACIONES =====
       if (sesion.observacion) {
-        if (y > 660) {
-          doc.addPage();
-          y = 50;
-        }
+        if (y > 680) { doc.addPage(); y = 50; }
 
-        y += 8;
-        doc.rect(50, y, 512, 22).fill('#e8eaf6');
-        doc.fill('#1a237e')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('OBSERVACIONES', 60, y + 6);
-        doc.fill('#000000');
+        doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
+          .text('OBSERVACIONES', 55, y + 4);
+        y += 22;
 
-        y += 30;
-        doc.fontSize(9).font('Helvetica').text(sesion.observacion, 60, y, { width: 492 });
+        doc.fill(GRIS_OSCURO).fontSize(8).font('Helvetica')
+          .text(sesion.observacion, 55, y, { width: 500 });
         y += 25;
       }
 
@@ -314,105 +223,94 @@ async function generarPDF(sesion) {
         doc.addPage();
         y = 50;
 
-        doc.rect(50, y, 512, 22).fill('#1a237e');
-        doc.fill('#ffffff')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('EVIDENCIA FOTOGRAFICA', 60, y + 6);
-        doc.fill('#000000');
+        doc.rect(0, 0, 612, 5).fill(NEGRO);
 
-        y += 32;
+        doc.rect(45, y, 522, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
+          .text('EVIDENCIA FOTOGRAFICA (VALIDACION IA)', 55, y + 4);
+        y += 30;
 
         for (var fp = 0; fp < fotosDescargadas.length; fp++) {
           var fotoData = fotosDescargadas[fp];
           var foto = fotoData.info;
 
-          if (y > 500) {
-            doc.addPage();
-            y = 50;
-          }
+          if (y > 480) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
 
-          // Photo header
           var esFotoNovedad = foto.tipo === 'novedad';
-          var headerColor = esFotoNovedad ? '#ffebee' : '#e8eaf6';
-          var textColor = esFotoNovedad ? '#c62828' : '#1a237e';
-          var tipoTexto = esFotoNovedad ? 'Novedad' : 'Verificacion aleatoria';
 
-          doc.rect(55, y, 502, 18).fill(headerColor);
-          doc.fill(textColor).fontSize(9).font('Helvetica-Bold')
-            .text('FOTO ' + (fp + 1) + ' - ' + tipoTexto + ': ' + foto.descripcion, 62, y + 5);
-          doc.fill('#000000');
+          // Photo label
+          var fotoLabel = esFotoNovedad ? 'NOVEDAD' : 'VERIFICACION';
+          var labelColor = esFotoNovedad ? ROJO : VERDE;
 
-          y += 24;
+          doc.rect(45, y, 70, 14).fill(labelColor);
+          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold')
+            .text(fotoLabel, 50, y + 3);
 
-          // Embed photo or show placeholder
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
+            .text(foto.descripcion, 125, y + 2);
+
+          y += 20;
+
+          // Photo
           if (fotoData.buffer) {
             try {
-              doc.image(fotoData.buffer, 105, y, { width: 400, height: 250, fit: [400, 250], align: 'center' });
-              y += 260;
+              doc.image(fotoData.buffer, 80, y, { width: 380, height: 220, fit: [380, 220], align: 'center' });
+              y += 230;
             } catch (imgErr) {
-              doc.rect(105, y, 400, 80).stroke('#cccccc');
-              doc.fill('#757575').fontSize(9).font('Helvetica')
-                .text('[Foto no se pudo incrustar]', 230, y + 35);
-              doc.fill('#000000');
+              doc.rect(80, y, 380, 80).strokeColor(GRIS_LINEA).lineWidth(1).stroke();
+              doc.fill(GRIS_CLARO).fontSize(8).font('Helvetica')
+                .text('[Foto no se pudo incrustar]', 210, y + 35);
               y += 90;
             }
           } else {
-            doc.rect(105, y, 400, 80).stroke('#cccccc');
-            doc.fill('#757575').fontSize(9).font('Helvetica')
-              .text('[Foto no disponible]', 240, y + 35);
-            doc.fill('#000000');
+            doc.rect(80, y, 380, 80).strokeColor(GRIS_LINEA).lineWidth(1).stroke();
+            doc.fill(GRIS_CLARO).fontSize(8).font('Helvetica')
+              .text('[Foto no disponible]', 220, y + 35);
             y += 90;
           }
 
           // Validation comment
-          var validColor = esFotoNovedad ? '#c62828' : '#2e7d32';
-          doc.fill(validColor).fontSize(8).font('Helvetica')
-            .text('Validacion: ' + (foto.validacion || 'Foto recibida'), 62, y, { width: 490 });
-          doc.fill('#000000');
-
+          doc.fill(esFotoNovedad ? ROJO : VERDE).fontSize(7).font('Helvetica')
+            .text('IA: ' + (foto.validacion || 'Foto recibida'), 80, y, { width: 380 });
           y += 25;
         }
       }
 
       // ===== FIRMA ELECTRONICA =====
-      if (y > 620) {
-        doc.addPage();
-        y = 50;
-      }
+      if (y > 600) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
 
       y += 15;
-      doc.rect(50, y, 512, 22).fill('#e8f5e9');
-      doc.fill('#2e7d32')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('FIRMA ELECTRONICA', 60, y + 6);
-      doc.fill('#000000');
+      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
+      y += 10;
 
+      doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
+        .text('VERIFICACION Y TRAZABILIDAD LEGAL', 45, y);
+      y += 14;
+
+      doc.fill(GRIS_OSCURO).fontSize(7).font('Helvetica');
+
+      var firmaTexto = 'Firma: Firmado digitalmente por ' + (sesion.conductor ? sesion.conductor.nombre : 'Conductor') + ' mediante WhatsApp (' + (sesion.conductor ? sesion.conductor.telefono : 'N/R') + ')';
+      doc.text(firmaTexto, 45, y, { width: 520 });
+      y += 12;
+
+      var idTransaccion = 'CERO-' + sesion.placa + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
+      doc.text('Timestamp: ' + ahora.toLocaleString('es-CO') + ' | ID Transaccion: ' + idTransaccion, 45, y, { width: 520 });
+      y += 12;
+
+      doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', 45, y, { width: 520 });
+
+      // ===== FOOTER BRANDING =====
       y += 30;
-      doc.fontSize(9).font('Helvetica');
+      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
+      y += 10;
 
-      var firmaData = [
-        ['Confirmacion', 'SI - Firmado por WhatsApp'],
-        ['Conductor', sesion.conductor ? sesion.conductor.nombre : 'No registrado'],
-        ['Telefono', sesion.conductor ? sesion.conductor.telefono : 'N/R'],
-        ['Fecha y hora', ahora.toLocaleString('es-CO')],
-        ['Base legal', 'Ley 527/1999 - Decreto 2364/2012 - Firma electronica simple']
-      ];
+      doc.rect(45, y, 522, 35).fill(NEGRO);
+      doc.fill('#ffffff').fontSize(7).font('Helvetica')
+        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia', 55, y + 6, { width: 400 });
+      doc.text('fotografica y valida cada paso legalmente con firmas digitales.', 55, y + 17, { width: 400 });
 
-      for (var f = 0; f < firmaData.length; f++) {
-        doc.font('Helvetica-Bold').text(firmaData[f][0] + ':', 60, y);
-        doc.font('Helvetica').text(firmaData[f][1], 200, y);
-        y += 15;
-      }
-
-      // ===== PIE DE PAGINA =====
-      y += 25;
-      doc.rect(50, y, 512, 1).fill('#cccccc');
-      y += 8;
-      doc.fontSize(7).fill('#999999').font('Helvetica')
-        .text('Documento generado automaticamente por CERO - ' + ahora.toLocaleString('es-CO'), 50, y, { align: 'center' });
-      doc.text('Formato basado en I-GL-001-F04 Rev 05 | Valido segun Resolucion 40595 de 2022 - PESV', 50, y + 10, { align: 'center' });
+      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold')
+        .text('CERO', 490, y + 10);
 
       doc.end();
     } catch (error) {
