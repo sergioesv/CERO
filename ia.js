@@ -1,98 +1,91 @@
-var config = require('./config');
-var axios = require('axios'); // Asegúrate de tener axios en tu package.json
+const Anthropic = require('@anthropic-ai/sdk');
+const axios = require('axios');
+const { ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('./config');
 
-var MODELO_TEXTO = 'claude-haiku-4-5-20251001';
-var MODELO_VISION = 'claude-sonnet-4-20250514';
+const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-// Función auxiliar para descargar de Twilio con Auth y seguir redirecciones
+// Descargar imagen con autenticación Twilio
 async function descargarImagen(url) {
   try {
-    var auth = Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64');
-    var response = await axios({
-      method: 'get',
-      url: url,
+    const isTwilio = url.includes('api.twilio.com');
+    const config = {
       responseType: 'arraybuffer',
-      headers: { 'Authorization': 'Basic ' + auth },
       maxRedirects: 5
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error descargando imagen de Twilio:', error.message);
-    return null;
-  }
-}
-
-async function interpretarNovedad(grupo, mensaje) {
-  try {
-    var itemsTexto = grupo.items.map(function(i) { return i.nombre; }).join(', ');
-
-    var response = await config.anthropic.messages.create({
-      model: MODELO_TEXTO,
-      max_tokens: 600,
-      messages: [{
-        role: 'user',
-        content: 'Eres el sistema CERO de inspeccion vehicular colombiano. El operario reporta una novedad en el grupo "' + grupo.nombre + '" con estos items: ' + itemsTexto + '.\n\nEl operario escribio: "' + mensaje + '"\n\nIMPORTANTE: Interpreta segun el tipo de item:\n- Niveles de liquidos (aceite, refrigerante, frenos): OK / Bajo / Vacio\n- Fugas: Sin fugas / Con fugas\n- Llantas: OK / Desgastada / Danada / Sin presion\n- Luces y electricos: Funciona / Intermitente / No funciona\n- Frenos y pedales: Funciona / Duro o flojo / No funciona\n- Equipo carretera: Completo / Incompleto / Falta\n- Cinturones y espejos: OK / Danado / Falta\n- General: OK / Regular / Malo\n\nEl operario puede escribir con errores, jerga colombiana o frases incompletas. Ejemplos: "aceite bajito" = nivel bajo, "llanta lisa" = desgastada, "no hay extintor" = falta, "pito no suena" = no funciona.\n\nIdentifica cuales items tienen problema y cuales estan bien. Responde SOLO en JSON:\n{\n  "items": [\n    {"nombre": "nombre del item", "estado": 1, "nota": null, "descripcion_estado": "OK"},\n    {"nombre": "nombre del item", "estado": 2, "nota": "lo que dijo el operario", "descripcion_estado": "Nivel bajo"}\n  ],\n  "resumen": "texto corto confirmando lo que entendiste"\n}\n\nEstado 1=OK, 2=Requiere atencion, 3=Critico/Malo, 4=N/A.\nEl campo "descripcion_estado" debe ser especifico al tipo de item.'
-      }]
-    });
-
-    var texto = response.content[0].text.trim();
-    var jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      var resultado = JSON.parse(jsonMatch[0]);
-      resultado.hay_novedad = true;
-      return resultado;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error Claude interpretacion:', error);
-    return null;
-  }
-}
-
-function marcarTodoOK(grupo) {
-  var items = grupo.items.map(function(i) {
-    var descripcion = 'OK';
-    var nombre = i.nombre.toLowerCase();
-    if (nombre.indexOf('aceite') >= 0 || nombre.indexOf('refrigerante') >= 0 || nombre.indexOf('liquido') >= 0) {
-      descripcion = 'Nivel OK';
-    } else if (nombre.indexOf('fugas') >= 0) {
-      descripcion = 'Sin fugas';
-    } else if (nombre.indexOf('luces') >= 0 || nombre.indexOf('stops') >= 0 || nombre.indexOf('pito') >= 0 || nombre.indexOf('tablero') >= 0) {
-      descripcion = 'Funciona';
-    } else if (nombre.indexOf('freno') >= 0 || nombre.indexOf('pedal') >= 0) {
-      descripcion = 'Funciona';
-    } else if (nombre.indexOf('equipo') >= 0) {
-      descripcion = 'Completo';
-    }
-    return {
-      nombre: i.nombre,
-      estado: 1,
-      nota: null,
-      descripcion_estado: descripcion
     };
-  });
 
+    if (isTwilio) {
+      config.auth = {
+        username: TWILIO_ACCOUNT_SID,
+        password: TWILIO_AUTH_TOKEN
+      };
+    }
+
+    const response = await axios.get(url, config);
+    const base64 = Buffer.from(response.data).toString('base64');
+    const mediaType = response.headers['content-type'] || 'image/jpeg';
+    
+    return { base64, mediaType };
+  } catch (error) {
+    console.error('Error descargando imagen:', error.message);
+    throw new Error('No se pudo descargar la imagen');
+  }
+}
+
+// Marcar todo OK sin IA
+function marcarTodoOK() {
   return {
-    items: items,
-    hay_novedad: false,
-    resumen: 'Todo OK'
+    estado: 'OK',
+    items: [],
+    observacion: null
   };
 }
 
-async function validarFoto(mediaUrl, descripcionEsperada) {
+// Interpretar novedad con Haiku
+async function interpretarNovedad(texto, items) {
+  const prompt = `Eres asistente de inspección vehicular. El operario reportó: "${texto}"
+
+Items del bloque: ${items.join(', ')}
+
+Clasifica cada item mencionado:
+- Niveles: OK / Bajo / Vacío
+- Fugas: Sin fugas / Con fugas
+- Llantas: OK / Desgastada / Dañada
+- Luces/Eléctricos: Funciona / Intermitente / No funciona
+- Frenos/Pedales: Funciona / Duro o flojo / No funciona
+- Equipo: Completo / Incompleto / Falta
+- Cinturones/Espejos: OK / Dañado / Falta
+
+Responde SOLO en JSON:
+{
+  "items": [
+    {"nombre": "Aceite", "estado": "Bajo", "critico": true}
+  ],
+  "observacion": "texto original del operario"
+}`;
+
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 500,
+    messages: [{ role: 'user', content: prompt }]
+  });
+
+  const respuesta = message.content[0].text;
+  const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
+  
+  if (!jsonMatch) {
+    throw new Error('IA no devolvió JSON válido');
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+// Validar foto con Sonnet Vision
+async function validarFoto(urlFoto, descripcionEsperada) {
   try {
-    // 1. Descargamos la imagen primero (Fase 1: Manejo de autenticación)
-    var imagenBuffer = await descargarImagen(mediaUrl);
-    if (!imagenBuffer) {
-        return { valida: true, descripcion: 'Error al descargar imagen para validacion', razon_rechazo: null };
-    }
+    const { base64, mediaType } = await descargarImagen(urlFoto);
 
-    // 2. Convertimos a Base64 para Claude
-    var base64Imagen = imagenBuffer.toString('base64');
-
-    // 3. Enviamos a Claude Vision
-    var response = await config.anthropic.messages.create({
-      model: MODELO_VISION,
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
       messages: [{
         role: 'user',
@@ -101,28 +94,46 @@ async function validarFoto(mediaUrl, descripcionEsperada) {
             type: 'image',
             source: {
               type: 'base64',
-              media_type: 'image/jpeg',
-              data: base64Imagen
+              media_type: mediaType,
+              data: base64
             }
           },
           {
             type: 'text',
-            text: 'Eres el validador de fotos del sistema CERO de inspeccion vehicular. Se pidio al operario: "' + descripcionEsperada + '".\n\nAnaliza la foto y responde SOLO en JSON:\n{\n  "valida": true o false,\n  "descripcion": "que se ve en la foto",\n  "razon_rechazo": null o "por que no es valida"\n}'
+            text: `¿Esta foto muestra "${descripcionEsperada}" de un vehículo?
+
+Responde SOLO en JSON:
+{
+  "valida": true/false,
+  "razon": "descripción breve",
+  "comentario": "lo que ves en la foto"
+}`
           }
         ]
       }]
     });
 
-    var texto = response.content[0].text.trim();
-    var jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    const respuesta = message.content[0].text;
+    const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
+    
+    if (!jsonMatch) {
+      return { valida: false, razon: 'Error de validación', comentario: '' };
     }
-    return { valida: true, descripcion: 'No se pudo validar', razon_rechazo: null };
+
+    return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    console.error('Error validacion foto:', error);
-    return { valida: true, descripcion: 'Error en validacion', razon_rechazo: null };
+    console.error('Error validando foto:', error.message);
+    return { 
+      valida: false, 
+      razon: 'Error al procesar imagen',
+      comentario: error.message 
+    };
   }
 }
 
-module.exports = { interpretarNovedad, marcarTodoOK, validarFoto };
+module.exports = {
+  marcarTodoOK,
+  interpretarNovedad,
+  validarFoto,
+  descargarImagen
+};
