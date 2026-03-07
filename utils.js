@@ -9,8 +9,21 @@ function responderTwiml(res, mensaje) {
   res.send(twiml);
 }
 
+function formatGrupoMsg(grupo, prefijo) {
+  var msg = prefijo ? (prefijo + '\n\n') : '';
+  msg += '*' + grupo.nombre + '*\n';
+  msg += grupo.abreviado + '\n';
+  msg += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+  msg += '1\u20e3 Todo OK\n';
+  msg += '2\u20e3 Novedad\n';
+  msg += '3\u20e3 Atras';
+  return msg;
+}
+
 function generarResumen(sesion) {
-  var resumen = 'Revision completa - RESUMEN ' + sesion.placa + '\n';
+  var resumen = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+  resumen += '*RESUMEN ' + sesion.placa + '*\n';
+  resumen += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
   var hayNovedades = false;
 
   for (var g = 0; g < GRUPOS.length; g++) {
@@ -25,19 +38,19 @@ function generarResumen(sesion) {
       hayNovedades = true;
       for (var m = 0; m < itemsMalos.length; m++) {
         var item = itemsMalos[m];
-        var icono = item.estado === 2 ? '[!]' : '[X]';
-        resumen += icono + ' ' + grupo.nombre + ' - ' + item.nombre;
-        if (item.nota) resumen += ' . ' + item.nota;
+        var icono = item.estado === 3 ? '\u26a0\ufe0f' : '\u26a0\ufe0f';
+        resumen += icono + ' *' + item.nombre + '* - ' + (item.descripcion_estado || (item.estado === 2 ? 'Atencion' : 'Critico'));
+        if (item.nota) resumen += '\n    _' + item.nota + '_';
         resumen += '\n';
       }
       for (var n = 0; n < itemsNA.length; n++) {
-        resumen += '[ ] ' + grupo.nombre + ' - ' + itemsNA[n].nombre + ' N/A\n';
+        resumen += '\u25cb ' + itemsNA[n].nombre + ' - N/A\n';
       }
     }
   }
 
   if (!hayNovedades) {
-    resumen += 'Todo en buen estado - sin novedades';
+    resumen += '\u2705 Todo en buen estado';
   }
 
   return resumen;
@@ -56,4 +69,4 @@ function esCritico(grupoId, itemNombre) {
   return false;
 }
 
-module.exports = { responderTwiml, generarResumen, esCritico };
+module.exports = { responderTwiml, generarResumen, esCritico, formatGrupoMsg };
