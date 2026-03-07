@@ -9,7 +9,7 @@ var utils = require('./utils');
 function registrarWebhook(app) {
 
   app.get('/', function(req, res) {
-    res.send('CERO esta corriendo - v2 con 4 bloques');
+    res.send('CERO v2 corriendo - modelo hibrido');
   });
 
   app.post('/webhook', async function(req, res) {
@@ -49,18 +49,40 @@ function registrarWebhook(app) {
           sesion.grupoActual--;
           var grupoAnterior = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[grupoAnterior.id];
-          return utils.responderTwiml(res, 'Volvemos al bloque anterior.\n' + grupoAnterior.nombre + '\n(' + grupoAnterior.abreviado + ')');
+          var msgAtras = 'Volvemos al bloque anterior.\n\n';
+          msgAtras += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
+          msgAtras += grupoAnterior.nombre + '\n';
+          msgAtras += grupoAnterior.abreviado + '\n\n';
+          msgAtras += '1\u20e3 Todo OK\n';
+          msgAtras += '2\u20e3 Novedad (describe cual)';
+          return utils.responderTwiml(res, msgAtras);
         }
         if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
           sesion.estado = 'ESPERANDO_KILOMETRAJE';
           return utils.responderTwiml(res, 'Volvemos. Kilometraje actual?');
+        }
+        if (sesion.estado === 'DESCRIBIR_NOVEDAD') {
+          sesion.estado = 'GRUPO';
+          var grupoVolver = GRUPOS[sesion.grupoActual];
+          var msgVolver = 'Volvemos.\n\n';
+          msgVolver += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
+          msgVolver += grupoVolver.nombre + '\n';
+          msgVolver += grupoVolver.abreviado + '\n\n';
+          msgVolver += '1\u20e3 Todo OK\n';
+          msgVolver += '2\u20e3 Novedad (describe cual)';
+          return utils.responderTwiml(res, msgVolver);
         }
         if (sesion.estado === 'FOTO_VERIFICACION') {
           sesion.grupoActual = GRUPOS.length - 1;
           sesion.estado = 'GRUPO';
           var ultimoGrupo = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[ultimoGrupo.id];
-          return utils.responderTwiml(res, 'Volvemos al ultimo bloque.\n' + ultimoGrupo.nombre + '\n(' + ultimoGrupo.abreviado + ')');
+          var msgUlt = 'Volvemos al ultimo bloque.\n\n';
+          msgUlt += ultimoGrupo.nombre + '\n';
+          msgUlt += ultimoGrupo.abreviado + '\n\n';
+          msgUlt += '1\u20e3 Todo OK\n';
+          msgUlt += '2\u20e3 Novedad (describe cual)';
+          return utils.responderTwiml(res, msgUlt);
         }
         if (sesion.estado === 'OBSERVACION') {
           sesion.estado = 'FOTO_VERIFICACION';
@@ -73,8 +95,7 @@ function registrarWebhook(app) {
         }
         return utils.responderTwiml(res, 'No se puede retroceder desde aqui. Escribe CANCELAR para salir o continua.');
       }
-      
-      
+
       switch (sesion.estado) {
 
         // ==================== INICIO ====================
@@ -136,57 +157,109 @@ function registrarWebhook(app) {
           sesion.estado = 'GRUPO';
 
           var grupo = GRUPOS[0];
-          return utils.responderTwiml(res,
-            'BLOQUE 1 de 4\n' + grupo.nombre + '\n(' + grupo.abreviado + ')\n1=Bueno 2=Regular 3=Malo 4=N/A\nResponde todo junto. Si hay novedad, describela.'
-          );
+          var msgGrupo = 'BLOQUE 1 de 4\n';
+          msgGrupo += grupo.nombre + '\n';
+          msgGrupo += grupo.abreviado + '\n\n';
+          msgGrupo += '1\u20e3 Todo OK\n';
+          msgGrupo += '2\u20e3 Novedad (describe cual)';
+
+          return utils.responderTwiml(res, msgGrupo);
         }
 
-        // ==================== GRUPOS ====================
+        // ==================== GRUPOS — FORMULARIO HIBRIDO ====================
         case 'GRUPO': {
           var grupoActual = GRUPOS[sesion.grupoActual];
-          var interpretacion = await ia.interpretarRespuesta(grupoActual, mensaje);
+          var respLimpia = mensaje.trim();
 
-          if (!interpretacion) {
-            return utils.responderTwiml(res, 'No entendi la respuesta. Intenta de nuevo con numeros o describe el estado.');
+          // 1️⃣ Todo OK — sin IA, respuesta instantanea
+          if (respLimpia === '1' || respLimpia === '1️⃣' || respLimpia.toLowerCase() === 'ok' || respLimpia.toLowerCase() === 'todo bien') {
+            sesion.respuestas[grupoActual.id] = ia.marcarTodoOK(grupoActual);
+
+            sesion.grupoActual++;
+
+            if (sesion.grupoActual < GRUPOS.length) {
+              var sig = GRUPOS[sesion.grupoActual];
+              var msgSig = 'OK\n\n';
+              msgSig += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
+              msgSig += sig.nombre + '\n';
+              msgSig += sig.abreviado + '\n\n';
+              msgSig += '1\u20e3 Todo OK\n';
+              msgSig += '2\u20e3 Novedad (describe cual)';
+              return utils.responderTwiml(res, msgSig);
+            }
+
+            // All groups done
+            var resumen = utils.generarResumen(sesion);
+            sesion.estado = 'FOTO_VERIFICACION';
+            sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
+            return utils.responderTwiml(res,
+              resumen + '\n\nFOTO 1 - Verificacion aleatoria\n' + sesion.fotoVerificacionDescripcion
+            );
           }
 
-          sesion.respuestas[grupoActual.id] = interpretacion;
+          // 2️⃣ Novedad — pedir descripcion
+          if (respLimpia === '2' || respLimpia === '2️⃣') {
+            sesion.estado = 'DESCRIBIR_NOVEDAD';
+            return utils.responderTwiml(res, 'Describe la novedad en ' + grupoActual.nombre + '.\nEscribe lo que encontraste (ej: "aceite bajo", "llanta lisa", "no hay extintor")');
+          }
 
-          if (interpretacion.hay_novedad) {
-            var novedadesGrupo = interpretacion.items
-              .filter(function(i) { return i.estado === 2 || i.estado === 3; })
-              .map(function(i) {
-                return {
-                  grupo: grupoActual.nombre,
-                  item: i.nombre,
-                  estado: i.estado,
-                  nota: i.nota,
-                  critico: utils.esCritico(grupoActual.id, i.nombre)
-                };
-              });
-            for (var x = 0; x < novedadesGrupo.length; x++) {
-              sesion.novedades.push(novedadesGrupo[x]);
-            }
+          // Si escribe texto directamente (no 1 ni 2), asumimos que es una novedad
+          sesion.estado = 'DESCRIBIR_NOVEDAD';
+          // Process the message as novelty description directly (fall through)
+        }
+
+        // ==================== DESCRIBIR NOVEDAD — AQUI ENTRA LA IA ====================
+        case 'DESCRIBIR_NOVEDAD': {
+          // Prevent fall-through issues
+          if (sesion.estado !== 'DESCRIBIR_NOVEDAD') break;
+
+          var grupoNovedad = GRUPOS[sesion.grupoActual];
+          var interpretacion = await ia.interpretarNovedad(grupoNovedad, mensaje);
+
+          if (!interpretacion) {
+            return utils.responderTwiml(res, 'No entendi. Describe la novedad de nuevo (ej: "aceite bajo", "llanta danada")');
+          }
+
+          sesion.respuestas[grupoNovedad.id] = interpretacion;
+
+          // Collect novelties
+          var novedadesGrupo = interpretacion.items
+            .filter(function(i) { return i.estado === 2 || i.estado === 3; })
+            .map(function(i) {
+              return {
+                grupo: grupoNovedad.nombre,
+                item: i.nombre,
+                estado: i.estado,
+                nota: i.nota,
+                critico: utils.esCritico(grupoNovedad.id, i.nombre)
+              };
+            });
+          for (var x = 0; x < novedadesGrupo.length; x++) {
+            sesion.novedades.push(novedadesGrupo[x]);
           }
 
           var confirmacion = interpretacion.resumen ? interpretacion.resumen + '\n\n' : '';
 
           sesion.grupoActual++;
+          sesion.estado = 'GRUPO';
 
           if (sesion.grupoActual < GRUPOS.length) {
-            var siguiente = GRUPOS[sesion.grupoActual];
-            return utils.responderTwiml(res,
-              confirmacion + 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n' + siguiente.nombre + '\n(' + siguiente.abreviado + ')'
-            );
+            var sigNov = GRUPOS[sesion.grupoActual];
+            var msgNov = confirmacion;
+            msgNov += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
+            msgNov += sigNov.nombre + '\n';
+            msgNov += sigNov.abreviado + '\n\n';
+            msgNov += '1\u20e3 Todo OK\n';
+            msgNov += '2\u20e3 Novedad (describe cual)';
+            return utils.responderTwiml(res, msgNov);
           }
 
-          // All groups done - show summary
-          var resumen = utils.generarResumen(sesion);
+          // All groups done
+          var resumenNov = utils.generarResumen(sesion);
           sesion.estado = 'FOTO_VERIFICACION';
           sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
-
           return utils.responderTwiml(res,
-            resumen + '\n\nFOTO 1 - Verificacion aleatoria\n' + sesion.fotoVerificacionDescripcion
+            confirmacion + resumenNov + '\n\nFOTO 1 - Verificacion aleatoria\n' + sesion.fotoVerificacionDescripcion
           );
         }
 
@@ -339,7 +412,6 @@ function registrarWebhook(app) {
           var novedadesCriticas = sesion.novedades.filter(function(n) { return n.critico; });
           if (novedadesCriticas.length > 0) {
             console.log('ALERTA SUPERVISOR: ' + novedadesCriticas.length + ' items criticos en ' + sesion.placa);
-            // TODO: Send alert to supervisor via WhatsApp
           }
 
           // Copy session data before deleting
