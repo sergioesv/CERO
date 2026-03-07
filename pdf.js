@@ -226,9 +226,9 @@ async function generarPDF(sesion) {
               .text(item.estado === 2 ? 'ATENCION' : 'CRITICO', 518, y + 1);
           }
 
-          y += 4;
+          y += 12;
           doc.moveTo(55, y).lineTo(560, y).strokeColor(GRIS_LINEA).lineWidth(0.3).stroke();
-          y += 10;
+          y += 8;
         }
         y += 5;
       }
