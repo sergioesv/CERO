@@ -28,14 +28,14 @@ function registrarWebhook(app) {
 
       if (msgUpper === 'CANCELAR') {
         sesiones.eliminarSesion(telefono);
-        return utils.responderTwiml(res, 'Preoperacional cancelado. Escribe cualquier mensaje para empezar de nuevo.');
+        return utils.responderTwiml(res, '\u274c Preoperacional cancelado.\nEscribe cualquier mensaje para empezar de nuevo.');
       }
 
       if (msgUpper === 'REINICIAR') {
         sesiones.eliminarSesion(telefono);
         sesion = sesiones.obtenerSesion(telefono);
         sesion.estado = 'ESPERANDO_PLACA';
-        return utils.responderTwiml(res, 'BOT MTO - CERO\nReiniciado. Placa del vehiculo?');
+        return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nReiniciado. Placa del vehiculo?');
       }
 
       if (msgUpper === 'ATRAS') {
@@ -43,60 +43,40 @@ function registrarWebhook(app) {
           sesion.estado = 'ESPERANDO_PLACA';
           sesion.placa = null;
           sesion.vehiculo = null;
-          return utils.responderTwiml(res, 'Volvemos. Placa del vehiculo?');
+          return utils.responderTwiml(res, '\u25c0\ufe0f Placa del vehiculo?');
         }
         if (sesion.estado === 'GRUPO' && sesion.grupoActual > 0) {
           sesion.grupoActual--;
           var grupoAnterior = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[grupoAnterior.id];
-          var msgAtras = 'Volvemos al bloque anterior.\n\n';
-          msgAtras += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
-          msgAtras += grupoAnterior.nombre + '\n';
-          msgAtras += grupoAnterior.abreviado + '\n\n';
-          msgAtras += '1\u20e3 Todo OK\n';
-          msgAtras += '2\u20e3 Novedad (describe cual)\n';
-          msgAtras += '3\u20e3 Atras';
-          return utils.responderTwiml(res, msgAtras);
+          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnterior, '\u25c0\ufe0f Volvemos'));
         }
         if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
           sesion.estado = 'ESPERANDO_KILOMETRAJE';
-          return utils.responderTwiml(res, 'Volvemos. Kilometraje actual?');
+          return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
         }
         if (sesion.estado === 'DESCRIBIR_NOVEDAD') {
           sesion.estado = 'GRUPO';
           var grupoVolver = GRUPOS[sesion.grupoActual];
-          var msgVolver = 'Volvemos.\n\n';
-          msgVolver += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
-          msgVolver += grupoVolver.nombre + '\n';
-          msgVolver += grupoVolver.abreviado + '\n\n';
-          msgVolver += '1\u20e3 Todo OK\n';
-          msgVolver += '2\u20e3 Novedad (describe cual)\n';
-          msgVolver += '3\u20e3 Atras';
-          return utils.responderTwiml(res, msgVolver);
+          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoVolver, '\u25c0\ufe0f Volvemos'));
         }
         if (sesion.estado === 'FOTO_VERIFICACION') {
           sesion.grupoActual = GRUPOS.length - 1;
           sesion.estado = 'GRUPO';
           var ultimoGrupo = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[ultimoGrupo.id];
-          var msgUlt = 'Volvemos al ultimo bloque.\n\n';
-          msgUlt += ultimoGrupo.nombre + '\n';
-          msgUlt += ultimoGrupo.abreviado + '\n\n';
-          msgUlt += '1\u20e3 Todo OK\n';
-          msgUlt += '2\u20e3 Novedad (describe cual)\n';
-          msgUlt += '3\u20e3 Atras';
-          return utils.responderTwiml(res, msgUlt);
+          return utils.responderTwiml(res, utils.formatGrupoMsg(ultimoGrupo, '\u25c0\ufe0f Volvemos'));
         }
         if (sesion.estado === 'OBSERVACION') {
           sesion.estado = 'FOTO_VERIFICACION';
           sesion.fotos.pop();
-          return utils.responderTwiml(res, 'Volvemos. ' + sesion.fotoVerificacionDescripcion);
+          return utils.responderTwiml(res, '\u25c0\ufe0f ' + sesion.fotoVerificacionDescripcion);
         }
         if (sesion.estado === 'CONFIRMACION') {
           sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, 'Volvemos. Observacion final? Si no hay, escribe no');
+          return utils.responderTwiml(res, '\u25c0\ufe0f Observacion final? Si no hay, escribe *no*');
         }
-        return utils.responderTwiml(res, 'No se puede retroceder desde aqui. Escribe CANCELAR para salir o continua.');
+        return utils.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
       }
 
       switch (sesion.estado) {
@@ -104,7 +84,7 @@ function registrarWebhook(app) {
         // ==================== INICIO ====================
         case 'INICIO': {
           sesion.estado = 'ESPERANDO_PLACA';
-          return utils.responderTwiml(res, 'BOT MTO - CERO\nBuenos dias. Placa del vehiculo?');
+          return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nBuenos dias \ud83d\udc4b\nPlaca del vehiculo?');
         }
 
         // ==================== PLACA ====================
@@ -118,13 +98,13 @@ function registrarWebhook(app) {
             .single();
 
           if (resultado.error || !resultado.data) {
-            return utils.responderTwiml(res, 'Placa ' + placaLimpia + ' no encontrada. Verifica e intenta de nuevo.');
+            return utils.responderTwiml(res, '\u274c Placa *' + placaLimpia + '* no encontrada.\nVerifica e intenta de nuevo.');
           }
 
           var vehiculo = resultado.data;
 
           if (vehiculo.bloqueado) {
-            return utils.responderTwiml(res, 'Vehiculo ' + placaLimpia + ' BLOQUEADO: ' + (vehiculo.motivo_bloqueo || 'Contacte al supervisor'));
+            return utils.responderTwiml(res, '\ud83d\udeab *Vehiculo BLOQUEADO*\n' + placaLimpia + '\n' + (vehiculo.motivo_bloqueo || 'Contacte al supervisor'));
           }
 
           sesion.placa = placaLimpia;
@@ -140,7 +120,7 @@ function registrarWebhook(app) {
 
           sesion.estado = 'ESPERANDO_KILOMETRAJE';
           return utils.responderTwiml(res,
-            placaLimpia + ' . ' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\nKilometraje actual?'
+            '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\nKilometraje actual?'
           );
         }
 
@@ -148,11 +128,11 @@ function registrarWebhook(app) {
         case 'ESPERANDO_KILOMETRAJE': {
           var km = parseInt(mensaje.replace(/[^0-9]/g, ''));
           if (isNaN(km) || km < 0) {
-            return utils.responderTwiml(res, 'Escribe solo el numero del kilometraje.');
+            return utils.responderTwiml(res, '\u274c Escribe solo el numero del kilometraje.');
           }
 
           if (sesion.vehiculo.kilometraje && km < sesion.vehiculo.kilometraje) {
-            return utils.responderTwiml(res, 'Kilometraje invalido. El ultimo registrado fue ' + sesion.vehiculo.kilometraje + ' km. El nuevo debe ser igual o mayor.');
+            return utils.responderTwiml(res, '\u274c Kilometraje invalido.\nUltimo registrado: *' + sesion.vehiculo.kilometraje + ' km*\nDebe ser igual o mayor.');
           }
 
           sesion.kilometraje = km;
@@ -160,14 +140,7 @@ function registrarWebhook(app) {
           sesion.estado = 'GRUPO';
 
           var grupo = GRUPOS[0];
-          var msgGrupo = 'BLOQUE 1 de 4\n';
-          msgGrupo += grupo.nombre + '\n';
-          msgGrupo += grupo.abreviado + '\n\n';
-          msgGrupo += '1\u20e3 Todo OK\n';
-          msgGrupo += '2\u20e3 Novedad (describe cual)\n';
-          msgGrupo += '3\u20e3 Atras';
-
-          return utils.responderTwiml(res, msgGrupo);
+          return utils.responderTwiml(res, utils.formatGrupoMsg(grupo, '\ud83d\udcdd *Inspeccion iniciada*\n' + sesion.placa + ' | ' + km + ' km'));
         }
 
         // ==================== GRUPOS — FORMULARIO HIBRIDO ====================
@@ -176,21 +149,14 @@ function registrarWebhook(app) {
           var respLimpia = mensaje.trim();
 
           // 1️⃣ Todo OK — sin IA, respuesta instantanea
-          if (respLimpia === '1' || respLimpia === '1️⃣' || respLimpia.toLowerCase() === 'ok' || respLimpia.toLowerCase() === 'todo bien') {
+          if (respLimpia === '1' || respLimpia === '1\ufe0f\u20e3' || respLimpia.toLowerCase() === 'ok' || respLimpia.toLowerCase() === 'todo bien') {
             sesion.respuestas[grupoActual.id] = ia.marcarTodoOK(grupoActual);
 
             sesion.grupoActual++;
 
             if (sesion.grupoActual < GRUPOS.length) {
               var sig = GRUPOS[sesion.grupoActual];
-              var msgSig = 'OK\n\n';
-              msgSig += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
-              msgSig += sig.nombre + '\n';
-              msgSig += sig.abreviado + '\n\n';
-              msgSig += '1\u20e3 Todo OK\n';
-              msgSig += '2\u20e3 Novedad (describe cual)\n';
-              msgSig += '3\u20e3 Atras';
-              return utils.responderTwiml(res, msgSig);
+              return utils.responderTwiml(res, utils.formatGrupoMsg(sig, '\u2705 OK'));
             }
 
             // All groups done
@@ -198,56 +164,46 @@ function registrarWebhook(app) {
             sesion.estado = 'FOTO_VERIFICACION';
             sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
             return utils.responderTwiml(res,
-              resumen + '\n\nFOTO 1 - Verificacion aleatoria\n' + sesion.fotoVerificacionDescripcion
+              resumen + '\n\n\ud83d\udcf8 *Foto de verificacion*\n' + sesion.fotoVerificacionDescripcion
             );
           }
 
           // 2️⃣ Novedad — pedir descripcion
-          if (respLimpia === '2' || respLimpia === '2️⃣') {
+          if (respLimpia === '2' || respLimpia === '2\ufe0f\u20e3') {
             sesion.estado = 'DESCRIBIR_NOVEDAD';
-            return utils.responderTwiml(res, 'Describe la novedad en ' + grupoActual.nombre + '.\nEscribe lo que encontraste (ej: "aceite bajo", "llanta lisa", "no hay extintor")');
+            return utils.responderTwiml(res, '\u270d\ufe0f *Describe la novedad en:*\n' + grupoActual.nombre + '\n\n_Escribe lo que encontraste_\n_Ej: "aceite bajo", "llanta lisa", "no hay extintor"_');
           }
 
-          // 3️⃣ Atras — regresa al paso anterior
-          if (respLimpia === '3' || respLimpia === '3️⃣' || respLimpia.toLowerCase() === 'atras') {
+          // 3️⃣ Atras
+          if (respLimpia === '3' || respLimpia === '3\ufe0f\u20e3' || respLimpia.toLowerCase() === 'atras') {
             if (sesion.grupoActual > 0) {
               sesion.grupoActual--;
               var grupoAnt = GRUPOS[sesion.grupoActual];
               delete sesion.respuestas[grupoAnt.id];
-              var msgAtr = 'Volvemos al bloque anterior.\n\n';
-              msgAtr += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
-              msgAtr += grupoAnt.nombre + '\n';
-              msgAtr += grupoAnt.abreviado + '\n\n';
-              msgAtr += '1\u20e3 Todo OK\n';
-              msgAtr += '2\u20e3 Novedad (describe cual)\n';
-              msgAtr += '3\u20e3 Atras';
-              return utils.responderTwiml(res, msgAtr);
+              return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnt, '\u25c0\ufe0f Volvemos'));
             } else {
               sesion.estado = 'ESPERANDO_KILOMETRAJE';
-              return utils.responderTwiml(res, 'Volvemos. Kilometraje actual?');
+              return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
             }
           }
 
-          // Si escribe texto directamente (no 1 ni 2), asumimos que es una novedad
+          // Si escribe texto directamente, asumimos novedad
           sesion.estado = 'DESCRIBIR_NOVEDAD';
-          // Process the message as novelty description directly (fall through)
         }
 
-        // ==================== DESCRIBIR NOVEDAD — AQUI ENTRA LA IA ====================
+        // ==================== DESCRIBIR NOVEDAD ====================
         case 'DESCRIBIR_NOVEDAD': {
-          // Prevent fall-through issues
           if (sesion.estado !== 'DESCRIBIR_NOVEDAD') break;
 
           var grupoNovedad = GRUPOS[sesion.grupoActual];
           var interpretacion = await ia.interpretarNovedad(grupoNovedad, mensaje);
 
           if (!interpretacion) {
-            return utils.responderTwiml(res, 'No entendi. Describe la novedad de nuevo (ej: "aceite bajo", "llanta danada")');
+            return utils.responderTwiml(res, '\u274c No entendi.\nDescribe la novedad de nuevo.\n_Ej: "aceite bajo", "llanta danada"_');
           }
 
           sesion.respuestas[grupoNovedad.id] = interpretacion;
 
-          // Collect novelties
           var novedadesGrupo = interpretacion.items
             .filter(function(i) { return i.estado === 2 || i.estado === 3; })
             .map(function(i) {
@@ -263,43 +219,35 @@ function registrarWebhook(app) {
             sesion.novedades.push(novedadesGrupo[x]);
           }
 
-          var confirmacion = interpretacion.resumen ? interpretacion.resumen + '\n\n' : '';
+          var confirmacion = interpretacion.resumen ? '\u2705 ' + interpretacion.resumen : '';
 
           sesion.grupoActual++;
           sesion.estado = 'GRUPO';
 
           if (sesion.grupoActual < GRUPOS.length) {
             var sigNov = GRUPOS[sesion.grupoActual];
-            var msgNov = confirmacion;
-            msgNov += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
-            msgNov += sigNov.nombre + '\n';
-            msgNov += sigNov.abreviado + '\n\n';
-            msgNov += '1\u20e3 Todo OK\n';
-            msgNov += '2\u20e3 Novedad (describe cual)\n';
-            msgNov += '3\u20e3 Atras';
-            return utils.responderTwiml(res, msgNov);
+            return utils.responderTwiml(res, utils.formatGrupoMsg(sigNov, confirmacion));
           }
 
-          // All groups done
           var resumenNov = utils.generarResumen(sesion);
           sesion.estado = 'FOTO_VERIFICACION';
           sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
           return utils.responderTwiml(res,
-            confirmacion + resumenNov + '\n\nFOTO 1 - Verificacion aleatoria\n' + sesion.fotoVerificacionDescripcion
+            confirmacion + '\n\n' + resumenNov + '\n\n\ud83d\udcf8 *Foto de verificacion*\n' + sesion.fotoVerificacionDescripcion
           );
         }
 
         // ==================== FOTO VERIFICACION ====================
         case 'FOTO_VERIFICACION': {
           if (numMedia === 0) {
-            return utils.responderTwiml(res, 'Necesito la foto. Toma la foto y enviala por favor.');
+            return utils.responderTwiml(res, '\ud83d\udcf8 Necesito la foto.\nToma la foto y enviala.');
           }
 
           var validacion = await ia.validarFoto(mediaUrl, sesion.fotoVerificacionDescripcion);
 
           if (!validacion.valida) {
             return utils.responderTwiml(res,
-              'Foto no valida - ' + validacion.razon_rechazo + '\nNecesito: ' + sesion.fotoVerificacionDescripcion
+              '\u274c *Foto no valida*\n' + validacion.razon_rechazo + '\n\nNecesito: ' + sesion.fotoVerificacionDescripcion
             );
           }
 
@@ -318,18 +266,18 @@ function registrarWebhook(app) {
             var novedad = sesion.fotosNovedadPendientes[0];
             sesion.estado = 'FOTO_NOVEDAD';
             return utils.responderTwiml(res,
-              'Foto valida\n\nFOTO ' + (sesion.fotos.length + 1) + ' - Novedad\nTome foto de: ' + novedad.item + ' - ' + (novedad.nota || novedad.grupo)
+              '\u2705 Foto valida\n\n\ud83d\udcf8 *Foto de novedad*\n' + novedad.item + ': _' + (novedad.nota || novedad.grupo) + '_'
             );
           }
 
           sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, 'Foto valida\n\nObservacion final? Si no hay, escribe no');
+          return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
         }
 
         // ==================== FOTOS DE NOVEDADES ====================
         case 'FOTO_NOVEDAD': {
           if (numMedia === 0) {
-            return utils.responderTwiml(res, 'Necesito la foto de la novedad. Enviala por favor.');
+            return utils.responderTwiml(res, '\ud83d\udcf8 Necesito la foto de la novedad.\nEnviala por favor.');
           }
 
           var novedadActual = sesion.fotosNovedadPendientes[0];
@@ -347,12 +295,12 @@ function registrarWebhook(app) {
           if (sesion.fotosNovedadPendientes.length > 0) {
             var siguienteNov = sesion.fotosNovedadPendientes[0];
             return utils.responderTwiml(res,
-              'Foto recibida\n\nFOTO ' + (sesion.fotos.length + 1) + ' - Novedad\nTome foto de: ' + siguienteNov.item + ' - ' + (siguienteNov.nota || siguienteNov.grupo)
+              '\u2705 Foto recibida\n\n\ud83d\udcf8 *Foto de novedad*\n' + siguienteNov.item + ': _' + (siguienteNov.nota || siguienteNov.grupo) + '_'
             );
           }
 
           sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, 'Foto recibida\n\nObservacion final? Si no hay, escribe no');
+          return utils.responderTwiml(res, '\u2705 Foto recibida\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
         }
 
         // ==================== OBSERVACION ====================
@@ -360,13 +308,19 @@ function registrarWebhook(app) {
           sesion.observacion = mensaje.toLowerCase() === 'no' ? null : mensaje;
           sesion.estado = 'CONFIRMACION';
 
-          var textoFirma = 'CONFIRMACION\n';
-          textoFirma += 'Vehiculo: ' + sesion.placa + '\n';
-          textoFirma += 'Kilometraje: ' + sesion.kilometraje + '\n';
-          textoFirma += 'Novedades: ' + (sesion.novedades.length > 0 ? sesion.novedades.length : 'Ninguna') + '\n';
-          textoFirma += 'Fotos: ' + sesion.fotos.length + '\n';
-          if (sesion.observacion) textoFirma += 'Observacion: ' + sesion.observacion + '\n';
-          textoFirma += '\nConfirma el preoperacional? Escriba SI para firmar.';
+          var textoFirma = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+          textoFirma += '\ud83d\udcdd *CONFIRMAR PREOPERACIONAL*\n';
+          textoFirma += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+          textoFirma += '\ud83d\ude97 Vehiculo: *' + sesion.placa + '*\n';
+          textoFirma += '\ud83d\udccf Kilometraje: *' + sesion.kilometraje + ' km*\n';
+          if (sesion.novedades.length > 0) {
+            textoFirma += '\u26a0\ufe0f Novedades: *' + sesion.novedades.length + '*\n';
+          } else {
+            textoFirma += '\u2705 Sin novedades\n';
+          }
+          textoFirma += '\ud83d\udcf7 Fotos: *' + sesion.fotos.length + '*\n';
+          if (sesion.observacion) textoFirma += '\ud83d\udcac _' + sesion.observacion + '_\n';
+          textoFirma += '\n\u270d\ufe0f Escriba *SI* para firmar';
 
           return utils.responderTwiml(res, textoFirma);
         }
@@ -374,7 +328,7 @@ function registrarWebhook(app) {
         // ==================== CONFIRMACION / FIRMA ====================
         case 'CONFIRMACION': {
           if (mensaje.toUpperCase() !== 'SI') {
-            return utils.responderTwiml(res, 'Escriba SI para confirmar y firmar, o CANCELAR para anular.');
+            return utils.responderTwiml(res, 'Escriba *SI* para firmar\no *CANCELAR* para anular.');
           }
 
           var ahora = new Date();
@@ -392,7 +346,7 @@ function registrarWebhook(app) {
             frenos_direccion_llantas: sesion.respuestas.frenos_direccion_llantas || null,
             cabina_equipo: sesion.respuestas.cabina_equipo || null,
             novedades: sesion.novedades.map(function(n) {
-              var prefix = n.critico ? '[CRITICO] ' : '';
+              var prefix = n.critico ? '\u26a0\ufe0f CRITICO ' : '';
               return prefix + n.grupo + ': ' + n.item + ' - ' + (n.nota || '');
             }),
             observaciones: sesion.observacion,
@@ -408,12 +362,11 @@ function registrarWebhook(app) {
 
           if (resPreop.error) {
             console.error('Error guardando preoperacional:', resPreop.error);
-            return utils.responderTwiml(res, 'Error guardando el preoperacional. Intente de nuevo o contacte al supervisor.');
+            return utils.responderTwiml(res, '\u274c Error guardando. Intente de nuevo o contacte al supervisor.');
           }
 
           var preop = resPreop.data;
 
-          // Save photos
           if (sesion.fotos.length > 0) {
             var fotosParaGuardar = sesion.fotos.map(function(f) {
               return {
@@ -428,47 +381,49 @@ function registrarWebhook(app) {
             await config.supabase.from('fotos_evidencia').insert(fotosParaGuardar);
           }
 
-          // Update mileage
           await config.supabase
             .from('vehiculos')
             .update({ kilometraje: sesion.kilometraje })
             .eq('id', sesion.vehiculo.id);
 
-          // Check critical items and alert supervisor
           var novedadesCriticas = sesion.novedades.filter(function(n) { return n.critico; });
           if (novedadesCriticas.length > 0) {
             console.log('ALERTA SUPERVISOR: ' + novedadesCriticas.length + ' items criticos en ' + sesion.placa);
           }
 
-          // Copy session data before deleting
           var datosSesion = sesiones.copiarSesion(sesion);
           sesiones.eliminarSesion(telefono);
 
-          var msgFinal = 'PREOPERACIONAL FIRMADO\n';
-          msgFinal += datosSesion.placa + ' - ' + ahora.toLocaleDateString('es-CO') + '\n';
-          msgFinal += (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n';
-          msgFinal += datosSesion.kilometraje + ' km\n';
+          var msgFinal = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+          msgFinal += '\u2705 *PREOPERACIONAL FIRMADO*\n';
+          msgFinal += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+          msgFinal += '\ud83d\ude97 *' + datosSesion.placa + '* | ' + ahora.toLocaleDateString('es-CO') + '\n';
+          msgFinal += '\ud83d\udc64 ' + (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n';
+          msgFinal += '\ud83d\udccf ' + datosSesion.kilometraje + ' km\n';
           if (novedadesCriticas.length > 0) {
-            msgFinal += 'ALERTA: ' + novedadesCriticas.length + ' item(es) critico(s) - Supervisor notificado\n';
+            msgFinal += '\u26a0\ufe0f *' + novedadesCriticas.length + ' item(es) critico(s)*\n';
+            msgFinal += '_Supervisor notificado_\n';
+          } else if (datosSesion.novedades.length > 0) {
+            msgFinal += '\u26a0\ufe0f ' + datosSesion.novedades.length + ' novedad(es)\n';
+          } else {
+            msgFinal += '\u2705 Sin novedades\n';
           }
-          msgFinal += datosSesion.novedades.length > 0 ? datosSesion.novedades.length + ' novedad(es)' : 'Sin novedades';
-          msgFinal += '\n\nGenerando PDF...';
+          msgFinal += '\n\ud83d\udcc4 Generando PDF...';
 
           utils.responderTwiml(res, msgFinal);
 
-          // Generate and send PDF in background
           pdf.subirYEnviarPDF(datosSesion, preop.id, telefono);
           return;
         }
 
         default: {
           sesion.estado = 'INICIO';
-          return utils.responderTwiml(res, 'BOT MTO - CERO\nBuenos dias. Placa del vehiculo?');
+          return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nBuenos dias \ud83d\udc4b\nPlaca del vehiculo?');
         }
       }
     } catch (error) {
       console.error('Error en webhook:', error);
-      return utils.responderTwiml(res, 'Error interno. Intente de nuevo en un momento.');
+      return utils.responderTwiml(res, '\u274c Error interno. Intente de nuevo.');
     }
   });
 }
