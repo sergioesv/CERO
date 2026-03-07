@@ -8,12 +8,41 @@ var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
     var client = url.startsWith('https') ? https : http;
-    client.get(url, function(response) {
-      var chunks = [];
-      response.on('data', function(chunk) { chunks.push(chunk); });
-      response.on('end', function() { resolve(Buffer.concat(chunks)); });
-      response.on('error', reject);
-    }).on('error', reject);
+    var options = {};
+
+    // Twilio media URLs need authentication
+    if (url.indexOf('twilio.com') >= 0 || url.indexOf('api.twilio.com') >= 0) {
+      var urlObj = new URL(url);
+      options = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64')
+        }
+      };
+      client.get(options, function(response) {
+        // Follow redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          descargarImagen(response.headers.location).then(resolve).catch(reject);
+          return;
+        }
+        var chunks = [];
+        response.on('data', function(chunk) { chunks.push(chunk); });
+        response.on('end', function() { resolve(Buffer.concat(chunks)); });
+        response.on('error', reject);
+      }).on('error', reject);
+    } else {
+      client.get(url, function(response) {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          descargarImagen(response.headers.location).then(resolve).catch(reject);
+          return;
+        }
+        var chunks = [];
+        response.on('data', function(chunk) { chunks.push(chunk); });
+        response.on('end', function() { resolve(Buffer.concat(chunks)); });
+        response.on('error', reject);
+      }).on('error', reject);
+    }
   });
 }
 
