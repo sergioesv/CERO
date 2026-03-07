@@ -54,7 +54,8 @@ function registrarWebhook(app) {
           msgAtras += grupoAnterior.nombre + '\n';
           msgAtras += grupoAnterior.abreviado + '\n\n';
           msgAtras += '1\u20e3 Todo OK\n';
-          msgAtras += '2\u20e3 Novedad (describe cual)';
+          msgAtras += '2\u20e3 Novedad (describe cual)\n';
+          msgAtras += '3\u20e3 Atras';
           return utils.responderTwiml(res, msgAtras);
         }
         if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
@@ -69,7 +70,8 @@ function registrarWebhook(app) {
           msgVolver += grupoVolver.nombre + '\n';
           msgVolver += grupoVolver.abreviado + '\n\n';
           msgVolver += '1\u20e3 Todo OK\n';
-          msgVolver += '2\u20e3 Novedad (describe cual)';
+          msgVolver += '2\u20e3 Novedad (describe cual)\n';
+          msgVolver += '3\u20e3 Atras';
           return utils.responderTwiml(res, msgVolver);
         }
         if (sesion.estado === 'FOTO_VERIFICACION') {
@@ -81,7 +83,8 @@ function registrarWebhook(app) {
           msgUlt += ultimoGrupo.nombre + '\n';
           msgUlt += ultimoGrupo.abreviado + '\n\n';
           msgUlt += '1\u20e3 Todo OK\n';
-          msgUlt += '2\u20e3 Novedad (describe cual)';
+          msgUlt += '2\u20e3 Novedad (describe cual)\n';
+          msgUlt += '3\u20e3 Atras';
           return utils.responderTwiml(res, msgUlt);
         }
         if (sesion.estado === 'OBSERVACION') {
@@ -161,7 +164,8 @@ function registrarWebhook(app) {
           msgGrupo += grupo.nombre + '\n';
           msgGrupo += grupo.abreviado + '\n\n';
           msgGrupo += '1\u20e3 Todo OK\n';
-          msgGrupo += '2\u20e3 Novedad (describe cual)';
+          msgGrupo += '2\u20e3 Novedad (describe cual)\n';
+          msgGrupo += '3\u20e3 Atras';
 
           return utils.responderTwiml(res, msgGrupo);
         }
@@ -184,7 +188,8 @@ function registrarWebhook(app) {
               msgSig += sig.nombre + '\n';
               msgSig += sig.abreviado + '\n\n';
               msgSig += '1\u20e3 Todo OK\n';
-              msgSig += '2\u20e3 Novedad (describe cual)';
+              msgSig += '2\u20e3 Novedad (describe cual)\n';
+              msgSig += '3\u20e3 Atras';
               return utils.responderTwiml(res, msgSig);
             }
 
@@ -201,6 +206,26 @@ function registrarWebhook(app) {
           if (respLimpia === '2' || respLimpia === '2️⃣') {
             sesion.estado = 'DESCRIBIR_NOVEDAD';
             return utils.responderTwiml(res, 'Describe la novedad en ' + grupoActual.nombre + '.\nEscribe lo que encontraste (ej: "aceite bajo", "llanta lisa", "no hay extintor")');
+          }
+
+          // 3️⃣ Atras — regresa al paso anterior
+          if (respLimpia === '3' || respLimpia === '3️⃣' || respLimpia.toLowerCase() === 'atras') {
+            if (sesion.grupoActual > 0) {
+              sesion.grupoActual--;
+              var grupoAnt = GRUPOS[sesion.grupoActual];
+              delete sesion.respuestas[grupoAnt.id];
+              var msgAtr = 'Volvemos al bloque anterior.\n\n';
+              msgAtr += 'BLOQUE ' + (sesion.grupoActual + 1) + ' de 4\n';
+              msgAtr += grupoAnt.nombre + '\n';
+              msgAtr += grupoAnt.abreviado + '\n\n';
+              msgAtr += '1\u20e3 Todo OK\n';
+              msgAtr += '2\u20e3 Novedad (describe cual)\n';
+              msgAtr += '3\u20e3 Atras';
+              return utils.responderTwiml(res, msgAtr);
+            } else {
+              sesion.estado = 'ESPERANDO_KILOMETRAJE';
+              return utils.responderTwiml(res, 'Volvemos. Kilometraje actual?');
+            }
           }
 
           // Si escribe texto directamente (no 1 ni 2), asumimos que es una novedad
@@ -250,7 +275,8 @@ function registrarWebhook(app) {
             msgNov += sigNov.nombre + '\n';
             msgNov += sigNov.abreviado + '\n\n';
             msgNov += '1\u20e3 Todo OK\n';
-            msgNov += '2\u20e3 Novedad (describe cual)';
+            msgNov += '2\u20e3 Novedad (describe cual)\n';
+            msgNov += '3\u20e3 Atras';
             return utils.responderTwiml(res, msgNov);
           }
 
