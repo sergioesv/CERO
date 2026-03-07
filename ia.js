@@ -1,7 +1,26 @@
 var config = require('./config');
+var axios = require('axios'); // Asegúrate de tener axios en tu package.json
 
 var MODELO_TEXTO = 'claude-haiku-4-5-20251001';
 var MODELO_VISION = 'claude-sonnet-4-20250514';
+
+// Función auxiliar para descargar de Twilio con Auth y seguir redirecciones
+async function descargarImagen(url) {
+  try {
+    var auth = Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64');
+    var response = await axios({
+      method: 'get',
+      url: url,
+      responseType: 'arraybuffer',
+      headers: { 'Authorization': 'Basic ' + auth },
+      maxRedirects: 5
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error descargando imagen de Twilio:', error.message);
+    return null;
+  }
+}
 
 async function interpretarNovedad(grupo, mensaje) {
   try {
@@ -62,6 +81,16 @@ function marcarTodoOK(grupo) {
 
 async function validarFoto(mediaUrl, descripcionEsperada) {
   try {
+    // 1. Descargamos la imagen primero (Fase 1: Manejo de autenticación)
+    var imagenBuffer = await descargarImagen(mediaUrl);
+    if (!imagenBuffer) {
+        return { valida: true, descripcion: 'Error al descargar imagen para validacion', razon_rechazo: null };
+    }
+
+    // 2. Convertimos a Base64 para Claude
+    var base64Imagen = imagenBuffer.toString('base64');
+
+    // 3. Enviamos a Claude Vision
     var response = await config.anthropic.messages.create({
       model: MODELO_VISION,
       max_tokens: 300,
@@ -71,8 +100,9 @@ async function validarFoto(mediaUrl, descripcionEsperada) {
           {
             type: 'image',
             source: {
-              type: 'url',
-              url: mediaUrl
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data: base64Imagen
             }
           },
           {
