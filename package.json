@@ -1,16 +1,17 @@
 {
   "name": "cero",
-  "version": "2.0.0",
-  "description": "Sistema de gestión de operaciones de campo por WhatsApp con IA",
+  "version": "1.0.0",
+  "description": "Sistema CERO - Preoperacional WhatsApp",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "twilio": "^4.23.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "@anthropic-ai/sdk": "^0.24.0",
-    "pdfkit": "^0.13.0"
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@supabase/supabase-js": "^2.48.0",
+    "axios": "^1.7.9",
+    "express": "^4.21.2",
+    "pdfkit": "^0.15.1",
+    "twilio": "^5.3.5"
   }
 }
