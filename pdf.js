@@ -1,394 +1,227 @@
-var PDFDocument = require('pdfkit');
-var https = require('https');
-var http = require('http');
-var config = require('./config');
-var GRUPOS = require('./grupos').GRUPOS;
-var LOGO_BASE64 = require('./logo').LOGO_BASE64;
+const PDFDocument = require('pdfkit');
+const { createClient } = require('@supabase/supabase-js');
+const { descargarImagen } = require('./ia');
+const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
+const { logoBase64 } = require('./logo');
 
-function descargarImagen(url) {
-  return new Promise(function(resolve, reject) {
-    var client = url.startsWith('https') ? https : http;
-    var options = {};
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Twilio media URLs need authentication
-    if (url.indexOf('twilio.com') >= 0 || url.indexOf('api.twilio.com') >= 0) {
-      var urlObj = new URL(url);
-      options = {
-        hostname: urlObj.hostname,
-        path: urlObj.pathname + urlObj.search,
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64')
-        }
-      };
-      client.get(options, function(response) {
-        // Follow redirects
-        if (response.statusCode === 301 || response.statusCode === 302) {
-          descargarImagen(response.headers.location).then(resolve).catch(reject);
-          return;
-        }
-        var chunks = [];
-        response.on('data', function(chunk) { chunks.push(chunk); });
-        response.on('end', function() { resolve(Buffer.concat(chunks)); });
-        response.on('error', reject);
-      }).on('error', reject);
-    } else {
-      client.get(url, function(response) {
-        if (response.statusCode === 301 || response.statusCode === 302) {
-          descargarImagen(response.headers.location).then(resolve).catch(reject);
-          return;
-        }
-        var chunks = [];
-        response.on('data', function(chunk) { chunks.push(chunk); });
-        response.on('end', function() { resolve(Buffer.concat(chunks)); });
-        response.on('error', reject);
-      }).on('error', reject);
-    }
-  });
-}
-
-async function generarPDF(sesion) {
-  // Download all photos first
-  var fotosDescargadas = [];
-  if (sesion.fotos && sesion.fotos.length > 0) {
-    for (var d = 0; d < sesion.fotos.length; d++) {
-      try {
-        var imgBuffer = await descargarImagen(sesion.fotos[d].url);
-        fotosDescargadas.push({ buffer: imgBuffer, info: sesion.fotos[d] });
-      } catch (e) {
-        console.error('Error descargando foto ' + d + ':', e);
-        fotosDescargadas.push({ buffer: null, info: sesion.fotos[d] });
-      }
-    }
-  }
-
-  return new Promise(function(resolve, reject) {
+async function generarPDF(datos) {
+  return new Promise(async (resolve, reject) => {
     try {
-      var doc = new PDFDocument({ size: 'LETTER', margin: 45 });
-      var chunks = [];
+      const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+      const chunks = [];
 
-      doc.on('data', function(chunk) { chunks.push(chunk); });
-      doc.on('end', function() { resolve(Buffer.concat(chunks)); });
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      var ahora = new Date();
-      var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
-      var hora = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      // ENCABEZADO
+      const logoBuffer = Buffer.from(logoBase64, 'base64');
+      doc.image(logoBuffer, 50, 40, { width: 80 });
+      
+      doc.fontSize(20).font('Helvetica-Bold')
+         .text('CERO SYSTEM', 150, 45);
+      
+      doc.fontSize(8).font('Helvetica')
+         .text('I-GL-001-F04 Rev 05', 450, 50, { align: 'right' });
 
-      var NEGRO = '#1A1A1A';
-      var GRIS_OSCURO = '#333333';
-      var GRIS = '#666666';
-      var GRIS_CLARO = '#999999';
-      var GRIS_FONDO = '#F5F5F5';
-      var GRIS_LINEA = '#E0E0E0';
-      var VERDE = '#2E7D32';
-      var VERDE_CLARO = '#E8F5E9';
-      var ROJO = '#C62828';
-      var ROJO_CLARO = '#FFEBEE';
-      var AMARILLO = '#F9A825';
+      doc.moveTo(50, 90).lineTo(562, 90).stroke();
 
-      // ===== THIN ACCENT BAR =====
-      doc.rect(0, 0, 612, 5).fill(NEGRO);
+      // PLACA HERO
+      doc.fontSize(28).font('Helvetica-Bold')
+         .text(datos.placa, 50, 110);
 
-      // ===== HEADER WITH LOGO =====
-      try {
-        var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
-        doc.image(logoBuffer, 45, 12, { width: 50, height: 45 });
-      } catch (e) {}
+      doc.fontSize(12).font('Helvetica')
+         .text(`${datos.marca} ${datos.modelo} ${datos.anio}`, 50, 145);
 
-      doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold')
-        .text('EDEMSA | CERO SYSTEM', 105, 18);
-      doc.fill(GRIS_CLARO).fontSize(7).font('Helvetica')
-        .text('Inspeccion Preoperacional de Vehiculo', 105, 30);
-
-      // Right side
-      doc.fill(GRIS_CLARO).fontSize(7).font('Helvetica')
-        .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 });
-      doc.text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
-
-      // Separator
-      doc.moveTo(45, 62).lineTo(567, 62).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
-
-      // ===== VEHICLE HERO SECTION =====
-      var y = 72;
-
-      // Vehicle name large
-      doc.fill(NEGRO).fontSize(20).font('Helvetica-Bold')
-        .text((sesion.vehiculo.marca || '') + ' ' + (sesion.vehiculo.modelo || ''), 45, y);
-      y += 24;
-
-      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold')
-        .text(sesion.placa, 45, y);
-
-      // Right side vehicle info
-      doc.fill(GRIS).fontSize(8).font('Helvetica')
-        .text(sesion.vehiculo.tipo || '', 420, 74, { align: 'right', width: 147 });
-      doc.text('Anio ' + (sesion.vehiculo.anio || 'N/R'), 420, 86, { align: 'right', width: 147 });
-
-      y += 35;
-      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
-      y += 12;
-
-      // ===== INFO CARDS ROW =====
-      var cardW = 123;
-      var cards = [
-        { label: 'PILOTO', value: sesion.conductor ? sesion.conductor.nombre : 'N/R' },
-        { label: 'LICENCIA', value: sesion.conductor ? 'Cat. ' + (sesion.conductor.licencia_categoria || 'N/R') : 'N/R' },
-        { label: 'ODOMETRO', value: sesion.kilometraje + ' km' },
-        { label: 'FECHA', value: fecha.split(' de ').slice(0,2).join('/') }
+      // TARJETAS DE INFO
+      const yCards = 180;
+      const cardData = [
+        { label: 'PILOTO', value: datos.conductor },
+        { label: 'LICENCIA', value: datos.licencia },
+        { label: 'ODÓMETRO', value: `${datos.kilometraje} km` },
+        { label: 'FECHA', value: new Date(datos.fecha).toLocaleDateString('es-CO') }
       ];
 
-      for (var ci = 0; ci < cards.length; ci++) {
-        var cx = 45 + ci * (cardW + 10);
-        doc.rect(cx, y, cardW, 35).fill(GRIS_FONDO);
-        doc.fill(GRIS_CLARO).fontSize(6).font('Helvetica-Bold')
-          .text(cards[ci].label, cx + 8, y + 6, { width: cardW - 16 });
-        doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold')
-          .text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 });
+      cardData.forEach((card, i) => {
+        const x = 50 + (i * 128);
+        doc.rect(x, yCards, 120, 50).fillAndStroke('#F5F5F5', '#E0E0E0');
+        doc.fillColor('#000')
+           .fontSize(8).font('Helvetica-Bold')
+           .text(card.label, x + 10, yCards + 10);
+        doc.fontSize(10).font('Helvetica')
+           .text(card.value, x + 10, yCards + 28, { width: 100 });
+      });
+
+      let yPos = 260;
+
+      // NOVEDADES CRÍTICAS
+      const criticas = datos.items.filter(i => i.critico && i.estado !== 'OK');
+      if (criticas.length > 0) {
+        doc.rect(50, yPos, 512, 40).fill('#000');
+        doc.fillColor('#FFF').fontSize(12).font('Helvetica-Bold')
+           .text('⚠ NOVEDADES CRÍTICAS', 60, yPos + 12);
+        
+        doc.fontSize(10).font('Helvetica')
+           .text(criticas.map(c => `${c.nombre}: ${c.estado}`).join(' • '), 60, yPos + 28);
+        
+        yPos += 60;
       }
 
-      y += 48;
-
-      // ===== NOVEDADES CRITICAS (if any, show at top) =====
-      var novedadesCriticas = sesion.novedades.filter(function(n) { return n.critico; });
-
-      if (sesion.novedades.length > 0) {
-        doc.rect(45, y, 522, 18).fill(NEGRO);
-        doc.fill('#ffffff').fontSize(8).font('Helvetica-Bold')
-          .text('NOVEDADES CRITICAS REPORTADAS', 55, y + 5);
-        y += 25;
-
-        for (var ni = 0; ni < sesion.novedades.length; ni++) {
-          var nov = sesion.novedades[ni];
-
-          if (y > 700) { doc.addPage(); y = 50; }
-
-          // Accent bar
-          var novColor = nov.critico ? ROJO : AMARILLO;
-          doc.rect(45, y, 3, 28).fill(novColor);
-
-          // Content
-          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
-            .text(nov.grupo, 55, y + 2);
-
-          var estadoDesc = nov.nota || '';
-          doc.fill(novColor).fontSize(8).font('Helvetica-Bold')
-            .text(nov.item + (estadoDesc ? ' (' + estadoDesc + ')' : ''), 55, y + 14);
-
-          // Alert tag
-          if (nov.critico) {
-            doc.rect(480, y + 5, 80, 14).fill(ROJO_CLARO);
-            doc.fill(ROJO).fontSize(6).font('Helvetica-Bold')
-              .text('Alerta Supervisor', 485, y + 9);
-          }
-
-          y += 35;
+      // BLOQUES DE INSPECCIÓN
+      doc.fillColor('#000');
+      datos.bloques.forEach(bloque => {
+        if (yPos > 650) {
+          doc.addPage();
+          yPos = 50;
         }
-      }
 
-      // ===== INSPECTION RESULTS BY BLOCK =====
-      for (var g = 0; g < GRUPOS.length; g++) {
-        var grupo = GRUPOS[g];
-        var respuesta = sesion.respuestas[grupo.id];
-        if (!respuesta) continue;
+        doc.fontSize(14).font('Helvetica-Bold')
+           .text(bloque.nombre, 50, yPos);
+        yPos += 25;
 
-        if (y > 640) { doc.addPage(); y = 50; }
-
-        // Block header
-        doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
-        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
-          .text(grupo.nombre, 55, y + 4);
-        y += 22;
-
-        // Items
-        for (var j = 0; j < respuesta.items.length; j++) {
-          var item = respuesta.items[j];
-
-          if (y > 720) { doc.addPage(); y = 50; }
-
-          // Item name
-          doc.fill(NEGRO).fontSize(8).font('Helvetica')
-            .text(item.nombre, 55, y);
-
-          // Estado with contextual description
-          var estadoTexto = item.descripcion_estado || (item.estado === 1 ? 'OK' : item.estado === 2 ? 'Atencion' : item.estado === 3 ? 'Malo' : 'N/A');
-          var estadoColor = item.estado === 1 ? VERDE : item.estado === 2 ? AMARILLO : item.estado === 3 ? ROJO : GRIS_CLARO;
-
-          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold')
-            .text(estadoTexto, 350, y);
-
-          // Status indicator
-          if (item.estado === 1) {
-            doc.fill(VERDE).fontSize(8).font('Helvetica-Bold')
-              .text('OK', 520, y);
-          } else if (item.estado === 2 || item.estado === 3) {
-            // Warning icon
-            doc.rect(515, y - 1, 40, 12).fill(item.estado === 2 ? AMARILLO : ROJO);
-            doc.fill('#ffffff').fontSize(6).font('Helvetica-Bold')
-              .text(item.estado === 2 ? 'ATENCION' : 'CRITICO', 518, y + 1);
+        bloque.items.forEach(item => {
+          const color = item.estado === 'OK' ? '#4CAF50' : 
+                       item.critico ? '#F44336' : '#FF9800';
+          
+          doc.rect(50, yPos, 8, 8).fill(color);
+          doc.fillColor('#000').fontSize(10).font('Helvetica')
+             .text(item.nombre, 65, yPos);
+          
+          doc.fontSize(9).font('Helvetica-Bold')
+             .text(item.estado, 300, yPos);
+          
+          if (item.critico) {
+            doc.fontSize(7).fillColor('#F44336')
+               .text('[CRÍTICO]', 400, yPos);
           }
+          
+          yPos += 20;
+        });
 
-          y += 12;
-          doc.moveTo(55, y).lineTo(560, y).strokeColor(GRIS_LINEA).lineWidth(0.3).stroke();
-          y += 8;
+        yPos += 15;
+      });
+
+      // OBSERVACIONES
+      if (datos.observacion) {
+        if (yPos > 680) {
+          doc.addPage();
+          yPos = 50;
         }
-        y += 5;
+        
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#000')
+           .text('OBSERVACIONES', 50, yPos);
+        yPos += 20;
+        
+        doc.fontSize(10).font('Helvetica')
+           .text(datos.observacion, 50, yPos, { width: 512 });
+        yPos += 40;
       }
 
-      // ===== OBSERVACIONES =====
-      if (sesion.observacion) {
-        if (y > 680) { doc.addPage(); y = 50; }
-
-        doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
-        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
-          .text('OBSERVACIONES', 55, y + 4);
-        y += 22;
-
-        doc.fill(GRIS_OSCURO).fontSize(8).font('Helvetica')
-          .text(sesion.observacion, 55, y, { width: 500 });
-        y += 25;
-      }
-
-      // ===== EVIDENCIA FOTOGRAFICA =====
-      if (fotosDescargadas.length > 0) {
+      // FOTOS (NUEVA PÁGINA)
+      if (datos.fotos && datos.fotos.length > 0) {
         doc.addPage();
-        y = 50;
+        doc.fontSize(16).font('Helvetica-Bold')
+           .text('EVIDENCIA FOTOGRÁFICA', 50, 50);
 
-        doc.rect(0, 0, 612, 5).fill(NEGRO);
+        let yFoto = 90;
 
-        doc.rect(45, y, 522, 18).fill(NEGRO);
-        doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
-          .text('EVIDENCIA FOTOGRAFICA (VALIDACION IA)', 55, y + 4);
-        y += 30;
+        for (const foto of datos.fotos) {
+          try {
+            const { base64 } = await descargarImagen(foto.url);
+            const imgBuffer = Buffer.from(base64, 'base64');
 
-        for (var fp = 0; fp < fotosDescargadas.length; fp++) {
-          var fotoData = fotosDescargadas[fp];
-          var foto = fotoData.info;
-
-          if (y > 480) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
-
-          var esFotoNovedad = foto.tipo === 'novedad';
-
-          // Photo label
-          var fotoLabel = esFotoNovedad ? 'NOVEDAD' : 'VERIFICACION';
-          var labelColor = esFotoNovedad ? ROJO : VERDE;
-
-          doc.rect(45, y, 70, 14).fill(labelColor);
-          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold')
-            .text(fotoLabel, 50, y + 3);
-
-          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
-            .text(foto.descripcion, 125, y + 2);
-
-          y += 20;
-
-          // Photo
-          if (fotoData.buffer) {
-            try {
-              doc.image(fotoData.buffer, 80, y, { width: 380, height: 220, fit: [380, 220], align: 'center' });
-              y += 230;
-            } catch (imgErr) {
-              doc.rect(80, y, 380, 80).strokeColor(GRIS_LINEA).lineWidth(1).stroke();
-              doc.fill(GRIS_CLARO).fontSize(8).font('Helvetica')
-                .text('[Foto no se pudo incrustar]', 210, y + 35);
-              y += 90;
+            if (yFoto > 600) {
+              doc.addPage();
+              yFoto = 50;
             }
-          } else {
-            doc.rect(80, y, 380, 80).strokeColor(GRIS_LINEA).lineWidth(1).stroke();
-            doc.fill(GRIS_CLARO).fontSize(8).font('Helvetica')
-              .text('[Foto no disponible]', 220, y + 35);
-            y += 90;
-          }
 
-          // Validation comment
-          doc.fill(esFotoNovedad ? ROJO : VERDE).fontSize(7).font('Helvetica')
-            .text('IA: ' + (foto.validacion || 'Foto recibida'), 80, y, { width: 380 });
-          y += 25;
+            // TAG
+            const tagColor = foto.tipo === 'verificacion' ? '#4CAF50' : '#F44336';
+            const tagText = foto.tipo === 'verificacion' ? 'VERIFICACIÓN' : 'NOVEDAD';
+            
+            doc.rect(50, yFoto, 100, 20).fill(tagColor);
+            doc.fillColor('#FFF').fontSize(10).font('Helvetica-Bold')
+               .text(tagText, 55, yFoto + 5);
+
+            yFoto += 30;
+
+            // FOTO
+            doc.image(imgBuffer, 50, yFoto, { 
+              width: 250, 
+              align: 'left' 
+            });
+
+            // COMENTARIO IA
+            doc.fillColor('#000').fontSize(9).font('Helvetica')
+               .text(foto.comentario || foto.descripcion, 320, yFoto, { 
+                 width: 220,
+                 align: 'left'
+               });
+
+            yFoto += 210;
+
+          } catch (error) {
+            console.error('Error incrustando foto:', error.message);
+            doc.fillColor('#F44336').fontSize(9)
+               .text(`[Error: ${foto.descripcion}]`, 50, yFoto);
+            yFoto += 30;
+          }
         }
       }
 
-      // ===== FIRMA ELECTRONICA =====
-      if (y > 600) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
+      // FIRMA
+      doc.addPage();
+      doc.fontSize(12).font('Helvetica-Bold')
+         .text('FIRMA ELECTRÓNICA', 50, 50);
 
-      y += 15;
-      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
-      y += 10;
+      doc.fontSize(10).font('Helvetica').fillColor('#000')
+         .text(`Piloto: ${datos.conductor}`, 50, 80)
+         .text(`Teléfono: ${datos.telefono}`, 50, 100)
+         .text(`Fecha: ${new Date(datos.fecha).toLocaleString('es-CO')}`, 50, 120)
+         .text(`ID Transacción: CERO-${datos.placa}-${Date.now()}`, 50, 140);
 
-      doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
-        .text('VERIFICACION Y TRAZABILIDAD LEGAL', 45, y);
-      y += 14;
+      doc.fontSize(8).fillColor('#666')
+         .text('Firma válida según Ley 527/1999 - Firma Electrónica Simple', 50, 170);
 
-      doc.fill(GRIS_OSCURO).fontSize(7).font('Helvetica');
-
-      var firmaTexto = 'Firma: Firmado digitalmente por ' + (sesion.conductor ? sesion.conductor.nombre : 'Conductor') + ' mediante WhatsApp (' + (sesion.conductor ? sesion.conductor.telefono : 'N/R') + ')';
-      doc.text(firmaTexto, 45, y, { width: 520 });
-      y += 12;
-
-      var idTransaccion = 'CERO-' + sesion.placa + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
-      doc.text('Timestamp: ' + ahora.toLocaleString('es-CO') + ' | ID Transaccion: ' + idTransaccion, 45, y, { width: 520 });
-      y += 12;
-
-      doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', 45, y, { width: 520 });
-
-      // ===== FOOTER BRANDING =====
-      y += 30;
-      doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
-      y += 10;
-
-      doc.rect(45, y, 522, 35).fill(NEGRO);
-      doc.fill('#ffffff').fontSize(7).font('Helvetica')
-        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia', 55, y + 6, { width: 400 });
-      doc.text('fotografica y valida cada paso legalmente con firmas digitales.', 55, y + 17, { width: 400 });
-
-      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold')
-        .text('CERO', 490, y + 10);
+      // FOOTER
+      doc.rect(0, 720, 612, 72).fill('#000');
+      doc.fillColor('#FFF').fontSize(10).font('Helvetica-Bold')
+         .text('CERO SYSTEM', 50, 740)
+         .fontSize(8).font('Helvetica')
+         .text('Cero Papel • Cero Accidentes', 50, 760);
 
       doc.end();
+
     } catch (error) {
-      console.error('Error generando PDF:', error);
       reject(error);
     }
   });
 }
 
-async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
+async function subirYEnviarPDF(datos) {
   try {
-    var pdfBuffer = await generarPDF(sesion);
+    const pdfBuffer = await generarPDF(datos);
+    const nombreArchivo = `preop_${datos.placa}_${Date.now()}.pdf`;
 
-    var fecha = new Date().toISOString().split('T')[0];
-    var nombreArchivo = 'preop_' + sesion.placa + '_' + fecha + '_' + Date.now() + '.pdf';
-
-    var uploadResult = await config.supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('preoperacionales')
       .upload(nombreArchivo, pdfBuffer, {
         contentType: 'application/pdf',
         upsert: false
       });
 
-    if (uploadResult.error) {
-      console.error('Error subiendo PDF:', uploadResult.error);
-      return;
-    }
+    if (uploadError) throw uploadError;
 
-    var urlResult = config.supabase.storage
+    const { data: urlData } = supabase.storage
       .from('preoperacionales')
       .getPublicUrl(nombreArchivo);
 
-    var pdfUrl = urlResult.data.publicUrl;
-
-    await config.supabase
-      .from('preoperacionales')
-      .update({ pdf_url: pdfUrl })
-      .eq('id', preoperacionalId);
-
-    await config.twilioClient.messages.create({
-      from: config.TWILIO_WHATSAPP_NUMBER,
-      to: telefono,
-      body: 'PDF Preoperacional - ' + sesion.placa + '\n' + new Date().toLocaleDateString('es-CO') + '\n\nDescarga aqui:\n' + pdfUrl
-    });
-
-    console.log('PDF enviado a ' + telefono + ': ' + pdfUrl);
+    return urlData.publicUrl;
 
   } catch (error) {
-    console.error('Error en subirYEnviarPDF:', error);
+    console.error('Error generando/subiendo PDF:', error);
+    throw error;
   }
 }
 
