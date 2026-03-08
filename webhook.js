@@ -432,7 +432,20 @@ function registrarWebhook(app) {
 
           utils.responderTwiml(res, msgFinal);
 
-          pdf.subirYEnviarPDF(datosSesion, preop.id, telefono);
+                    pdf.subirYEnviarPDF(datosSesion, preop.id, telefono).then(function(urlPDF) {
+            if (urlPDF) {
+              config.twilioClient.messages.create({
+                from: config.TWILIO_WHATSAPP_NUMBER,
+                to: telefono,
+                body: '📄 *PDF Preoperacional listo*',
+                mediaUrl: [urlPDF]
+              }).catch(function(e) {
+                console.error('Error enviando PDF WhatsApp:', e.message);
+              });
+            }
+          }).catch(function(e) {
+            console.error('Error en PDF:', e.message);
+          });
           return;
         }
 
