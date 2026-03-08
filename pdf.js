@@ -192,9 +192,6 @@ async function generarPDF(sesion) {
       // ===== BLOQUES DE INSPECCION =====
       for (var g = 0; g < GRUPOS.length; g++) {
         var grupo = GRUPOS[g];
-        var respuesta = sesion.respuestas ? sesion.respuestas[grupo.id] : null;
-        if (!respuesta) continue;
-
         if (y > 640) { doc.addPage(); y = 50; }
 
         doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
@@ -202,25 +199,30 @@ async function generarPDF(sesion) {
           .text(grupo.nombre, 55, y + 4);
         y += 22;
 
-        var itemsRespuesta = respuesta.items || [];
+        // Construir mapa de estados reportados para este grupo
+        var respuesta = sesion.respuestas ? sesion.respuestas[grupo.id] : null;
+        var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
+        var mapaEstados = {};
+        for (var ri = 0; ri < itemsReportados.length; ri++) {
+          mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
+        }
 
-        for (var j = 0; j < itemsRespuesta.length; j++) {
-          var item = itemsRespuesta[j];
+        // Iterar sobre TODOS los items definidos del grupo
+        for (var j = 0; j < grupo.items.length; j++) {
+          var itemDef = grupo.items[j];
           if (y > 720) { doc.addPage(); y = 50; }
 
           doc.fill(NEGRO).fontSize(8).font('Helvetica')
-            .text(item.nombre || '', 55, y);
+            .text(itemDef.nombre || '', 55, y);
 
-          // Estado: puede venir como string contextual o como número
-          var estadoVal = item.estado;
+          var estadoVal = mapaEstados[itemDef.nombre] || 'OK';
           var estadoTexto, estadoColor;
 
           if (typeof estadoVal === 'number') {
             estadoTexto = estadoVal === 1 ? 'OK' : estadoVal === 2 ? 'Atencion' : estadoVal === 3 ? 'Malo' : 'N/A';
             estadoColor = estadoVal === 1 ? VERDE : estadoVal === 2 ? AMARILLO : estadoVal === 3 ? ROJO : GRIS_CLARO;
           } else {
-            // String contextual (OK, Bajo, Vacio, Funciona, etc.)
-            estadoTexto = estadoVal || 'OK';
+            estadoTexto = estadoVal;
             var est = estadoTexto.toLowerCase();
             if (est === 'ok' || est === 'funciona' || est === 'completo' || est === 'sin fugas') {
               estadoColor = VERDE;
@@ -234,7 +236,6 @@ async function generarPDF(sesion) {
           doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold')
             .text(estadoTexto, 350, y);
 
-          // Badge estado
           if (estadoColor === VERDE) {
             doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y);
           } else {
