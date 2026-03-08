@@ -17,7 +17,7 @@ async function descargarImagen(url) {
 
       function seguirUrl(currentUrl, saltos) {
         if (saltos > 5) return reject(new Error('Demasiadas redirecciones'));
-
+        console.log('URL a descargar:', currentUrl);
         const urlObj = new URL(currentUrl);
         const options = {
           hostname: urlObj.hostname,
