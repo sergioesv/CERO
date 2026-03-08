@@ -196,7 +196,7 @@ function registrarWebhook(app) {
           if (sesion.estado !== 'DESCRIBIR_NOVEDAD') break;
 
           var grupoNovedad = GRUPOS[sesion.grupoActual];
-          var interpretacion = await ia.interpretarNovedad(grupoNovedad, mensaje);
+          var interpretacion = await ia.interpretarNovedad(mensaje, grupoNovedad.items.map(function(i){ return i.nombre; }));
 
           if (!interpretacion) {
             return utils.responderTwiml(res, '\u274c No entendi.\nDescribe la novedad de nuevo.\n_Ej: "aceite bajo", "llanta danada"_');
