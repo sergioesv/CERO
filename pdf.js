@@ -1,10 +1,15 @@
 const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const { descargarImagen } = require('./ia');
-const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 const { logoBase64 } = require('./logo');
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Función para quitar comillas
+const clean = (value) => value ? value.replace(/^["']|["']$/g, '') : value;
+
+const supabase = createClient(
+  clean(process.env.SUPABASE_URL), 
+  clean(process.env.SUPABASE_KEY)
+);
 
 async function generarPDF(datos) {
   return new Promise(async (resolve, reject) => {
