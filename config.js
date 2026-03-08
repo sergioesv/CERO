@@ -8,6 +8,7 @@ function clean(value) {
 }
 
 const ANTHROPIC_API_KEY = clean(process.env.ANTHROPIC_API_KEY);
+console.log('API KEY inicia con:', ANTHROPIC_API_KEY ? ANTHROPIC_API_KEY.substring(0, 20) : 'UNDEFINED');
 const TWILIO_ACCOUNT_SID = clean(process.env.TWILIO_ACCOUNT_SID);
 const TWILIO_AUTH_TOKEN = clean(process.env.TWILIO_AUTH_TOKEN);
 
