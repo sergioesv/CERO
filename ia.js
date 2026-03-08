@@ -1,15 +1,10 @@
-const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
-const { ANTHROPIC_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('./config');
-
-const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+const { anthropic, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('./config');
 
 // Descargar imagen con autenticación Twilio
 async function descargarImagen(url) {
   try {
     const isTwilio = url.includes('twilio.com') || url.includes('twiliocdn.com');
-    console.log('URL foto:', url);
-    console.log('isTwilio:', isTwilio);
     const config = {
       responseType: 'arraybuffer',
       maxRedirects: 5
