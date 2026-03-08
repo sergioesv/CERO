@@ -181,7 +181,7 @@ async function generarPDF(datos) {
          .text('FIRMA ELECTRÓNICA', 50, 50);
 
       doc.fontSize(10).font('Helvetica').fillColor('#000')
-         .text(`Piloto: ${datos.conductor}`, 50, 80)
+         .text(`Piloto: ${datos.conductor ? (datos.conductor.nombre || datos.conductor) : 'N/A'}`, 50, 80)
          .text(`Teléfono: ${datos.telefono}`, 50, 100)
          .text(`Fecha: ${new Date(datos.fecha).toLocaleString('es-CO')}`, 50, 120)
          .text(`ID Transacción: CERO-${datos.placa}-${Date.now()}`, 50, 140);
