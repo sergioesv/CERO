@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const { descargarImagen } = require('./ia');
-const { logoBase64 } = require('./logo');
+const { LOGO_BASE64: logoBase64 } = require('./logo');
 
 // Función para quitar comillas
 const clean = (value) => value ? value.replace(/^["']|["']$/g, '') : value;
