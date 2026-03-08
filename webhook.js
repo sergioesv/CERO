@@ -392,6 +392,25 @@ function registrarWebhook(app) {
           }
 
           var datosSesion = sesiones.copiarSesion(sesion);
+          
+          // Construir bloques e items para el PDF
+          datosSesion.bloques = GRUPOS.map(function(grupo) {
+            var respGrupo = datosSesion.respuestas[grupo.id] || { items: [] };
+            var itemsRespuesta = respGrupo.items || [];
+            return {
+              nombre: grupo.nombre,
+              items: grupo.items.map(function(itemDef) {
+                var encontrado = itemsRespuesta.find(function(r) { return r.nombre === itemDef.nombre; });
+                return {
+                  nombre: itemDef.nombre,
+                  critico: itemDef.critico,
+                  estado: encontrado ? encontrado.estado : 'OK'
+                };
+              })
+            };
+          });
+          datosSesion.items = datosSesion.novedades || [];
+          
           sesiones.eliminarSesion(telefono);
 
           var msgFinal = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
