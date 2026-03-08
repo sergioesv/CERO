@@ -8,6 +8,8 @@ const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 async function descargarImagen(url) {
   try {
     const isTwilio = url.includes('twilio.com') || url.includes('twiliocdn.com');
+    console.log('URL foto:', url);
+    console.log('isTwilio:', isTwilio);
     const config = {
       responseType: 'arraybuffer',
       maxRedirects: 5
