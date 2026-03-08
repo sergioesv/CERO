@@ -247,7 +247,7 @@ function registrarWebhook(app) {
 
           if (!validacion.valida) {
             return utils.responderTwiml(res,
-              '\u274c *Foto no valida*\n' + validacion.razon_rechazo + '\n\nNecesito: ' + sesion.fotoVerificacionDescripcion
+              '\u274c *Foto no valida*\n' + validacion.razon + '\n\nNecesito: ' + sesion.fotoVerificacionDescripcion
             );
           }
 
@@ -255,7 +255,7 @@ function registrarWebhook(app) {
             tipo: 'verificacion',
             url: mediaUrl,
             descripcion: sesion.fotoVerificacionDescripcion,
-            validacion: validacion.descripcion
+            validacion: validacion.comentario
           });
 
           if (sesion.novedades.length > 0) {
@@ -287,7 +287,7 @@ function registrarWebhook(app) {
             tipo: 'novedad',
             url: mediaUrl,
             descripcion: novedadActual.grupo + ' - ' + novedadActual.item,
-            validacion: validacionNov.descripcion
+            validacion: validacionNov.comentario
           });
 
           sesion.fotosNovedadPendientes.shift();
