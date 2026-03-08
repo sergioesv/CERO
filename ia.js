@@ -93,8 +93,43 @@ Responde SOLO en JSON sin texto adicional:
   return JSON.parse(jsonMatch[0]);
 }
 
-// Validar foto con Sonnet Vision
-async function validarFoto(urlFoto, descripcionEsperada) {
+// Describir foto sin validación estricta (acepta cualquier foto del vehículo)
+async function describirFoto(urlFoto, contexto) {
+  try {
+    const { base64, mediaType } = await descargarImagen(urlFoto);
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64 }
+          },
+          {
+            type: 'text',
+            text: `Describe brevemente lo que ves en esta foto. Contexto: "${contexto}". Responde SOLO en JSON: {"comentario": "descripción de lo que ves"}`
+          }
+        ]
+      }]
+    });
+
+    const respuesta = message.content[0].text;
+    const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { valida: true, comentario: 'Foto recibida' };
+    const parsed = JSON.parse(jsonMatch[0]);
+    return { valida: true, comentario: parsed.comentario || 'Foto recibida' };
+  } catch (error) {
+    console.error('Error describiendo foto:', error.message);
+    return { valida: true, comentario: 'Foto recibida' };
+  }
+}
+
+// Validar foto con Sonnet Vision — solo para foto de verificación aleatoria
+async function validarFoto(urlFoto, descripcionEsperada, soloDescribir) {
+  if (soloDescribir) return describirFoto(urlFoto, descripcionEsperada);
   try {
     const { base64, mediaType } = await descargarImagen(urlFoto);
 
@@ -106,22 +141,11 @@ async function validarFoto(urlFoto, descripcionEsperada) {
         content: [
           {
             type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaType,
-              data: base64
-            }
+            source: { type: 'base64', media_type: mediaType, data: base64 }
           },
           {
             type: 'text',
-            text: `¿Esta foto muestra "${descripcionEsperada}" de un vehículo?
-
-Responde SOLO en JSON:
-{
-  "valida": true/false,
-  "razon": "descripción breve",
-  "comentario": "lo que ves en la foto"
-}`
+            text: `¿Esta foto muestra alguna parte de un vehículo relacionada con "${descripcionEsperada}"? Acepta si es cualquier parte del vehículo o sus componentes. Rechaza solo si claramente no es un vehículo ni sus partes. Responde SOLO en JSON: {"valida": true/false, "razon": "descripción breve", "comentario": "lo que ves en la foto"}`
           }
         ]
       }]
@@ -129,19 +153,11 @@ Responde SOLO en JSON:
 
     const respuesta = message.content[0].text;
     const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
-    
-    if (!jsonMatch) {
-      return { valida: false, razon: 'Error de validación', comentario: '' };
-    }
-
+    if (!jsonMatch) return { valida: false, razon: 'Error de validación', comentario: '' };
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
     console.error('Error validando foto:', error.message);
-    return { 
-      valida: false, 
-      razon: 'Error al procesar imagen',
-      comentario: error.message 
-    };
+    return { valida: false, razon: 'Error al procesar imagen', comentario: error.message };
   }
 }
 
@@ -149,5 +165,6 @@ module.exports = {
   marcarTodoOK,
   interpretarNovedad,
   validarFoto,
+  describirFoto,
   descargarImagen
 };
