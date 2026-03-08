@@ -18,6 +18,12 @@ function registrarWebhook(app) {
     var mediaUrl = req.body.MediaUrl0 || null;
     var numMedia = parseInt(req.body.NumMedia || '0');
 
+    // Bloqueo de concurrencia — evita doble procesamiento si el usuario envía rápido
+    if (!sesiones.bloquear(telefono)) {
+      console.log('[' + telefono + '] BLOQUEADO - mensaje descartado (procesando anterior)');
+      return utils.responderTwiml(res, '⏳ Procesando... espera un momento y reenvía.');
+    }
+
     var sesion = sesiones.obtenerSesion(telefono);
 
     console.log('[' + telefono + '] Estado: ' + sesion.estado + ' | Mensaje: ' + mensaje + ' | Media: ' + numMedia);
@@ -93,6 +99,11 @@ function registrarWebhook(app) {
         if (sesion.estado === 'CONFIRMACION') {
           sesion.estado = 'OBSERVACION';
           return utils.responderTwiml(res, '\u25c0\ufe0f Observacion final? Si no hay, escribe *no*');
+        }
+        if (sesion.estado === 'OBSERVACION') {
+          sesion.estado = 'FOTO_ADICIONAL';
+          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'adicional'; });
+          return utils.responderTwiml(res, '\u25c0\ufe0f Fotos adicionales? Envie fotos o escriba *no*');
         }
         return utils.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
       }
@@ -287,7 +298,17 @@ function registrarWebhook(app) {
           });
 
           if (sesion.novedades.length > 0) {
-            sesion.fotosNovedadPendientes = sesion.novedades.slice();
+            // Excluir ítems sinFoto (bocina, tablero, pedales, aseo, aire) — no se pueden fotografiar
+            var GRUPOS_MAP = {};
+            for (var gm = 0; gm < GRUPOS.length; gm++) {
+              for (var im = 0; im < GRUPOS[gm].items.length; im++) {
+                GRUPOS_MAP[GRUPOS[gm].items[im].nombre] = GRUPOS[gm].items[im];
+              }
+            }
+            sesion.fotosNovedadPendientes = sesion.novedades.filter(function(n) {
+              var def = GRUPOS_MAP[n.item];
+              return !def || !def.sinFoto;
+            });
             var novedad = sesion.fotosNovedadPendientes[0];
             sesion.estado = 'FOTO_NOVEDAD';
             return utils.responderTwiml(res,
@@ -295,8 +316,8 @@ function registrarWebhook(app) {
             );
           }
 
-          sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
+          sesion.estado = 'FOTO_ADICIONAL';
+          return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
         }
 
         // ==================== FOTOS DE NOVEDADES ====================
@@ -309,13 +330,13 @@ function registrarWebhook(app) {
           }
 
           var novedadActual = sesion.fotosNovedadPendientes[0];
-          var validacionNov = await ia.validarFoto(mediaUrl, novedadActual.item + ' - ' + (novedadActual.nota || ''));
+          var descNov = await ia.describirFoto(mediaUrl, novedadActual.item + ' - ' + (novedadActual.nota || ''));
 
           sesion.fotos.push({
             tipo: 'novedad',
             url: mediaUrl,
             descripcion: novedadActual.grupo + ' - ' + novedadActual.item,
-            validacion: validacionNov.comentario
+            validacion: descNov.comentario
           });
 
           sesion.fotosNovedadPendientes.shift();
@@ -327,8 +348,25 @@ function registrarWebhook(app) {
             );
           }
 
+          sesion.estado = 'FOTO_ADICIONAL';
+          return utils.responderTwiml(res, '\u2705 Todas las fotos recibidas\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
+        }
+
+        // ==================== FOTO ADICIONAL (OPCIONAL) ====================
+        case 'FOTO_ADICIONAL': {
+          if (numMedia > 0) {
+            var descAd = await ia.describirFoto(mediaUrl, 'evidencia adicional preoperacional ' + sesion.placa);
+            sesion.fotos.push({
+              tipo: 'adicional',
+              url: mediaUrl,
+              descripcion: 'Foto adicional',
+              validacion: descAd.comentario
+            });
+            return utils.responderTwiml(res, '\u2705 Foto guardada\n\nEnvie otra foto o escriba *no* para continuar');
+          }
+          // Texto "no" u otro → pasar a observacion
           sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, '\u2705 Todas las fotos recibidas\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
+          return utils.responderTwiml(res, '\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
         }
 
         // ==================== OBSERVACION ====================
@@ -474,6 +512,8 @@ function registrarWebhook(app) {
     } catch (error) {
       console.error('Error en webhook:', error);
       return utils.responderTwiml(res, '\u274c Error interno. Intente de nuevo.');
+    } finally {
+      sesiones.desbloquear(telefono);
     }
   });
 }
