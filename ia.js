@@ -54,23 +54,25 @@ function marcarTodoOK() {
 
 // Interpretar novedad con Haiku
 async function interpretarNovedad(texto, items) {
-  const prompt = `Eres asistente de inspección vehicular. El operario reportó: "${texto}"
+  const prompt = `Eres asistente de inspección vehicular. El operario reportó una novedad: "${texto}"
 
-Items del bloque: ${items.join(', ')}
+Ítems posibles del bloque: ${items.join(', ')}
 
-Clasifica cada item mencionado:
-- Niveles: OK / Bajo / Vacío
-- Fugas: Sin fugas / Con fugas
-- Llantas: OK / Desgastada / Dañada
-- Luces/Eléctricos: Funciona / Intermitente / No funciona
-- Frenos/Pedales: Funciona / Duro o flojo / No funciona
-- Equipo: Completo / Incompleto / Falta
-- Cinturones/Espejos: OK / Dañado / Falta
+REGLA IMPORTANTE: Solo incluye en el JSON los ítems que el operario mencionó explícitamente con una falla. No incluyas ítems que no se mencionaron. Si el operario dijo "llanta desinflada", solo reporta el ítem de llantas.
 
-Responde SOLO en JSON:
+Clasifica el estado usando estas categorías según el tipo de ítem:
+- Niveles de líquidos: Bajo / Vacío
+- Fugas: Con fugas
+- Llantas: Desgastada / Dañada / Sin presión
+- Luces/Eléctricos: Intermitente / No funciona
+- Frenos/Pedales: Duro o flojo / No funciona
+- Equipo carretera: Incompleto / Falta
+- Cinturones/Espejos: Dañado / Falta
+
+Responde SOLO en JSON sin texto adicional:
 {
   "items": [
-    {"nombre": "Aceite", "estado": "Bajo", "critico": true}
+    {"nombre": "nombre exacto del ítem según la lista", "estado": "estado según categoría"}
   ],
   "observacion": "texto original del operario"
 }`;
