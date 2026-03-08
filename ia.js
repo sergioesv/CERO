@@ -3,7 +3,7 @@ const axios = require('axios');
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('./config');
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
+console.log('Anthropic key en ia.js:', process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.substring(0, 25) : 'UNDEFINED');
 // Descargar imagen con autenticación Twilio
 async function descargarImagen(url) {
   try {
