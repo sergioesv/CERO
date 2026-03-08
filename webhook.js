@@ -410,7 +410,8 @@ function registrarWebhook(app) {
             };
           });
           datosSesion.items = datosSesion.novedades || [];
-          
+          datosSesion.telefono = telefono;
+          datosSesion.fecha = new Date().toISOString();
           sesiones.eliminarSesion(telefono);
 
           var msgFinal = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
