@@ -22,6 +22,8 @@ const twilioClient = twilio(
   clean(process.env.TWILIO_AUTH_TOKEN)
 );
 
-const TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886';
+const TWILIO_ACCOUNT_SID = clean(process.env.TWILIO_ACCOUNT_SID);
+const TWILIO_AUTH_TOKEN = clean(process.env.TWILIO_AUTH_TOKEN);
+const ANTHROPIC_API_KEY = clean(process.env.ANTHROPIC_API_KEY);
 
-module.exports = { anthropic, supabase, twilioClient, TWILIO_WHATSAPP_NUMBER };
+module.exports = { anthropic, supabase, twilioClient, TWILIO_WHATSAPP_NUMBER, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, ANTHROPIC_API_KEY };
