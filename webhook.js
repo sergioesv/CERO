@@ -49,6 +49,8 @@ function registrarWebhook(app) {
           sesion.grupoActual--;
           var grupoAnterior = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[grupoAnterior.id];
+          // Limpiar novedades del grupo al que volvemos
+          sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== grupoAnterior.nombre; });
           return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnterior, '\u25c0\ufe0f Volvemos'));
         }
         if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
@@ -65,11 +67,27 @@ function registrarWebhook(app) {
           sesion.estado = 'GRUPO';
           var ultimoGrupo = GRUPOS[sesion.grupoActual];
           delete sesion.respuestas[ultimoGrupo.id];
+          sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== ultimoGrupo.nombre; });
           return utils.responderTwiml(res, utils.formatGrupoMsg(ultimoGrupo, '\u25c0\ufe0f Volvemos'));
         }
-        if (sesion.estado === 'OBSERVACION') {
+        if (sesion.estado === 'FOTO_NOVEDAD') {
+          // Volver a foto de verificacion
           sesion.estado = 'FOTO_VERIFICACION';
-          sesion.fotos.pop();
+          sesion.fotosNovedadPendientes = [];
+          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'novedad'; });
+          return utils.responderTwiml(res, '\u25c0\ufe0f ' + sesion.fotoVerificacionDescripcion);
+        }
+        if (sesion.estado === 'OBSERVACION') {
+          if (sesion.novedades.length > 0) {
+            // Volver a fotos de novedad
+            sesion.fotosNovedadPendientes = sesion.novedades.slice();
+            sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'novedad'; });
+            sesion.estado = 'FOTO_NOVEDAD';
+            var novVolver = sesion.fotosNovedadPendientes[0];
+            return utils.responderTwiml(res, '\u25c0\ufe0f \ud83d\udcf8 *Foto de novedad*\n' + novVolver.item + ': _' + (novVolver.nota || novVolver.grupo) + '_');
+          }
+          sesion.estado = 'FOTO_VERIFICACION';
+          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'verificacion'; });
           return utils.responderTwiml(res, '\u25c0\ufe0f ' + sesion.fotoVerificacionDescripcion);
         }
         if (sesion.estado === 'CONFIRMACION') {
@@ -143,15 +161,14 @@ function registrarWebhook(app) {
           return utils.responderTwiml(res, utils.formatGrupoMsg(grupo, '\ud83d\udcdd *Inspeccion iniciada*\n' + sesion.placa + ' | ' + km + ' km'));
         }
 
-        // ==================== GRUPOS — FORMULARIO HIBRIDO ====================
+        // ==================== GRUPOS ====================
         case 'GRUPO': {
           var grupoActual = GRUPOS[sesion.grupoActual];
           var respLimpia = mensaje.trim();
 
-          // 1️⃣ Todo OK — sin IA, respuesta instantanea
+          // 1️⃣ Todo OK
           if (respLimpia === '1' || respLimpia === '1\ufe0f\u20e3' || respLimpia.toLowerCase() === 'ok' || respLimpia.toLowerCase() === 'todo bien') {
             sesion.respuestas[grupoActual.id] = ia.marcarTodoOK(grupoActual);
-
             sesion.grupoActual++;
 
             if (sesion.grupoActual < GRUPOS.length) {
@@ -159,7 +176,6 @@ function registrarWebhook(app) {
               return utils.responderTwiml(res, utils.formatGrupoMsg(sig, '\u2705 OK'));
             }
 
-            // All groups done
             var resumen = utils.generarResumen(sesion);
             sesion.estado = 'FOTO_VERIFICACION';
             sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
@@ -168,10 +184,15 @@ function registrarWebhook(app) {
             );
           }
 
-          // 2️⃣ Novedad — pedir descripcion
+          // 2️⃣ Novedad — ejemplos contextuales del grupo actual
           if (respLimpia === '2' || respLimpia === '2\ufe0f\u20e3') {
             sesion.estado = 'DESCRIBIR_NOVEDAD';
-            return utils.responderTwiml(res, '\u270d\ufe0f *Describe la novedad en:*\n' + grupoActual.nombre + '\n\n_Escribe lo que encontraste_\n_Ej: "aceite bajo", "llanta lisa", "no hay extintor"_');
+            var ejemplos = grupoActual.items.slice(0, 2).map(function(i) {
+              return i.nombre.toLowerCase();
+            }).join('", "');
+            return utils.responderTwiml(res,
+              '\u270d\ufe0f *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
+            );
           }
 
           // 3️⃣ Atras
@@ -180,15 +201,14 @@ function registrarWebhook(app) {
               sesion.grupoActual--;
               var grupoAnt = GRUPOS[sesion.grupoActual];
               delete sesion.respuestas[grupoAnt.id];
+              sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== grupoAnt.nombre; });
               return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnt, '\u25c0\ufe0f Volvemos'));
-            } else {
-              sesion.estado = 'ESPERANDO_KILOMETRAJE';
-              return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
             }
+            sesion.estado = 'ESPERANDO_KILOMETRAJE';
+            return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
           }
 
-          // Si escribe texto directamente, asumimos novedad
-          sesion.estado = 'DESCRIBIR_NOVEDAD';
+          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoActual, '\u274c Responde 1, 2 o 3'));
         }
 
         // ==================== DESCRIBIR NOVEDAD ====================
@@ -196,30 +216,38 @@ function registrarWebhook(app) {
           if (sesion.estado !== 'DESCRIBIR_NOVEDAD') break;
 
           var grupoNovedad = GRUPOS[sesion.grupoActual];
-          var interpretacion = await ia.interpretarNovedad(mensaje, grupoNovedad.items.map(function(i){ return i.nombre; }));
+          var interpretacion = await ia.interpretarNovedad(mensaje, grupoNovedad.items.map(function(i) { return i.nombre; }));
 
           if (!interpretacion) {
-            return utils.responderTwiml(res, '\u274c No entendi.\nDescribe la novedad de nuevo.\n_Ej: "aceite bajo", "llanta danada"_');
+            var ejemplosError = grupoNovedad.items.slice(0, 2).map(function(i) { return i.nombre.toLowerCase(); }).join('", "');
+            return utils.responderTwiml(res, '\u274c No entendi.\nDescribe la novedad de nuevo.\n_Ej: "' + ejemplosError + ' malo"_');
           }
 
           sesion.respuestas[grupoNovedad.id] = interpretacion;
 
+          // FIX: filtrar por estado string, no por número
           var novedadesGrupo = interpretacion.items
-            .filter(function(i) { return i.estado === 2 || i.estado === 3; })
+            .filter(function(i) {
+              var est = (i.estado || '').toLowerCase();
+              return est !== 'ok' && est !== 'funciona' && est !== 'sin fugas' && est !== 'completo' && est !== '';
+            })
             .map(function(i) {
               return {
                 grupo: grupoNovedad.nombre,
                 item: i.nombre,
                 estado: i.estado,
-                nota: i.nota,
+                nota: i.estado,
                 critico: utils.esCritico(grupoNovedad.id, i.nombre)
               };
             });
+
           for (var x = 0; x < novedadesGrupo.length; x++) {
             sesion.novedades.push(novedadesGrupo[x]);
           }
 
-          var confirmacion = interpretacion.resumen ? '\u2705 ' + interpretacion.resumen : '';
+          var confirmacion = novedadesGrupo.length > 0
+            ? '\u26a0\ufe0f Anotado: ' + novedadesGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
+            : '\u2705 Registrado';
 
           sesion.grupoActual++;
           sesion.estado = 'GRUPO';
@@ -259,14 +287,11 @@ function registrarWebhook(app) {
           });
 
           if (sesion.novedades.length > 0) {
-            sesion.fotosNovedadPendientes = [];
-            for (var nn = 0; nn < sesion.novedades.length; nn++) {
-              sesion.fotosNovedadPendientes.push(sesion.novedades[nn]);
-            }
+            sesion.fotosNovedadPendientes = sesion.novedades.slice();
             var novedad = sesion.fotosNovedadPendientes[0];
             sesion.estado = 'FOTO_NOVEDAD';
             return utils.responderTwiml(res,
-              '\u2705 Foto valida\n\n\ud83d\udcf8 *Foto de novedad*\n' + novedad.item + ': _' + (novedad.nota || novedad.grupo) + '_'
+              '\u2705 Foto valida\n\n\ud83d\udcf8 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + novedad.item + '*\n_' + (novedad.nota || novedad.grupo) + '_'
             );
           }
 
@@ -277,7 +302,10 @@ function registrarWebhook(app) {
         // ==================== FOTOS DE NOVEDADES ====================
         case 'FOTO_NOVEDAD': {
           if (numMedia === 0) {
-            return utils.responderTwiml(res, '\ud83d\udcf8 Necesito la foto de la novedad.\nEnviala por favor.');
+            var novPend = sesion.fotosNovedadPendientes[0];
+            return utils.responderTwiml(res,
+              '\ud83d\udcf8 Necesito la foto de:\n*' + novPend.item + '*\n_' + (novPend.nota || novPend.grupo) + '_\nEnviala por favor.'
+            );
           }
 
           var novedadActual = sesion.fotosNovedadPendientes[0];
@@ -295,12 +323,12 @@ function registrarWebhook(app) {
           if (sesion.fotosNovedadPendientes.length > 0) {
             var siguienteNov = sesion.fotosNovedadPendientes[0];
             return utils.responderTwiml(res,
-              '\u2705 Foto recibida\n\n\ud83d\udcf8 *Foto de novedad*\n' + siguienteNov.item + ': _' + (siguienteNov.nota || siguienteNov.grupo) + '_'
+              '\u2705 Foto recibida\n\n\ud83d\udcf8 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + siguienteNov.item + '*\n_' + (siguienteNov.nota || siguienteNov.grupo) + '_'
             );
           }
 
           sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, '\u2705 Foto recibida\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
+          return utils.responderTwiml(res, '\u2705 Todas las fotos recibidas\n\n\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
         }
 
         // ==================== OBSERVACION ====================
@@ -315,12 +343,15 @@ function registrarWebhook(app) {
           textoFirma += '\ud83d\udccf Kilometraje: *' + sesion.kilometraje + ' km*\n';
           if (sesion.novedades.length > 0) {
             textoFirma += '\u26a0\ufe0f Novedades: *' + sesion.novedades.length + '*\n';
+            sesion.novedades.forEach(function(n) {
+              textoFirma += '  \u2022 ' + n.item + ': ' + n.estado + '\n';
+            });
           } else {
             textoFirma += '\u2705 Sin novedades\n';
           }
           textoFirma += '\ud83d\udcf7 Fotos: *' + sesion.fotos.length + '*\n';
           if (sesion.observacion) textoFirma += '\ud83d\udcac _' + sesion.observacion + '_\n';
-          textoFirma += '\n\u270d\ufe0f Escriba *SI* para firmar';
+          textoFirma += '\n\u270d\ufe0f Escriba *SI* para firmar\no *ATRAS* para corregir';
 
           return utils.responderTwiml(res, textoFirma);
         }
@@ -328,7 +359,7 @@ function registrarWebhook(app) {
         // ==================== CONFIRMACION / FIRMA ====================
         case 'CONFIRMACION': {
           if (mensaje.toUpperCase() !== 'SI') {
-            return utils.responderTwiml(res, 'Escriba *SI* para firmar\no *CANCELAR* para anular.');
+            return utils.responderTwiml(res, 'Escriba *SI* para firmar\no *ATRAS* para corregir\no *CANCELAR* para anular.');
           }
 
           var ahora = new Date();
@@ -392,8 +423,7 @@ function registrarWebhook(app) {
           }
 
           var datosSesion = sesiones.copiarSesion(sesion);
-          
-          // Construir bloques e items para el PDF
+
           datosSesion.bloques = GRUPOS.map(function(grupo) {
             var respGrupo = datosSesion.respuestas[grupo.id] || { items: [] };
             var itemsRespuesta = respGrupo.items || [];
@@ -411,7 +441,7 @@ function registrarWebhook(app) {
           });
           datosSesion.items = datosSesion.novedades || [];
           datosSesion.telefono = telefono;
-          datosSesion.fecha = new Date().toISOString();
+          datosSesion.fecha = ahora.toISOString();
           sesiones.eliminarSesion(telefono);
 
           var msgFinal = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
@@ -432,20 +462,7 @@ function registrarWebhook(app) {
 
           utils.responderTwiml(res, msgFinal);
 
-                    pdf.subirYEnviarPDF(datosSesion, preop.id, telefono).then(function(urlPDF) {
-            if (urlPDF) {
-              config.twilioClient.messages.create({
-                from: config.TWILIO_WHATSAPP_NUMBER,
-                to: telefono,
-                body: '📄 *PDF Preoperacional listo*',
-                mediaUrl: [urlPDF]
-              }).catch(function(e) {
-                console.error('Error enviando PDF WhatsApp:', e.message);
-              });
-            }
-          }).catch(function(e) {
-            console.error('Error en PDF:', e.message);
-          });
+          pdf.subirYEnviarPDF(datosSesion, preop.id, telefono);
           return;
         }
 
