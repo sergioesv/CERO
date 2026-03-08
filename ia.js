@@ -7,7 +7,7 @@ const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 // Descargar imagen con autenticación Twilio
 async function descargarImagen(url) {
   try {
-    const isTwilio = url.includes('api.twilio.com');
+    const isTwilio = url.includes('twilio.com') || url.includes('twiliocdn.com');
     const config = {
       responseType: 'arraybuffer',
       maxRedirects: 5
