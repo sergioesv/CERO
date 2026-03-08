@@ -1,16 +1,12 @@
 const express = require('express');
-const webhook = require('./webhook');
+const { registrarWebhook } = require('./webhook');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(express.urlencoded({ extended: false }));
 
-app.post('/webhook', webhook);
-
-app.get('/', (req, res) => {
-  res.send('CERO v2 activo');
-});
+registrarWebhook(app);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`CERO v2 corriendo en puerto ${PORT}`);
