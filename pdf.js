@@ -101,8 +101,7 @@ async function generarPDF(sesion) {
         var savedX = doc.x;
         var savedY = doc.y;
 
-        // Barra negra superior (coordenadas absolutas)
-        doc.rect(0, 0, PAGE_W, 5).fill(NEGRO);
+        // Sin barra superior — causa conflicto con márgenes PDFKit
 
         // Footer (coordenada absoluta fija, no mueve flujo de texto)
         doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
