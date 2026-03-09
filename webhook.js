@@ -198,11 +198,12 @@ function registrarWebhook(app) {
           // 2️⃣ Novedad — ejemplos contextuales del grupo actual
           if (respLimpia === '2' || respLimpia === '2\ufe0f\u20e3') {
             sesion.estado = 'DESCRIBIR_NOVEDAD';
+            var listaItems = grupoActual.items.map(function(i) { return '• ' + i.nombre; }).join('\n');
             var ejemplos = grupoActual.items.slice(0, 2).map(function(i) {
               return i.nombre.toLowerCase();
             }).join('", "');
             return utils.responderTwiml(res,
-              '\u270d\ufe0f *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
+              '\u270d\ufe0f *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n------\n' + listaItems + '\n------\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
             );
           }
 
