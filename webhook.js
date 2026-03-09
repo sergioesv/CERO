@@ -147,10 +147,28 @@ function registrarWebhook(app) {
 
           sesion.conductor = resConductor.data;
 
+          if (!sesion.conductor) {
+            sesion.estado = 'ESPERANDO_NOMBRE';
+            return utils.responderTwiml(res,
+              '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\n\u00bfTu nombre completo?'
+            );
+          }
+
           sesion.estado = 'ESPERANDO_KILOMETRAJE';
           return utils.responderTwiml(res,
             '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\nKilometraje actual?'
           );
+        }
+
+        // ==================== NOMBRE (conductor no registrado) ====================
+        case 'ESPERANDO_NOMBRE': {
+          var nombreLibre = mensaje.trim();
+          if (nombreLibre.length < 3) {
+            return utils.responderTwiml(res, '\u274c Escribe tu nombre completo.');
+          }
+          sesion.conductor = { nombre: nombreLibre, licencia_categoria: 'N/R', telefono: telefono.replace('whatsapp:', '') };
+          sesion.estado = 'ESPERANDO_KILOMETRAJE';
+          return utils.responderTwiml(res, 'Hola *' + nombreLibre + '* \ud83d\udc4b\nKilometraje actual?');
         }
 
         // ==================== KILOMETRAJE ====================
