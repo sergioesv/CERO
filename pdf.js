@@ -3,7 +3,7 @@ var https = require('https');
 var http = require('http');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
-var LOGO_BASE64 = require('./logo').LOGO_BASE64; 
+var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
@@ -111,16 +111,17 @@ async function generarPDF(sesion) {
       });
 
       var pageCount = 0;
+      var decorando = false;
       doc.on('pageAdded', function() {
+        if (decorando) return;
+        decorando = true;
         pageCount++;
-        // Footer en todas las páginas — coordenada absoluta, lineBreak false
         doc.save();
         doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
           .text(
             'Pag. ' + pageCount + '  |  CERO',
             MARGIN, PAGE_H - 20, { width: CONTENT_W, align: 'center', lineBreak: false }
           );
-        // Mini header en páginas 2+
         if (pageCount > 1) {
           try {
             var lb = Buffer.from(LOGO_BASE64, 'base64');
@@ -133,6 +134,7 @@ async function generarPDF(sesion) {
           doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
         }
         doc.restore();
+        decorando = false;
       });
 
       var chunks = [];
