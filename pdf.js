@@ -105,11 +105,34 @@ async function generarPDF(sesion) {
       var horaStr = formatHoraColombia(ahora);
       var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
 
-      // bufferPages: true — clave para agregar header/footer después sin crear páginas extra
       var doc = new PDFDocument({
         size: 'LETTER',
-        margin: MARGIN,
-        bufferPages: true
+        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 50 }
+      });
+
+      var pageCount = 0;
+      doc.on('pageAdded', function() {
+        pageCount++;
+        // Footer en todas las páginas — coordenada absoluta, lineBreak false
+        doc.save();
+        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+          .text(
+            'Pag. ' + pageCount + '  |  CERO',
+            MARGIN, PAGE_H - 20, { width: CONTENT_W, align: 'center', lineBreak: false }
+          );
+        // Mini header en páginas 2+
+        if (pageCount > 1) {
+          try {
+            var lb = Buffer.from(LOGO_BASE64, 'base64');
+            doc.image(lb, MARGIN, 10, { width: 22, height: 20 });
+          } catch(e) {}
+          doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 73, 13, { lineBreak: false });
+          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+            .text((sesion.placa || '') + '  |  ' + fecha, 73, 23, { lineBreak: false });
+          doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+        }
+        doc.restore();
       });
 
       var chunks = [];
@@ -321,34 +344,6 @@ async function generarPDF(sesion) {
       doc.text('y valida cada paso legalmente con firmas digitales.', MARGIN + 10, y + 17, { width: 390 });
       doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
 
-      // ===== HEADER/FOOTER EN TODAS LAS PÁGINAS (bufferPages) =====
-      var range = doc.bufferedPageRange();
-      for (var pi = 0; pi < range.count; pi++) {
-        doc.switchToPage(range.start + pi);
-        var pageNum = pi + 1;
-
-        // Footer en todas las páginas
-        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-          .text(
-            'Pag. ' + pageNum + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            MARGIN, PAGE_H - 20, { width: CONTENT_W, align: 'center', lineBreak: false }
-          );
-
-        // Mini header en páginas 2+
-        if (pi > 0) {
-          try {
-            var lb = Buffer.from(LOGO_BASE64, 'base64');
-            doc.image(lb, MARGIN, 10, { width: 22, height: 20 });
-          } catch(e) {}
-          doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 73, 13, { lineBreak: false });
-          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-            .text((sesion.placa || '') + '  |  ' + fecha, 73, 23, { lineBreak: false });
-          doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
-        }
-      }
-
-      doc.flushPages();
       doc.end();
 
     } catch (error) {
