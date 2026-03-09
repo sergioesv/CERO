@@ -86,7 +86,7 @@ async function generarPDF(sesion) {
       var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000)); // Colombia UTC-5
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      var doc = new PDFDocument({ size: 'LETTER', margin: MARGIN, autoFirstPage: false });
+      var doc = new PDFDocument({ size: 'LETTER', margin: MARGIN, autoFirstPage: true });
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
@@ -97,7 +97,9 @@ async function generarPDF(sesion) {
       // ===== HELPER: nueva página con header y footer fijos =====
       function nuevaPagina(esPrimera) {
         numPagina++;
-        doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: 50, left: MARGIN, right: MARGIN } });
+        if (!esPrimera) {
+          doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: 50, left: MARGIN, right: MARGIN } });
+        }
 
         // Barra negra superior
         doc.rect(0, 0, PAGE_W, 5).fill(NEGRO);
