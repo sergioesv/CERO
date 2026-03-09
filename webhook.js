@@ -400,7 +400,9 @@ function registrarWebhook(app) {
             return utils.responderTwiml(res, 'Escriba *SI* para firmar\no *ATRAS* para corregir\no *CANCELAR* para anular.');
           }
 
-          var ahora = new Date();
+          var ahoraUTC = new Date();
+          // Colombia = UTC-5
+          var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
 
           var datosPreoperacional = {
             vehiculo_id: sesion.vehiculo.id,
