@@ -124,8 +124,7 @@ async function generarPDF(sesion) {
         .text(sesion.placa || '', 45, y);
 
       doc.fill(GRIS).fontSize(8).font('Helvetica')
-        .text(vehiculo.tipo || '', 420, 74, { align: 'right', width: 147 });
-      doc.text('Anio ' + (vehiculo.anio || 'N/R'), 420, 86, { align: 'right', width: 147 });
+        .text('Anio ' + (vehiculo.anio || 'N/R'), 420, 74, { align: 'right', width: 147 });
 
       y += 35;
       doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
@@ -192,6 +191,9 @@ async function generarPDF(sesion) {
       // ===== BLOQUES DE INSPECCION =====
       for (var g = 0; g < GRUPOS.length; g++) {
         var grupo = GRUPOS[g];
+        var respuesta = sesion.respuestas ? sesion.respuestas[grupo.id] : null;
+        if (!respuesta) continue;
+
         if (y > 640) { doc.addPage(); y = 50; }
 
         doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
@@ -199,30 +201,25 @@ async function generarPDF(sesion) {
           .text(grupo.nombre, 55, y + 4);
         y += 22;
 
-        // Construir mapa de estados reportados para este grupo
-        var respuesta = sesion.respuestas ? sesion.respuestas[grupo.id] : null;
-        var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
-        var mapaEstados = {};
-        for (var ri = 0; ri < itemsReportados.length; ri++) {
-          mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
-        }
+        var itemsRespuesta = respuesta.items || [];
 
-        // Iterar sobre TODOS los items definidos del grupo
-        for (var j = 0; j < grupo.items.length; j++) {
-          var itemDef = grupo.items[j];
+        for (var j = 0; j < itemsRespuesta.length; j++) {
+          var item = itemsRespuesta[j];
           if (y > 720) { doc.addPage(); y = 50; }
 
           doc.fill(NEGRO).fontSize(8).font('Helvetica')
-            .text(itemDef.nombre || '', 55, y);
+            .text(item.nombre || '', 55, y);
 
-          var estadoVal = mapaEstados[itemDef.nombre] || 'OK';
+          // Estado: puede venir como string contextual o como número
+          var estadoVal = item.estado;
           var estadoTexto, estadoColor;
 
           if (typeof estadoVal === 'number') {
             estadoTexto = estadoVal === 1 ? 'OK' : estadoVal === 2 ? 'Atencion' : estadoVal === 3 ? 'Malo' : 'N/A';
             estadoColor = estadoVal === 1 ? VERDE : estadoVal === 2 ? AMARILLO : estadoVal === 3 ? ROJO : GRIS_CLARO;
           } else {
-            estadoTexto = estadoVal;
+            // String contextual (OK, Bajo, Vacio, Funciona, etc.)
+            estadoTexto = estadoVal || 'OK';
             var est = estadoTexto.toLowerCase();
             if (est === 'ok' || est === 'funciona' || est === 'completo' || est === 'sin fugas') {
               estadoColor = VERDE;
@@ -236,6 +233,7 @@ async function generarPDF(sesion) {
           doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold')
             .text(estadoTexto, 350, y);
 
+          // Badge estado
           if (estadoColor === VERDE) {
             doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y);
           } else {
@@ -335,11 +333,13 @@ async function generarPDF(sesion) {
       doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
       y += 10;
 
-      doc.rect(45, y, 522, 35).fill(NEGRO);
+      doc.rect(45, y, 522, 40).fill(NEGRO);
       doc.fill('#ffffff').fontSize(7).font('Helvetica')
-        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia', 55, y + 6, { width: 400 });
-      doc.text('fotografica y valida cada paso legalmente con firmas digitales.', 55, y + 17, { width: 400 });
-      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
+        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia', 55, y + 5, { width: 380 });
+      doc.text('fotografica y valida cada paso legalmente con firmas digitales.', 55, y + 15, { width: 380 });
+      doc.fill('#ffffff').fontSize(6).font('Helvetica')
+        .text('Disenado por Sergio Andres Estrada Velez  |  v1.0', 55, y + 28, { width: 380 });
+      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 13);
 
       doc.end();
 
