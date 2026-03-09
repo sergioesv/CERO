@@ -86,7 +86,8 @@ async function generarPDF(sesion) {
       var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000)); // Colombia UTC-5
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      var doc = new PDFDocument({ size: 'LETTER', margin: MARGIN, autoFirstPage: true });
+      // autoFirstPage: false — controlamos TODAS las páginas manualmente
+      var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: false });
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
@@ -94,42 +95,50 @@ async function generarPDF(sesion) {
 
       var numPagina = 0;
 
-      // ===== HELPER: nueva página con header y footer fijos =====
-      function nuevaPagina(esPrimera) {
-        numPagina++;
-        if (!esPrimera) {
-          doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: 50, left: MARGIN, right: MARGIN } });
-        }
+      // Dibuja header/footer en la página actual sin mover el cursor de contenido
+      function decorarPagina(esPrimera) {
+        // Guardar posición actual del cursor
+        var savedX = doc.x;
+        var savedY = doc.y;
 
-        // Barra negra superior
+        // Barra negra superior (coordenadas absolutas)
         doc.rect(0, 0, PAGE_W, 5).fill(NEGRO);
 
-        // Footer fijo al fondo — coordenadas absolutas, no depende de y
-        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+        // Footer (coordenada absoluta fija, no mueve flujo de texto)
+        doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
           .text(
             'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            MARGIN, FOOTER_Y, { width: CONTENT_W, align: 'center' }
+            MARGIN, PAGE_H - 22, { width: CONTENT_W, align: 'center', lineBreak: false }
           );
 
         if (!esPrimera) {
-          // Mini header en páginas 2+
           try {
             var lb = Buffer.from(LOGO_BASE64, 'base64');
             doc.image(lb, MARGIN, 8, { width: 24, height: 22 });
           } catch(e) {}
           doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11);
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false });
           doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-            .text((sesion.placa || '') + '  |  ' + fecha, 75, 21);
+            .text((sesion.placa || '') + '  |  ' + fecha, 75, 21, { lineBreak: false });
           doc.moveTo(MARGIN, 36).lineTo(PAGE_W - MARGIN, 36).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
-          return 46; // y de inicio tras mini header
         }
-        return MARGIN + 10; // y de inicio primera página
+
+        // Restaurar posición del cursor
+        doc.x = savedX;
+        doc.y = savedY;
+      }
+
+      // ===== HELPER: nueva página =====
+      function nuevaPagina(esPrimera) {
+        numPagina++;
+        doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+        decorarPagina(esPrimera);
+        return esPrimera ? (MARGIN + 10) : 46;
       }
 
       // ===== HELPER: verificar espacio disponible =====
       function checkY(y, needed) {
-        if (y + needed > FOOTER_Y - 20) {
+        if (y + needed > PAGE_H - 50) {
           return nuevaPagina(false);
         }
         return y;
