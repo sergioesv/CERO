@@ -71,14 +71,40 @@ async function generarPDF(sesion) {
 
   return new Promise(function(resolve, reject) {
     try {
-      var doc = new PDFDocument({ size: 'LETTER', margin: 45 });
+      var doc = new PDFDocument({ size: 'LETTER', margin: 45, autoFirstPage: false });
       var chunks = [];
       doc.on('data', function(chunk) { chunks.push(chunk); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
       doc.on('error', reject);
 
-      var ahora = sesion.fecha ? new Date(sesion.fecha) : new Date();
+      var ahoraUTC = sesion.fecha ? new Date(sesion.fecha) : new Date();
+      // Colombia = UTC-5
+      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+      var numPagina = 0;
+
+      function nuevaPagina() {
+        numPagina++;
+        doc.addPage({ size: 'LETTER', margin: 45 });
+        // Barra superior negra
+        doc.rect(0, 0, 612, 5).fill('#1A1A1A');
+        // Header solo en páginas 2+
+        if (numPagina > 1) {
+          try {
+            var lb = Buffer.from(LOGO_BASE64, 'base64');
+            doc.image(lb, 45, 8, { width: 28, height: 25 });
+          } catch(e) {}
+          doc.fill('#1A1A1A').fontSize(7).font('Helvetica-Bold')
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 80, 12);
+          doc.fill('#999999').fontSize(6).font('Helvetica')
+            .text((sesion.placa || '') + '  |  ' + fecha, 80, 22);
+          doc.moveTo(45, 38).lineTo(567, 38).strokeColor('#E0E0E0').lineWidth(0.3).stroke();
+        }
+        // Footer en todas las páginas
+        doc.fill('#999999').fontSize(6).font('Helvetica')
+          .text('Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0', 45, 748, { width: 522, align: 'center' });
+        return numPagina > 1 ? 50 : null;
+      }
 
       var NEGRO       = '#1A1A1A';
       var GRIS_OSCURO = '#333333';
@@ -92,8 +118,8 @@ async function generarPDF(sesion) {
       var ROJO_CLARO  = '#FFEBEE';
       var AMARILLO    = '#F9A825';
 
-      // ===== THIN ACCENT BAR =====
-      doc.rect(0, 0, 612, 5).fill(NEGRO);
+      // ===== PRIMERA PAGINA =====
+      nuevaPagina();
 
       // ===== HEADER =====
       try {
@@ -124,7 +150,8 @@ async function generarPDF(sesion) {
         .text(sesion.placa || '', 45, y);
 
       doc.fill(GRIS).fontSize(8).font('Helvetica')
-        .text('Anio ' + (vehiculo.anio || 'N/R'), 420, 74, { align: 'right', width: 147 });
+        .text(vehiculo.tipo || '', 420, 74, { align: 'right', width: 147 });
+      doc.text('Anio ' + (vehiculo.anio || 'N/R'), 420, 86, { align: 'right', width: 147 });
 
       y += 35;
       doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
@@ -134,7 +161,10 @@ async function generarPDF(sesion) {
       var conductor = sesion.conductor || {};
       var nombreConductor = conductor.nombre || 'N/R';
       var licenciaCat = conductor.licencia_categoria ? 'Cat. ' + conductor.licencia_categoria : 'N/R';
-      var fechaCorta = fecha.split(' de ').slice(0, 2).join('/');
+      var diaNum = ahora.getDate();
+      var mesNombre = ahora.toLocaleDateString('es-CO', { month: 'long' });
+      var horaStr = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
 
       var cardW = 123;
       var cards = [
@@ -166,7 +196,7 @@ async function generarPDF(sesion) {
 
         for (var ni = 0; ni < novedades.length; ni++) {
           var nov = novedades[ni];
-          if (y > 700) { doc.addPage(); y = 50; }
+          if (y > 700) { nuevaPagina(); y = 50; }
 
           var novColor = nov.critico ? ROJO : AMARILLO;
           doc.rect(45, y, 3, 28).fill(novColor);
@@ -194,7 +224,7 @@ async function generarPDF(sesion) {
         var respuesta = sesion.respuestas ? sesion.respuestas[grupo.id] : null;
         if (!respuesta) continue;
 
-        if (y > 640) { doc.addPage(); y = 50; }
+        if (y > 640) { nuevaPagina(); y = 55; }
 
         doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
         doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
@@ -205,7 +235,7 @@ async function generarPDF(sesion) {
 
         for (var j = 0; j < itemsRespuesta.length; j++) {
           var item = itemsRespuesta[j];
-          if (y > 720) { doc.addPage(); y = 50; }
+          if (y > 720) { nuevaPagina(); y = 55; }
 
           doc.fill(NEGRO).fontSize(8).font('Helvetica')
             .text(item.nombre || '', 55, y);
@@ -251,7 +281,7 @@ async function generarPDF(sesion) {
 
       // ===== OBSERVACIONES =====
       if (sesion.observacion) {
-        if (y > 680) { doc.addPage(); y = 50; }
+        if (y > 680) { nuevaPagina(); y = 55; }
         doc.rect(45, y, 522, 16).fill(GRIS_FONDO);
         doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
           .text('OBSERVACIONES', 55, y + 4);
@@ -263,9 +293,8 @@ async function generarPDF(sesion) {
 
       // ===== EVIDENCIA FOTOGRAFICA =====
       if (fotosDescargadas.length > 0) {
-        doc.addPage();
-        y = 50;
-        doc.rect(0, 0, 612, 5).fill(NEGRO);
+        nuevaPagina();
+        y = 55;
 
         doc.rect(45, y, 522, 18).fill(NEGRO);
         doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
@@ -275,7 +304,7 @@ async function generarPDF(sesion) {
         for (var fp = 0; fp < fotosDescargadas.length; fp++) {
           var fotoData = fotosDescargadas[fp];
           var foto = fotoData.info;
-          if (y > 480) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
+          if (y > 480) { nuevaPagina(); y = 55; }
 
           var esFotoNovedad = foto.tipo === 'novedad';
           var labelColor = esFotoNovedad ? ROJO : VERDE;
@@ -308,7 +337,7 @@ async function generarPDF(sesion) {
       }
 
       // ===== FIRMA =====
-      if (y > 600) { doc.addPage(); y = 50; doc.rect(0, 0, 612, 5).fill(NEGRO); }
+      if (y > 600) { nuevaPagina(); y = 55; }
 
       y += 15;
       doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
@@ -333,13 +362,11 @@ async function generarPDF(sesion) {
       doc.moveTo(45, y).lineTo(567, y).strokeColor(GRIS_LINEA).lineWidth(0.5).stroke();
       y += 10;
 
-      doc.rect(45, y, 522, 40).fill(NEGRO);
+      doc.rect(45, y, 522, 35).fill(NEGRO);
       doc.fill('#ffffff').fontSize(7).font('Helvetica')
-        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia', 55, y + 5, { width: 380 });
-      doc.text('fotografica y valida cada paso legalmente con firmas digitales.', 55, y + 15, { width: 380 });
-      doc.fill('#ffffff').fontSize(6).font('Helvetica')
-        .text('Disenado por Sergio Andres Estrada Velez  |  v1.0', 55, y + 28, { width: 380 });
-      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 13);
+        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia fotografica', 55, y + 6, { width: 400 });
+      doc.text('y valida cada paso legalmente con firmas digitales.', 55, y + 17, { width: 400 });
+      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
 
       doc.end();
 
