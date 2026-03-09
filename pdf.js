@@ -49,6 +49,20 @@ function descargarImagen(url) {
   });
 }
 
+// Formatea hora Colombia manualmente (Railway corre en UTC)
+function formatHoraColombia(date) {
+  var h = date.getHours();
+  var m = date.getMinutes();
+  var ampm = h >= 12 ? 'p. m.' : 'a. m.';
+  var h12 = h % 12 || 12;
+  return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+}
+
+function formatFechaColombia(date) {
+  var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return date.getDate() + ' de ' + meses[date.getMonth()] + ' de ' + date.getFullYear();
+}
+
 async function generarPDF(sesion) {
   var fotosDescargadas = [];
   if (sesion.fotos && sesion.fotos.length > 0) {
@@ -65,7 +79,6 @@ async function generarPDF(sesion) {
 
   return new Promise(function(resolve, reject) {
     try {
-      // ===== CONSTANTES =====
       var NEGRO      = '#1A1A1A';
       var GRIS_OSC   = '#333333';
       var GRIS       = '#666666';
@@ -79,74 +92,34 @@ async function generarPDF(sesion) {
       var PAGE_W     = 612;
       var PAGE_H     = 792;
       var MARGIN     = 45;
-      var CONTENT_W  = PAGE_W - MARGIN * 2;   // 522
-      var FOOTER_Y   = PAGE_H - 30;           // 762 — posición fija del pie
+      var CONTENT_W  = PAGE_W - MARGIN * 2;
+      var MAX_Y      = PAGE_H - 80; // límite seguro antes del footer
 
+      // Hora Colombia (UTC-5) formateada manualmente
       var ahoraUTC = sesion.fecha ? new Date(sesion.fecha) : new Date();
-      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000)); // Colombia UTC-5
-      var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
+      var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      var fecha = formatFechaColombia(ahora);
+      var diaNum = ahora.getDate();
+      var mesNombre = meses[ahora.getMonth()];
+      var horaStr = formatHoraColombia(ahora);
+      var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
 
-      // autoFirstPage: false — controlamos TODAS las páginas manualmente
-      var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: false });
+      // bufferPages: true — clave para agregar header/footer después sin crear páginas extra
+      var doc = new PDFDocument({
+        size: 'LETTER',
+        margin: MARGIN,
+        bufferPages: true
+      });
+
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
       doc.on('error', reject);
 
-      var numPagina = 0;
+      // ===== PÁGINA 1: HEADER COMPLETO =====
+      var y = MARGIN;
 
-      // Dibuja header/footer en la página actual sin mover el cursor de contenido
-      function decorarPagina(esPrimera) {
-        // Guardar posición actual del cursor
-        var savedX = doc.x;
-        var savedY = doc.y;
-
-        // Sin barra superior — causa conflicto con márgenes PDFKit
-
-        // Footer (coordenada absoluta fija, no mueve flujo de texto)
-        doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
-          .text(
-            'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            MARGIN, PAGE_H - 22, { width: CONTENT_W, align: 'center', lineBreak: false }
-          );
-
-        if (!esPrimera) {
-          try {
-            var lb = Buffer.from(LOGO_BASE64, 'base64');
-            doc.image(lb, MARGIN, 8, { width: 24, height: 22 });
-          } catch(e) {}
-          doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false });
-          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-            .text((sesion.placa || '') + '  |  ' + fecha, 75, 21, { lineBreak: false });
-          doc.moveTo(MARGIN, 36).lineTo(PAGE_W - MARGIN, 36).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
-        }
-
-        // Restaurar posición del cursor
-        doc.x = savedX;
-        doc.y = savedY;
-      }
-
-      // ===== HELPER: nueva página =====
-      function nuevaPagina(esPrimera) {
-        numPagina++;
-        doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
-        decorarPagina(esPrimera);
-        return esPrimera ? (MARGIN + 10) : 46;
-      }
-
-      // ===== HELPER: verificar espacio disponible =====
-      function checkY(y, needed) {
-        if (y + needed > PAGE_H - 50) {
-          return nuevaPagina(false);
-        }
-        return y;
-      }
-
-      // ===== PÁGINA 1 =====
-      var y = nuevaPagina(true);
-
-      // Header completo p1
       try {
         var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
         doc.image(logoBuffer, MARGIN, 12, { width: 50, height: 45 });
@@ -167,14 +140,9 @@ async function generarPDF(sesion) {
       doc.fill(NEGRO).fontSize(20).font('Helvetica-Bold')
         .text(marcaModelo, MARGIN, y, { width: 360, lineBreak: false });
       y += 26;
-
-      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold')
-        .text(sesion.placa || '', MARGIN, y);
-
-      // Año a la derecha (sin tipo)
+      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold').text(sesion.placa || '', MARGIN, y);
       doc.fill(GRIS).fontSize(8).font('Helvetica')
         .text('Año ' + (vehiculo.anio || 'N/R'), 420, 80, { align: 'right', width: 147 });
-
       y += 36;
       doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 12;
@@ -183,11 +151,6 @@ async function generarPDF(sesion) {
       var conductor = sesion.conductor || {};
       var nombreConductor = conductor.nombre || 'N/R';
       var licenciaCat = conductor.licencia_categoria ? 'Cat. ' + conductor.licencia_categoria : 'N/R';
-      var diaNum = ahora.getDate();
-      var mesNombre = ahora.toLocaleDateString('es-CO', { month: 'long' });
-      var horaStr = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-      var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
-
       var cardW = 123;
       var cards = [
         { label: 'PILOTO',   value: nombreConductor },
@@ -206,13 +169,12 @@ async function generarPDF(sesion) {
       // ===== NOVEDADES =====
       var novedades = sesion.novedades || [];
       if (novedades.length > 0) {
-        y = checkY(y, 30);
+        if (y + 30 > MAX_Y) { doc.addPage(); y = MARGIN; }
         doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
         doc.fill('#ffffff').fontSize(8).font('Helvetica-Bold').text('NOVEDADES CRITICAS REPORTADAS', MARGIN + 10, y + 5);
         y += 25;
-
         for (var ni = 0; ni < novedades.length; ni++) {
-          y = checkY(y, 36);
+          if (y + 36 > MAX_Y) { doc.addPage(); y = MARGIN; }
           var nov = novedades[ni];
           var novColor = nov.critico ? ROJO : AMARILLO;
           doc.rect(MARGIN, y, 3, 28).fill(novColor);
@@ -231,13 +193,12 @@ async function generarPDF(sesion) {
       // ===== BLOQUES DE INSPECCION =====
       for (var g = 0; g < GRUPOS.length; g++) {
         var grupo = GRUPOS[g];
-        y = checkY(y, 40);
+        if (y + 40 > MAX_Y) { doc.addPage(); y = MARGIN; }
 
         doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
         doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(grupo.nombre, MARGIN + 10, y + 4);
         y += 22;
 
-        // Mapa de estados reportados
         var respuesta = (sesion.respuestas && sesion.respuestas[grupo.id]) ? sesion.respuestas[grupo.id] : null;
         var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
         var mapaEstados = {};
@@ -246,7 +207,7 @@ async function generarPDF(sesion) {
         }
 
         for (var j = 0; j < grupo.items.length; j++) {
-          y = checkY(y, 22);
+          if (y + 22 > MAX_Y) { doc.addPage(); y = MARGIN; }
           var itemDef = grupo.items[j];
           var estadoVal = mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK';
           var estadoTexto, estadoColor;
@@ -259,7 +220,7 @@ async function generarPDF(sesion) {
             var est = estadoTexto.toLowerCase();
             if (est === 'ok' || est === 'funciona' || est === 'completo' || est === 'sin fugas') {
               estadoColor = VERDE;
-            } else if (est === 'bajo' || est === 'desgastada' || est === 'intermitente' || est === 'incompleto' || est === 'danado' || est === 'duro o flojo' || est === 'sin presión' || est === 'sin presion') {
+            } else if (est === 'bajo' || est === 'desgastada' || est === 'intermitente' || est === 'incompleto' || est === 'danado' || est === 'duro o flojo' || est === 'sin presion' || est === 'sin presión') {
               estadoColor = AMARILLO;
             } else {
               estadoColor = ROJO;
@@ -284,17 +245,18 @@ async function generarPDF(sesion) {
 
       // ===== OBSERVACIONES =====
       if (sesion.observacion) {
-        y = checkY(y, 50);
+        if (y + 50 > MAX_Y) { doc.addPage(); y = MARGIN; }
         doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
         doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text('OBSERVACIONES', MARGIN + 10, y + 4);
         y += 22;
         doc.fill(GRIS_OSC).fontSize(8).font('Helvetica').text(sesion.observacion, MARGIN + 10, y, { width: 500 });
-        y += 25;
+        y += 30;
       }
 
       // ===== EVIDENCIA FOTOGRAFICA =====
       if (fotosDescargadas.length > 0) {
-        y = nuevaPagina(false);
+        doc.addPage();
+        y = MARGIN;
 
         doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
         doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
@@ -302,7 +264,7 @@ async function generarPDF(sesion) {
         y += 30;
 
         for (var fp = 0; fp < fotosDescargadas.length; fp++) {
-          y = checkY(y, 290);
+          if (y + 290 > MAX_Y) { doc.addPage(); y = MARGIN; }
           var fotoData = fotosDescargadas[fp];
           var foto = fotoData.info;
           var esFotoNovedad = foto.tipo === 'novedad';
@@ -335,25 +297,22 @@ async function generarPDF(sesion) {
         }
       }
 
-      // ===== FIRMA Y FOOTER FINAL =====
-      y = checkY(y, 120);
+      // ===== FIRMA =====
+      if (y + 120 > MAX_Y) { doc.addPage(); y = MARGIN; }
       y += 15;
       doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 10;
-
       doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', MARGIN, y);
       y += 14;
-
       var telFirma = sesion.telefono ? sesion.telefono.replace('whatsapp:', '') : (conductor.telefono || 'N/R');
       doc.fill(GRIS_OSC).fontSize(7).font('Helvetica')
         .text('Firma: Firmado digitalmente por ' + nombreConductor + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
       y += 12;
-      var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
-      doc.text('Timestamp: ' + ahora.toLocaleString('es-CO') + ' | ID Transaccion: ' + idTx, MARGIN, y, { width: 520 });
+      var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.getFullYear() + ('0'+(ahora.getMonth()+1)).slice(-2) + ('0'+ahora.getDate()).slice(-2);
+      doc.text('Timestamp: ' + diaNum + '/' + (ahora.getMonth()+1) + '/' + ahora.getFullYear() + ', ' + horaStr + ' | ID Transaccion: ' + idTx, MARGIN, y, { width: 520 });
       y += 12;
       doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', MARGIN, y, { width: 520 });
       y += 30;
-
       doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 10;
       doc.rect(MARGIN, y, CONTENT_W, 35).fill(NEGRO);
@@ -362,6 +321,34 @@ async function generarPDF(sesion) {
       doc.text('y valida cada paso legalmente con firmas digitales.', MARGIN + 10, y + 17, { width: 390 });
       doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
 
+      // ===== HEADER/FOOTER EN TODAS LAS PÁGINAS (bufferPages) =====
+      var range = doc.bufferedPageRange();
+      for (var pi = 0; pi < range.count; pi++) {
+        doc.switchToPage(pi);
+        var pageNum = pi + 1;
+
+        // Footer en todas las páginas
+        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+          .text(
+            'Pag. ' + pageNum + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
+            MARGIN, PAGE_H - 20, { width: CONTENT_W, align: 'center', lineBreak: false }
+          );
+
+        // Mini header en páginas 2+
+        if (pi > 0) {
+          try {
+            var lb = Buffer.from(LOGO_BASE64, 'base64');
+            doc.image(lb, MARGIN, 10, { width: 22, height: 20 });
+          } catch(e) {}
+          doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 73, 13, { lineBreak: false });
+          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+            .text((sesion.placa || '') + '  |  ' + fecha, 73, 23, { lineBreak: false });
+          doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+        }
+      }
+
+      doc.flushPages();
       doc.end();
 
     } catch (error) {
@@ -391,10 +378,15 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
 
     await config.supabase.from('preoperacionales').update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
 
+    var ahoraUTC2 = new Date();
+    var ahoraCO2 = new Date(ahoraUTC2.getTime() - 5 * 60 * 60 * 1000);
+    var meses2 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var fechaMsg = ahoraCO2.getDate() + '/' + meses2[ahoraCO2.getMonth()] + '/' + ahoraCO2.getFullYear();
+
     await config.twilioClient.messages.create({
       from: config.TWILIO_WHATSAPP_NUMBER,
       to: telefono,
-      body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + ahora_co() + '\n\nDescarga aqui:\n' + pdfUrl
+      body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + fechaMsg + '\n\nDescarga aqui:\n' + pdfUrl
     });
 
     console.log('PDF enviado a ' + telefono);
@@ -404,12 +396,6 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     console.error('Error en subirYEnviarPDF:', error);
     return null;
   }
-}
-
-function ahora_co() {
-  var u = new Date();
-  var c = new Date(u.getTime() - 5 * 60 * 60 * 1000);
-  return c.toLocaleDateString('es-CO');
 }
 
 module.exports = { generarPDF, subirYEnviarPDF };
