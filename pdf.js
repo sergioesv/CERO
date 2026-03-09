@@ -3,7 +3,7 @@ var https = require('https');
 var http = require('http');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
-var LOGO_BASE64 = require('./logo').LOGO_BASE64;
+var LOGO_BASE64 = require('./logo').LOGO_BASE64; 
 
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
