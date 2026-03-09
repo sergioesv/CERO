@@ -116,6 +116,8 @@ async function generarPDF(sesion) {
         if (decorando) return;
         decorando = true;
         pageCount++;
+        var savedX = doc.x;
+        var savedY = doc.y;
         doc.save();
         doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
           .text(
@@ -134,6 +136,8 @@ async function generarPDF(sesion) {
           doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
         }
         doc.restore();
+        doc.x = savedX;
+        doc.y = savedY;
         decorando = false;
       });
 
