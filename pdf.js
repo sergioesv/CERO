@@ -96,8 +96,8 @@ async function generarPDF(sesion) {
       var MAX_Y      = PAGE_H - 80; // límite seguro antes del footer
 
       // Hora Colombia (UTC-5) formateada manualmente
-      var ahoraUTC = sesion.fecha ? new Date(sesion.fecha) : new Date();
-      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
+      // sesion.fecha ya viene en hora Colombia (Railway la guarda con new Date())
+      var ahora = sesion.fecha ? new Date(sesion.fecha) : new Date();
       var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
       var fecha = formatFechaColombia(ahora);
       var diaNum = ahora.getDate();
@@ -324,7 +324,7 @@ async function generarPDF(sesion) {
       // ===== HEADER/FOOTER EN TODAS LAS PÁGINAS (bufferPages) =====
       var range = doc.bufferedPageRange();
       for (var pi = 0; pi < range.count; pi++) {
-        doc.switchToPage(pi);
+        doc.switchToPage(range.start + pi);
         var pageNum = pi + 1;
 
         // Footer en todas las páginas
