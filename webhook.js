@@ -1,530 +1,402 @@
+var PDFDocument = require('pdfkit');
+var https = require('https');
+var http = require('http');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
-var FOTOS_VERIFICACION = require('./grupos').FOTOS_VERIFICACION;
-var sesiones = require('./sesiones');
-var ia = require('./ia');
-var pdf = require('./pdf');
-var utils = require('./utils');
+var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
-function registrarWebhook(app) {
-
-  app.get('/', function(req, res) {
-    res.send('CERO v2 corriendo - modelo hibrido');
-  });
-
-  app.post('/webhook', async function(req, res) {
-    var mensaje = (req.body.Body || '').trim();
-    var telefono = req.body.From || '';
-    var mediaUrl = req.body.MediaUrl0 || null;
-    var numMedia = parseInt(req.body.NumMedia || '0');
-
-    // Bloqueo de concurrencia — evita doble procesamiento si el usuario envía rápido
-    if (!sesiones.bloquear(telefono)) {
-      console.log('[' + telefono + '] BLOQUEADO - mensaje descartado (procesando anterior)');
-      return utils.responderTwiml(res, '⏳ Procesando... espera un momento y reenvía.');
-    }
-
-    var sesion = sesiones.obtenerSesion(telefono);
-
-    console.log('[' + telefono + '] Estado: ' + sesion.estado + ' | Mensaje: ' + mensaje + ' | Media: ' + numMedia);
-
-    try {
-      // ===== COMANDOS GLOBALES =====
-      var msgUpper = mensaje.toUpperCase();
-
-      if (msgUpper === 'CANCELAR') {
-        sesiones.eliminarSesion(telefono);
-        return utils.responderTwiml(res, '\u274c Preoperacional cancelado.\nEscribe cualquier mensaje para empezar de nuevo.');
+function descargarImagen(url) {
+  return new Promise(function(resolve, reject) {
+    var isTwilio = url.indexOf('twilio.com') >= 0 || url.indexOf('api.twilio.com') >= 0;
+    if (isTwilio) {
+      var credentials = Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64');
+      function seguirUrl(currentUrl, saltos) {
+        if (saltos > 5) return reject(new Error('Demasiadas redirecciones'));
+        var urlObj = new URL(currentUrl);
+        var options = {
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + urlObj.search,
+          method: 'GET',
+          headers: { 'Authorization': 'Basic ' + credentials }
+        };
+        var req = https.request(options, function(res) {
+          if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+            res.resume();
+            return seguirUrl(res.headers['location'], saltos + 1);
+          }
+          if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+          var chunks = [];
+          res.on('data', function(c) { chunks.push(c); });
+          res.on('end', function() { resolve(Buffer.concat(chunks)); });
+        });
+        req.on('error', reject);
+        req.end();
       }
-
-      if (msgUpper === 'REINICIAR') {
-        sesiones.eliminarSesion(telefono);
-        sesion = sesiones.obtenerSesion(telefono);
-        sesion.estado = 'ESPERANDO_PLACA';
-        return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nReiniciado. Placa del vehiculo?');
-      }
-
-      if (msgUpper === 'ATRAS') {
-        if (sesion.estado === 'ESPERANDO_KILOMETRAJE') {
-          sesion.estado = 'ESPERANDO_PLACA';
-          sesion.placa = null;
-          sesion.vehiculo = null;
-          return utils.responderTwiml(res, '\u25c0\ufe0f Placa del vehiculo?');
-        }
-        if (sesion.estado === 'GRUPO' && sesion.grupoActual > 0) {
-          sesion.grupoActual--;
-          var grupoAnterior = GRUPOS[sesion.grupoActual];
-          delete sesion.respuestas[grupoAnterior.id];
-          // Limpiar novedades del grupo al que volvemos
-          sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== grupoAnterior.nombre; });
-          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnterior, '\u25c0\ufe0f Volvemos'));
-        }
-        if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
-          sesion.estado = 'ESPERANDO_KILOMETRAJE';
-          return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
-        }
-        if (sesion.estado === 'DESCRIBIR_NOVEDAD') {
-          sesion.estado = 'GRUPO';
-          var grupoVolver = GRUPOS[sesion.grupoActual];
-          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoVolver, '\u25c0\ufe0f Volvemos'));
-        }
-        if (sesion.estado === 'FOTO_VERIFICACION') {
-          sesion.grupoActual = GRUPOS.length - 1;
-          sesion.estado = 'GRUPO';
-          var ultimoGrupo = GRUPOS[sesion.grupoActual];
-          delete sesion.respuestas[ultimoGrupo.id];
-          sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== ultimoGrupo.nombre; });
-          return utils.responderTwiml(res, utils.formatGrupoMsg(ultimoGrupo, '\u25c0\ufe0f Volvemos'));
-        }
-        if (sesion.estado === 'FOTO_NOVEDAD') {
-          // Volver a foto de verificacion
-          sesion.estado = 'FOTO_VERIFICACION';
-          sesion.fotosNovedadPendientes = [];
-          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'novedad'; });
-          return utils.responderTwiml(res, '\u25c0\ufe0f ' + sesion.fotoVerificacionDescripcion);
-        }
-        if (sesion.estado === 'OBSERVACION') {
-          if (sesion.novedades.length > 0) {
-            // Volver a fotos de novedad
-            sesion.fotosNovedadPendientes = sesion.novedades.slice();
-            sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'novedad'; });
-            sesion.estado = 'FOTO_NOVEDAD';
-            var novVolver = sesion.fotosNovedadPendientes[0];
-            return utils.responderTwiml(res, '\u25c0\ufe0f \ud83d\udcf8 *Foto de novedad*\n' + novVolver.item + ': _' + (novVolver.nota || novVolver.grupo) + '_');
-          }
-          sesion.estado = 'FOTO_VERIFICACION';
-          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'verificacion'; });
-          return utils.responderTwiml(res, '\u25c0\ufe0f ' + sesion.fotoVerificacionDescripcion);
-        }
-        if (sesion.estado === 'CONFIRMACION') {
-          sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, '\u25c0\ufe0f Observacion final? Si no hay, escribe *no*');
-        }
-        if (sesion.estado === 'OBSERVACION') {
-          sesion.estado = 'FOTO_ADICIONAL';
-          sesion.fotos = sesion.fotos.filter(function(f) { return f.tipo !== 'adicional'; });
-          return utils.responderTwiml(res, '\u25c0\ufe0f Fotos adicionales? Envie fotos o escriba *no*');
-        }
-        return utils.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
-      }
-
-      switch (sesion.estado) {
-
-        // ==================== INICIO ====================
-        case 'INICIO': {
-          sesion.estado = 'ESPERANDO_PLACA';
-          return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nBuenos dias \ud83d\udc4b\nPlaca del vehiculo?');
-        }
-
-        // ==================== PLACA ====================
-        case 'ESPERANDO_PLACA': {
-          var placaLimpia = mensaje.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-          var resultado = await config.supabase
-            .from('vehiculos')
-            .select('*')
-            .eq('placa', placaLimpia)
-            .single();
-
-          if (resultado.error || !resultado.data) {
-            return utils.responderTwiml(res, '\u274c Placa *' + placaLimpia + '* no encontrada.\nVerifica e intenta de nuevo.');
-          }
-
-          var vehiculo = resultado.data;
-
-          if (vehiculo.bloqueado) {
-            return utils.responderTwiml(res, '\ud83d\udeab *Vehiculo BLOQUEADO*\n' + placaLimpia + '\n' + (vehiculo.motivo_bloqueo || 'Contacte al supervisor'));
-          }
-
-          sesion.placa = placaLimpia;
-          sesion.vehiculo = vehiculo;
-
-          var resConductor = await config.supabase
-            .from('conductores')
-            .select('*')
-            .eq('telefono', telefono.replace('whatsapp:', ''))
-            .single();
-
-          sesion.conductor = resConductor.data;
-
-          sesion.estado = 'ESPERANDO_KILOMETRAJE';
-          return utils.responderTwiml(res,
-            '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\nKilometraje actual?'
-          );
-        }
-
-        // ==================== KILOMETRAJE ====================
-        case 'ESPERANDO_KILOMETRAJE': {
-          var km = parseInt(mensaje.replace(/[^0-9]/g, ''));
-          if (isNaN(km) || km < 0) {
-            return utils.responderTwiml(res, '\u274c Escribe solo el numero del kilometraje.');
-          }
-
-          if (sesion.vehiculo.kilometraje && km < sesion.vehiculo.kilometraje) {
-            return utils.responderTwiml(res, '\u274c Kilometraje invalido.\nUltimo registrado: *' + sesion.vehiculo.kilometraje + ' km*\nDebe ser igual o mayor.');
-          }
-
-          sesion.kilometraje = km;
-          sesion.grupoActual = 0;
-          sesion.estado = 'GRUPO';
-
-          var grupo = GRUPOS[0];
-          return utils.responderTwiml(res, utils.formatGrupoMsg(grupo, '\ud83d\udcdd *Inspeccion iniciada*\n' + sesion.placa + ' | ' + km + ' km'));
-        }
-
-        // ==================== GRUPOS ====================
-        case 'GRUPO': {
-          var grupoActual = GRUPOS[sesion.grupoActual];
-          var respLimpia = mensaje.trim();
-
-          // 1️⃣ Todo OK
-          if (respLimpia === '1' || respLimpia === '1\ufe0f\u20e3' || respLimpia.toLowerCase() === 'ok' || respLimpia.toLowerCase() === 'todo bien') {
-            sesion.respuestas[grupoActual.id] = ia.marcarTodoOK(grupoActual);
-            sesion.grupoActual++;
-
-            if (sesion.grupoActual < GRUPOS.length) {
-              var sig = GRUPOS[sesion.grupoActual];
-              return utils.responderTwiml(res, utils.formatGrupoMsg(sig, '\u2705 OK'));
-            }
-
-            var resumen = utils.generarResumen(sesion);
-            sesion.estado = 'FOTO_VERIFICACION';
-            sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
-            return utils.responderTwiml(res,
-              resumen + '\n\n\ud83d\udcf8 *Foto de verificacion*\n' + sesion.fotoVerificacionDescripcion
-            );
-          }
-
-          // 2️⃣ Novedad — ejemplos contextuales del grupo actual
-          if (respLimpia === '2' || respLimpia === '2\ufe0f\u20e3') {
-            sesion.estado = 'DESCRIBIR_NOVEDAD';
-            var listaItems = grupoActual.items.map(function(i) { return '• ' + i.nombre; }).join('\n');
-            var ejemplos = grupoActual.items.slice(0, 2).map(function(i) {
-              return i.nombre.toLowerCase();
-            }).join('", "');
-            return utils.responderTwiml(res,
-              '\u270d\ufe0f *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n------\n' + listaItems + '\n------\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
-            );
-          }
-
-          // 3️⃣ Atras
-          if (respLimpia === '3' || respLimpia === '3\ufe0f\u20e3' || respLimpia.toLowerCase() === 'atras') {
-            if (sesion.grupoActual > 0) {
-              sesion.grupoActual--;
-              var grupoAnt = GRUPOS[sesion.grupoActual];
-              delete sesion.respuestas[grupoAnt.id];
-              sesion.novedades = sesion.novedades.filter(function(n) { return n.grupo !== grupoAnt.nombre; });
-              return utils.responderTwiml(res, utils.formatGrupoMsg(grupoAnt, '\u25c0\ufe0f Volvemos'));
-            }
-            sesion.estado = 'ESPERANDO_KILOMETRAJE';
-            return utils.responderTwiml(res, '\u25c0\ufe0f Kilometraje actual?');
-          }
-
-          return utils.responderTwiml(res, utils.formatGrupoMsg(grupoActual, '\u274c Responde 1, 2 o 3'));
-        }
-
-        // ==================== DESCRIBIR NOVEDAD ====================
-        case 'DESCRIBIR_NOVEDAD': {
-          if (sesion.estado !== 'DESCRIBIR_NOVEDAD') break;
-
-          var grupoNovedad = GRUPOS[sesion.grupoActual];
-          var interpretacion = await ia.interpretarNovedad(mensaje, grupoNovedad.items.map(function(i) { return i.nombre; }));
-
-          if (!interpretacion) {
-            var ejemplosError = grupoNovedad.items.slice(0, 2).map(function(i) { return i.nombre.toLowerCase(); }).join('", "');
-            return utils.responderTwiml(res, '\u274c No entendi.\nDescribe la novedad de nuevo.\n_Ej: "' + ejemplosError + ' malo"_');
-          }
-
-          sesion.respuestas[grupoNovedad.id] = interpretacion;
-
-          // FIX: filtrar por estado string, no por número
-          var novedadesGrupo = interpretacion.items
-            .filter(function(i) {
-              var est = (i.estado || '').toLowerCase();
-              return est !== 'ok' && est !== 'funciona' && est !== 'sin fugas' && est !== 'completo' && est !== '';
-            })
-            .map(function(i) {
-              return {
-                grupo: grupoNovedad.nombre,
-                item: i.nombre,
-                estado: i.estado,
-                nota: i.estado,
-                critico: utils.esCritico(grupoNovedad.id, i.nombre)
-              };
-            });
-
-          for (var x = 0; x < novedadesGrupo.length; x++) {
-            sesion.novedades.push(novedadesGrupo[x]);
-          }
-
-          var confirmacion = novedadesGrupo.length > 0
-            ? '\u26a0\ufe0f Anotado: ' + novedadesGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
-            : '\u2705 Registrado';
-
-          sesion.grupoActual++;
-          sesion.estado = 'GRUPO';
-
-          if (sesion.grupoActual < GRUPOS.length) {
-            var sigNov = GRUPOS[sesion.grupoActual];
-            return utils.responderTwiml(res, utils.formatGrupoMsg(sigNov, confirmacion));
-          }
-
-          var resumenNov = utils.generarResumen(sesion);
-          sesion.estado = 'FOTO_VERIFICACION';
-          sesion.fotoVerificacionDescripcion = FOTOS_VERIFICACION[Math.floor(Math.random() * FOTOS_VERIFICACION.length)];
-          return utils.responderTwiml(res,
-            confirmacion + '\n\n' + resumenNov + '\n\n\ud83d\udcf8 *Foto de verificacion*\n' + sesion.fotoVerificacionDescripcion
-          );
-        }
-
-        // ==================== FOTO VERIFICACION ====================
-        case 'FOTO_VERIFICACION': {
-          if (numMedia === 0) {
-            return utils.responderTwiml(res, '\ud83d\udcf8 Necesito la foto.\nToma la foto y enviala.');
-          }
-
-          var validacion = await ia.validarFoto(mediaUrl, sesion.fotoVerificacionDescripcion);
-
-          if (!validacion.valida) {
-            return utils.responderTwiml(res,
-              '\u274c *Foto no valida*\n' + validacion.razon + '\n\nNecesito: ' + sesion.fotoVerificacionDescripcion
-            );
-          }
-
-          sesion.fotos.push({
-            tipo: 'verificacion',
-            url: mediaUrl,
-            descripcion: sesion.fotoVerificacionDescripcion,
-            validacion: validacion.comentario
-          });
-
-          if (sesion.novedades.length > 0) {
-            // Excluir ítems sinFoto (bocina, tablero, pedales, aseo, aire) — no se pueden fotografiar
-            var GRUPOS_MAP = {};
-            for (var gm = 0; gm < GRUPOS.length; gm++) {
-              for (var im = 0; im < GRUPOS[gm].items.length; im++) {
-                GRUPOS_MAP[GRUPOS[gm].items[im].nombre] = GRUPOS[gm].items[im];
-              }
-            }
-            sesion.fotosNovedadPendientes = sesion.novedades.filter(function(n) {
-              var def = GRUPOS_MAP[n.item];
-              return !def || !def.sinFoto;
-            });
-
-            if (sesion.fotosNovedadPendientes.length === 0) {
-              sesion.estado = 'FOTO_ADICIONAL';
-              return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
-            }
-
-            var novedad = sesion.fotosNovedadPendientes[0];
-            sesion.estado = 'FOTO_NOVEDAD';
-            return utils.responderTwiml(res,
-              '\u2705 Foto valida\n\n\ud83d\udcf8 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + novedad.item + '*\n_' + (novedad.nota || novedad.grupo) + '_'
-            );
-          }
-
-          sesion.estado = 'FOTO_ADICIONAL';
-          return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
-        }
-
-        // ==================== FOTOS DE NOVEDADES ====================
-        case 'FOTO_NOVEDAD': {
-          if (numMedia === 0) {
-            var novPend = sesion.fotosNovedadPendientes[0];
-            return utils.responderTwiml(res,
-              '\ud83d\udcf8 Necesito la foto de:\n*' + novPend.item + '*\n_' + (novPend.nota || novPend.grupo) + '_\nEnviala por favor.'
-            );
-          }
-
-          var novedadActual = sesion.fotosNovedadPendientes[0];
-          var descNov = await ia.describirFoto(mediaUrl, novedadActual.item + ' - ' + (novedadActual.nota || ''));
-
-          sesion.fotos.push({
-            tipo: 'novedad',
-            url: mediaUrl,
-            descripcion: novedadActual.grupo + ' - ' + novedadActual.item,
-            validacion: descNov.comentario
-          });
-
-          sesion.fotosNovedadPendientes.shift();
-
-          if (sesion.fotosNovedadPendientes.length > 0) {
-            var siguienteNov = sesion.fotosNovedadPendientes[0];
-            return utils.responderTwiml(res,
-              '\u2705 Foto recibida\n\n\ud83d\udcf8 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + siguienteNov.item + '*\n_' + (siguienteNov.nota || siguienteNov.grupo) + '_'
-            );
-          }
-
-          sesion.estado = 'FOTO_ADICIONAL';
-          return utils.responderTwiml(res, '\u2705 Todas las fotos recibidas\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
-        }
-
-        // ==================== FOTO ADICIONAL (OPCIONAL) ====================
-        case 'FOTO_ADICIONAL': {
-          if (numMedia > 0) {
-            var descAd = await ia.describirFoto(mediaUrl, 'evidencia adicional preoperacional ' + sesion.placa);
-            sesion.fotos.push({
-              tipo: 'adicional',
-              url: mediaUrl,
-              descripcion: 'Foto adicional',
-              validacion: descAd.comentario
-            });
-            return utils.responderTwiml(res, '\u2705 Foto guardada\n\nEnvie otra foto o escriba *no* para continuar');
-          }
-          // Texto "no" u otro → pasar a observacion
-          sesion.estado = 'OBSERVACION';
-          return utils.responderTwiml(res, '\ud83d\udcac Observacion final?\nSi no hay, escribe *no*');
-        }
-
-        // ==================== OBSERVACION ====================
-        case 'OBSERVACION': {
-          sesion.observacion = mensaje.toLowerCase() === 'no' ? null : mensaje;
-          sesion.estado = 'CONFIRMACION';
-
-          var textoFirma = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
-          textoFirma += '\ud83d\udcdd *CONFIRMAR PREOPERACIONAL*\n';
-          textoFirma += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
-          textoFirma += '\ud83d\ude97 Vehiculo: *' + sesion.placa + '*\n';
-          textoFirma += '\ud83d\udccf Kilometraje: *' + sesion.kilometraje + ' km*\n';
-          if (sesion.novedades.length > 0) {
-            textoFirma += '\u26a0\ufe0f Novedades: *' + sesion.novedades.length + '*\n';
-            sesion.novedades.forEach(function(n) {
-              textoFirma += '  \u2022 ' + n.item + ': ' + n.estado + '\n';
-            });
-          } else {
-            textoFirma += '\u2705 Sin novedades\n';
-          }
-          textoFirma += '\ud83d\udcf7 Fotos: *' + sesion.fotos.length + '*\n';
-          if (sesion.observacion) textoFirma += '\ud83d\udcac _' + sesion.observacion + '_\n';
-          textoFirma += '\n\u270d\ufe0f Escriba *SI* para firmar\no *ATRAS* para corregir';
-
-          return utils.responderTwiml(res, textoFirma);
-        }
-
-        // ==================== CONFIRMACION / FIRMA ====================
-        case 'CONFIRMACION': {
-          if (mensaje.toUpperCase() !== 'SI') {
-            return utils.responderTwiml(res, 'Escriba *SI* para firmar\no *ATRAS* para corregir\no *CANCELAR* para anular.');
-          }
-
-          var ahoraUTC = new Date();
-          // Colombia = UTC-5
-          var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
-
-          var datosPreoperacional = {
-            vehiculo_id: sesion.vehiculo.id,
-            conductor_id: sesion.conductor ? sesion.conductor.id : null,
-            placa: sesion.placa,
-            kilometraje: sesion.kilometraje,
-            fecha: ahora.toISOString().split('T')[0],
-            hora: ahora.toTimeString().split(' ')[0],
-            estado: 'completado',
-            motor_niveles: sesion.respuestas.motor_niveles || null,
-            electrico_luces: sesion.respuestas.electrico_luces || null,
-            frenos_direccion_llantas: sesion.respuestas.frenos_direccion_llantas || null,
-            cabina_equipo: sesion.respuestas.cabina_equipo || null,
-            novedades: sesion.novedades.map(function(n) {
-              var prefix = n.critico ? '\u26a0\ufe0f CRITICO ' : '';
-              return prefix + n.grupo + ': ' + n.item + ' - ' + (n.nota || '');
-            }),
-            observaciones: sesion.observacion,
-            firma_operario: true,
-            firma_timestamp: ahora.toISOString()
-          };
-
-          var resPreop = await config.supabase
-            .from('preoperacionales')
-            .insert(datosPreoperacional)
-            .select()
-            .single();
-
-          if (resPreop.error) {
-            console.error('Error guardando preoperacional:', resPreop.error);
-            return utils.responderTwiml(res, '\u274c Error guardando. Intente de nuevo o contacte al supervisor.');
-          }
-
-          var preop = resPreop.data;
-
-          if (sesion.fotos.length > 0) {
-            var fotosParaGuardar = sesion.fotos.map(function(f) {
-              return {
-                preoperacional_id: preop.id,
-                tipo: f.tipo,
-                descripcion: f.descripcion,
-                foto_url: f.url,
-                validada: true,
-                resultado_validacion: f.validacion
-              };
-            });
-            await config.supabase.from('fotos_evidencia').insert(fotosParaGuardar);
-          }
-
-          await config.supabase
-            .from('vehiculos')
-            .update({ kilometraje: sesion.kilometraje })
-            .eq('id', sesion.vehiculo.id);
-
-          var novedadesCriticas = sesion.novedades.filter(function(n) { return n.critico; });
-          if (novedadesCriticas.length > 0) {
-            console.log('ALERTA SUPERVISOR: ' + novedadesCriticas.length + ' items criticos en ' + sesion.placa);
-          }
-
-          var datosSesion = sesiones.copiarSesion(sesion);
-
-          datosSesion.bloques = GRUPOS.map(function(grupo) {
-            var respGrupo = datosSesion.respuestas[grupo.id] || { items: [] };
-            var itemsRespuesta = respGrupo.items || [];
-            return {
-              nombre: grupo.nombre,
-              items: grupo.items.map(function(itemDef) {
-                var encontrado = itemsRespuesta.find(function(r) { return r.nombre === itemDef.nombre; });
-                return {
-                  nombre: itemDef.nombre,
-                  critico: itemDef.critico,
-                  estado: encontrado ? encontrado.estado : 'OK'
-                };
-              })
-            };
-          });
-          datosSesion.items = datosSesion.novedades || [];
-          datosSesion.telefono = telefono;
-          datosSesion.fecha = ahora.toISOString();
-          sesiones.eliminarSesion(telefono);
-
-          var msgFinal = '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
-          msgFinal += '\u2705 *PREOPERACIONAL FIRMADO*\n';
-          msgFinal += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
-          msgFinal += '\ud83d\ude97 *' + datosSesion.placa + '* | ' + ahora.toLocaleDateString('es-CO') + '\n';
-          msgFinal += '\ud83d\udc64 ' + (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n';
-          msgFinal += '\ud83d\udccf ' + datosSesion.kilometraje + ' km\n';
-          if (novedadesCriticas.length > 0) {
-            msgFinal += '\u26a0\ufe0f *' + novedadesCriticas.length + ' item(es) critico(s)*\n';
-            msgFinal += '_Supervisor notificado_\n';
-          } else if (datosSesion.novedades.length > 0) {
-            msgFinal += '\u26a0\ufe0f ' + datosSesion.novedades.length + ' novedad(es)\n';
-          } else {
-            msgFinal += '\u2705 Sin novedades\n';
-          }
-          msgFinal += '\n\ud83d\udcc4 Generando PDF...';
-
-          utils.responderTwiml(res, msgFinal);
-
-          pdf.subirYEnviarPDF(datosSesion, preop.id, telefono);
+      seguirUrl(url, 0);
+    } else {
+      var client = url.startsWith('https') ? https : http;
+      client.get(url, function(response) {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          descargarImagen(response.headers.location).then(resolve).catch(reject);
           return;
         }
-
-        default: {
-          sesion.estado = 'INICIO';
-          return utils.responderTwiml(res, '\ud83d\ude97 *CERO - Preoperacional*\nBuenos dias \ud83d\udc4b\nPlaca del vehiculo?');
-        }
-      }
-    } catch (error) {
-      console.error('Error en webhook:', error);
-      return utils.responderTwiml(res, '\u274c Error interno. Intente de nuevo.');
-    } finally {
-      sesiones.desbloquear(telefono);
+        var chunks = [];
+        response.on('data', function(c) { chunks.push(c); });
+        response.on('end', function() { resolve(Buffer.concat(chunks)); });
+        response.on('error', reject);
+      }).on('error', reject);
     }
   });
 }
 
-module.exports = { registrarWebhook };
+// Formatea hora Colombia manualmente (Railway corre en UTC)
+function formatHoraColombia(date) {
+  var h = date.getHours();
+  var m = date.getMinutes();
+  var ampm = h >= 12 ? 'p. m.' : 'a. m.';
+  var h12 = h % 12 || 12;
+  return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+}
+
+function formatFechaColombia(date) {
+  var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return date.getDate() + ' de ' + meses[date.getMonth()] + ' de ' + date.getFullYear();
+}
+
+async function generarPDF(sesion) {
+  var fotosDescargadas = [];
+  if (sesion.fotos && sesion.fotos.length > 0) {
+    for (var d = 0; d < sesion.fotos.length; d++) {
+      try {
+        var imgBuffer = await descargarImagen(sesion.fotos[d].url);
+        fotosDescargadas.push({ buffer: imgBuffer, info: sesion.fotos[d] });
+      } catch (e) {
+        console.error('Error descargando foto ' + d + ':', e.message);
+        fotosDescargadas.push({ buffer: null, info: sesion.fotos[d] });
+      }
+    }
+  }
+
+  return new Promise(function(resolve, reject) {
+    try {
+      var NEGRO      = '#1A1A1A';
+      var GRIS_OSC   = '#333333';
+      var GRIS       = '#666666';
+      var GRIS_CLR   = '#999999';
+      var GRIS_FONDO = '#F5F5F5';
+      var GRIS_LIN   = '#E0E0E0';
+      var VERDE      = '#2E7D32';
+      var ROJO       = '#C62828';
+      var ROJO_CLR   = '#FFEBEE';
+      var AMARILLO   = '#F9A825';
+      var PAGE_W     = 612;
+      var PAGE_H     = 792;
+      var MARGIN     = 45;
+      var CONTENT_W  = PAGE_W - MARGIN * 2;
+      var MAX_Y      = PAGE_H - 50; // límite seguro antes del footer
+
+      // Hora Colombia (UTC-5) formateada manualmente
+      // sesion.fecha ya viene en hora Colombia (Railway la guarda con new Date())
+      var ahora = sesion.fecha ? new Date(sesion.fecha) : new Date();
+      var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      var fecha = formatFechaColombia(ahora);
+      var diaNum = ahora.getDate();
+      var mesNombre = meses[ahora.getMonth()];
+      var horaStr = formatHoraColombia(ahora);
+      var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
+
+      var doc = new PDFDocument({
+        size: 'LETTER',
+        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 20 }
+      });
+
+      var pageCount = 0;
+      var decorando = false;
+      doc.on('pageAdded', function() {
+        if (decorando) return;
+        decorando = true;
+        pageCount++;
+        var savedX = doc.x;
+        var savedY = doc.y;
+        doc.save();
+        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+          .text(
+            'Pag. ' + pageCount + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
+            MARGIN, PAGE_H - 20, { width: CONTENT_W, align: 'center', lineBreak: false }
+          );
+        if (pageCount > 1) {
+          try {
+            var lb = Buffer.from(LOGO_BASE64, 'base64');
+            doc.image(lb, MARGIN, 10, { width: 22, height: 20 });
+          } catch(e) {}
+          doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 73, 13, { lineBreak: false });
+          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
+            .text((sesion.placa || '') + '  |  ' + fecha, 73, 23, { lineBreak: false });
+          doc.moveTo(MARGIN, 38).lineTo(PAGE_W - MARGIN, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+        }
+        doc.restore();
+        doc.x = savedX;
+        doc.y = savedY;
+        decorando = false;
+      });
+
+      var chunks = [];
+      doc.on('data', function(c) { chunks.push(c); });
+      doc.on('end', function() { resolve(Buffer.concat(chunks)); });
+      doc.on('error', reject);
+
+      // ===== PÁGINA 1: HEADER COMPLETO =====
+      var y = MARGIN;
+
+      try {
+        var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
+        doc.image(logoBuffer, MARGIN, 12, { width: 50, height: 45 });
+      } catch (e) {}
+
+      doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold').text('EDEMSA | CERO SYSTEM', 105, 18);
+      doc.fill(GRIS_CLR).fontSize(7).font('Helvetica').text('Inspeccion Preoperacional de Vehiculo', 105, 30);
+      doc.fill(GRIS_CLR).fontSize(7).font('Helvetica')
+        .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 });
+      doc.text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
+      doc.moveTo(MARGIN, 62).lineTo(PAGE_W - MARGIN, 62).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+
+      // ===== HERO VEHÍCULO =====
+      y = 72;
+      var vehiculo = sesion.vehiculo || {};
+      var marcaModelo = ((vehiculo.marca || '') + ' ' + (vehiculo.modelo || '')).trim();
+
+      doc.fill(NEGRO).fontSize(20).font('Helvetica-Bold')
+        .text(marcaModelo, MARGIN, y, { width: 360, lineBreak: false });
+      y += 26;
+      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold').text(sesion.placa || '', MARGIN, y);
+      doc.fill(GRIS).fontSize(8).font('Helvetica')
+        .text('Año ' + (vehiculo.anio || 'N/R'), 420, 80, { align: 'right', width: 147 });
+      y += 36;
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+      y += 12;
+
+      // ===== TARJETAS INFO =====
+      var conductor = sesion.conductor || {};
+      var nombreConductor = conductor.nombre || 'N/R';
+      var licenciaCat = conductor.licencia_categoria ? 'Cat. ' + conductor.licencia_categoria : 'N/R';
+      var cardW = 123;
+      var cards = [
+        { label: 'PILOTO',   value: nombreConductor },
+        { label: 'LICENCIA', value: licenciaCat },
+        { label: 'ODOMETRO', value: (sesion.kilometraje || 0) + ' km' },
+        { label: 'FECHA',    value: fechaCorta }
+      ];
+      for (var ci = 0; ci < cards.length; ci++) {
+        var cx = MARGIN + ci * (cardW + 10);
+        doc.rect(cx, y, cardW, 35).fill(GRIS_FONDO);
+        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica-Bold').text(cards[ci].label, cx + 8, y + 6, { width: cardW - 16 });
+        doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold').text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 });
+      }
+      y += 48;
+
+      // ===== NOVEDADES =====
+      var novedades = sesion.novedades || [];
+      if (novedades.length > 0) {
+        if (y + 30 > MAX_Y) { doc.addPage(); y = MARGIN; }
+        doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(8).font('Helvetica-Bold').text('NOVEDADES CRITICAS REPORTADAS', MARGIN + 10, y + 5);
+        y += 25;
+        for (var ni = 0; ni < novedades.length; ni++) {
+          if (y + 36 > MAX_Y) { doc.addPage(); y = MARGIN; }
+          var nov = novedades[ni];
+          var novColor = nov.critico ? ROJO : AMARILLO;
+          doc.rect(MARGIN, y, 3, 28).fill(novColor);
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(nov.grupo || '', MARGIN + 10, y + 2);
+          var estadoDesc = nov.nota || nov.estado || '';
+          doc.fill(novColor).fontSize(8).font('Helvetica-Bold')
+            .text((nov.item || '') + (estadoDesc ? ' (' + estadoDesc.toUpperCase() + ')' : ''), MARGIN + 10, y + 14);
+          if (nov.critico) {
+            doc.rect(480, y + 5, 80, 14).fill(ROJO_CLR);
+            doc.fill(ROJO).fontSize(6).font('Helvetica-Bold').text('Alerta Supervisor', 485, y + 9);
+          }
+          y += 35;
+        }
+      }
+
+      // ===== BLOQUES DE INSPECCION =====
+      for (var g = 0; g < GRUPOS.length; g++) {
+        var grupo = GRUPOS[g];
+        if (y + 40 > MAX_Y) { doc.addPage(); y = MARGIN; }
+
+        doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(grupo.nombre, MARGIN + 10, y + 4);
+        y += 22;
+
+        var respuesta = (sesion.respuestas && sesion.respuestas[grupo.id]) ? sesion.respuestas[grupo.id] : null;
+        var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
+        var mapaEstados = {};
+        for (var ri = 0; ri < itemsReportados.length; ri++) {
+          mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
+        }
+
+        for (var j = 0; j < grupo.items.length; j++) {
+          if (y + 22 > MAX_Y) { doc.addPage(); y = MARGIN; }
+          var itemDef = grupo.items[j];
+          var estadoVal = mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK';
+          var estadoTexto, estadoColor;
+
+          if (typeof estadoVal === 'number') {
+            estadoTexto = estadoVal === 1 ? 'OK' : estadoVal === 2 ? 'Atencion' : estadoVal === 3 ? 'Malo' : 'N/A';
+            estadoColor = estadoVal === 1 ? VERDE : estadoVal === 2 ? AMARILLO : estadoVal === 3 ? ROJO : GRIS_CLR;
+          } else {
+            estadoTexto = estadoVal || 'OK';
+            var est = estadoTexto.toLowerCase();
+            if (est === 'ok' || est === 'funciona' || est === 'completo' || est === 'sin fugas') {
+              estadoColor = VERDE;
+            } else if (est === 'bajo' || est === 'desgastada' || est === 'intermitente' || est === 'incompleto' || est === 'danado' || est === 'duro o flojo' || est === 'sin presion' || est === 'sin presión') {
+              estadoColor = AMARILLO;
+            } else {
+              estadoColor = ROJO;
+            }
+          }
+
+          doc.fill(NEGRO).fontSize(8).font('Helvetica').text(itemDef.nombre, MARGIN + 10, y);
+          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold').text(estadoTexto, 350, y);
+          if (estadoColor === VERDE) {
+            doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y);
+          } else {
+            var badge = estadoColor === AMARILLO ? 'ATENCION' : 'CRITICO';
+            doc.rect(505, y - 1, 52, 12).fill(estadoColor);
+            doc.fill('#ffffff').fontSize(6).font('Helvetica-Bold').text(badge, 508, y + 1);
+          }
+          y += 12;
+          doc.moveTo(MARGIN + 10, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+          y += 8;
+        }
+        y += 5;
+      }
+
+      // ===== OBSERVACIONES =====
+      if (sesion.observacion) {
+        if (y + 50 > MAX_Y) { doc.addPage(); y = MARGIN; }
+        doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text('OBSERVACIONES', MARGIN + 10, y + 4);
+        y += 22;
+        doc.fill(GRIS_OSC).fontSize(8).font('Helvetica').text(sesion.observacion, MARGIN + 10, y, { width: 500 });
+        y += 30;
+      }
+
+      // ===== EVIDENCIA FOTOGRAFICA =====
+      if (fotosDescargadas.length > 0) {
+        doc.addPage();
+        y = MARGIN;
+
+        doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
+          .text('EVIDENCIA FOTOGRAFICA (VALIDACION IA)', MARGIN + 10, y + 4);
+        y += 30;
+
+        for (var fp = 0; fp < fotosDescargadas.length; fp++) {
+          if (y + 290 > MAX_Y) { doc.addPage(); y = MARGIN; }
+          var fotoData = fotosDescargadas[fp];
+          var foto = fotoData.info;
+          var esFotoNovedad = foto.tipo === 'novedad';
+          var labelColor = esFotoNovedad ? ROJO : VERDE;
+          var fotoLabel = esFotoNovedad ? 'NOVEDAD' : 'VERIFICACION';
+
+          doc.rect(MARGIN, y, 70, 14).fill(labelColor);
+          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold').text(fotoLabel, MARGIN + 5, y + 3);
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(foto.descripcion || '', MARGIN + 80, y + 2);
+          y += 20;
+
+          if (fotoData.buffer) {
+            try {
+              doc.image(fotoData.buffer, 80, y, { width: 380, height: 220, fit: [380, 220], align: 'center' });
+              y += 230;
+            } catch (imgErr) {
+              doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+              doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+              y += 70;
+            }
+          } else {
+            doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+            doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+            y += 70;
+          }
+
+          doc.fill(esFotoNovedad ? ROJO : VERDE).fontSize(7).font('Helvetica')
+            .text('IA: ' + (foto.validacion || 'Foto recibida'), 80, y, { width: 380 });
+          y += 30;
+        }
+      }
+
+      // ===== FIRMA =====
+      if (y + 120 > MAX_Y) { doc.addPage(); y = MARGIN; }
+      y += 15;
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+      y += 10;
+      doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', MARGIN, y);
+      y += 14;
+      var telFirma = sesion.telefono ? sesion.telefono.replace('whatsapp:', '') : (conductor.telefono || 'N/R');
+      doc.fill(GRIS_OSC).fontSize(7).font('Helvetica')
+        .text('Firma: Firmado digitalmente por ' + nombreConductor + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
+      y += 12;
+      var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.getFullYear() + ('0'+(ahora.getMonth()+1)).slice(-2) + ('0'+ahora.getDate()).slice(-2);
+      doc.text('Timestamp: ' + diaNum + '/' + (ahora.getMonth()+1) + '/' + ahora.getFullYear() + ', ' + horaStr + ' | ID Transaccion: ' + idTx, MARGIN, y, { width: 520 });
+      y += 12;
+      doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', MARGIN, y, { width: 520 });
+      y += 30;
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+      y += 10;
+      doc.rect(MARGIN, y, CONTENT_W, 35).fill(NEGRO);
+      doc.fill('#ffffff').fontSize(7).font('Helvetica')
+        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia fotografica', MARGIN + 10, y + 6, { width: 390 });
+      doc.text('y valida cada paso legalmente con firmas digitales.', MARGIN + 10, y + 17, { width: 390 });
+      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
+
+      doc.end();
+
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      reject(error);
+    }
+  });
+}
+
+async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
+  try {
+    var pdfBuffer = await generarPDF(sesion);
+    var nombreArchivo = 'preop_' + sesion.placa + '_' + Date.now() + '.pdf';
+
+    var uploadResult = await config.supabase.storage
+      .from('preoperacionales')
+      .upload(nombreArchivo, pdfBuffer, { contentType: 'application/pdf', upsert: false });
+
+    if (uploadResult.error) {
+      console.error('Error subiendo PDF:', uploadResult.error);
+      return null;
+    }
+
+    var urlResult = config.supabase.storage.from('preoperacionales').getPublicUrl(nombreArchivo);
+    var pdfUrl = urlResult.data.publicUrl;
+    console.log('PDF subido:', pdfUrl);
+
+    await config.supabase.from('preoperacionales').update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
+
+    var ahoraUTC2 = new Date();
+    var ahoraCO2 = new Date(ahoraUTC2.getTime() - 5 * 60 * 60 * 1000);
+    var meses2 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var fechaMsg = ahoraCO2.getDate() + '/' + meses2[ahoraCO2.getMonth()] + '/' + ahoraCO2.getFullYear();
+
+    await config.twilioClient.messages.create({
+      from: config.TWILIO_WHATSAPP_NUMBER,
+      to: telefono,
+      body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + fechaMsg + '\n\nDescarga aqui:\n' + pdfUrl
+    });
+
+    console.log('PDF enviado a ' + telefono);
+    return pdfUrl;
+
+  } catch (error) {
+    console.error('Error en subirYEnviarPDF:', error);
+    return null;
+  }
+}
+
+module.exports = { generarPDF, subirYEnviarPDF };
