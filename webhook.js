@@ -147,28 +147,10 @@ function registrarWebhook(app) {
 
           sesion.conductor = resConductor.data;
 
-          if (!sesion.conductor) {
-            sesion.estado = 'ESPERANDO_NOMBRE';
-            return utils.responderTwiml(res,
-              '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\n\u00bfTu nombre completo?'
-            );
-          }
-
           sesion.estado = 'ESPERANDO_KILOMETRAJE';
           return utils.responderTwiml(res,
             '\u2705 *' + placaLimpia + '*\n' + vehiculo.tipo + ' ' + vehiculo.marca + ' ' + (vehiculo.modelo || '') + '\n\nKilometraje actual?'
           );
-        }
-
-        // ==================== NOMBRE (conductor no registrado) ====================
-        case 'ESPERANDO_NOMBRE': {
-          var nombreLibre = mensaje.trim();
-          if (nombreLibre.length < 3) {
-            return utils.responderTwiml(res, '\u274c Escribe tu nombre completo.');
-          }
-          sesion.conductor = { nombre: nombreLibre, licencia_categoria: 'N/R', telefono: telefono.replace('whatsapp:', '') };
-          sesion.estado = 'ESPERANDO_KILOMETRAJE';
-          return utils.responderTwiml(res, 'Hola *' + nombreLibre + '* \ud83d\udc4b\nKilometraje actual?');
         }
 
         // ==================== KILOMETRAJE ====================
@@ -328,6 +310,12 @@ function registrarWebhook(app) {
               var def = GRUPOS_MAP[n.item];
               return !def || !def.sinFoto;
             });
+
+            if (sesion.fotosNovedadPendientes.length === 0) {
+              sesion.estado = 'FOTO_ADICIONAL';
+              return utils.responderTwiml(res, '\u2705 Foto valida\n\n\ud83d\udcf8 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar');
+            }
+
             var novedad = sesion.fotosNovedadPendientes[0];
             sesion.estado = 'FOTO_NOVEDAD';
             return utils.responderTwiml(res,
