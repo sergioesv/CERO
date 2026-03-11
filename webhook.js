@@ -79,7 +79,12 @@ function limpiarGrupo(sesion, grupo) {
 }
 
 function prepararFotosNovedad(sesion) {
-  sesion.fotosNovedadPendientes = utils.obtenerNovedadesFotografiables(sesion.novedades).map(function(novedad) {
+  var fotografiables = utils.obtenerNovedadesFotografiables(sesion.novedades);
+  var fotosTomadas = (sesion.fotos || []).filter(function(foto) {
+    return foto && foto.tipo === 'novedad';
+  }).length;
+
+  sesion.fotosNovedadPendientes = fotografiables.slice(fotosTomadas).map(function(novedad) {
     return {
       grupo: novedad.grupo,
       item: novedad.item,
