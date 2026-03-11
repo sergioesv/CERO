@@ -1,49 +1,45 @@
-const Anthropic = require('@anthropic-ai/sdk');
-const axios = require('axios');
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('./config');
+var axios = require('axios');
+var config = require('./config');
+var utils = require('./utils');
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+var anthropic = config.anthropic;
+var TWILIO_ACCOUNT_SID = config.TWILIO_ACCOUNT_SID;
+var TWILIO_AUTH_TOKEN = config.TWILIO_AUTH_TOKEN;
 
-console.log('--- CHEQUEO DE CREDENCIALES ---');
-console.log('SID presente:', !!TWILIO_ACCOUNT_SID);
-console.log('Token presente:', !!TWILIO_AUTH_TOKEN);
-console.log('Longitud del Token:', TWILIO_AUTH_TOKEN ? TWILIO_AUTH_TOKEN.length : 0);
-console.log('Inicia con:', TWILIO_AUTH_TOKEN ? TWILIO_AUTH_TOKEN.substring(0, 4) : 'N/A');
-console.log('-------------------------------');
-
-// Descargar imagen con autenticación Twilio
 async function descargarImagen(url) {
   try {
-    const isTwilio = url.includes('twilio.com') || url.includes('twiliocdn.com');
-    
-    const credentials = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-    console.log('URL a descargar:', url);
-    console.log('Credencial base64 (primeros 20):', credentials.substring(0, 20));
-
-    const config = {
+    var isTwilio = /twilio\.com|twiliocdn\.com/i.test(url);
+    var requestConfig = {
       responseType: 'arraybuffer',
       maxRedirects: 10,
-      headers: isTwilio ? {
-        'Authorization': `Basic ${credentials}`
-      } : {}
+      headers: {}
     };
 
-    const response = await axios.get(url, config);
-    const base64 = Buffer.from(response.data).toString('base64');
-    const mediaType = response.headers['content-type'] || 'image/jpeg';
-    console.log('Imagen descargada OK. Tipo:', mediaType, 'Tamaño:', response.data.length);
-    return { base64, mediaType };
+    if (isTwilio && TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+      var credentials = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
+      requestConfig.headers.Authorization = 'Basic ' + credentials;
+    }
+
+    var response = await axios.get(url, requestConfig);
+    return {
+      base64: Buffer.from(response.data).toString('base64'),
+      mediaType: response.headers['content-type'] || 'image/jpeg'
+    };
   } catch (error) {
     console.error('Error descargando imagen:', error.message);
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Headers respuesta:', JSON.stringify(error.response.headers));
-    }
     throw new Error('No se pudo descargar la imagen');
   }
 }
 
-// Marcar todo OK sin IA
+function extraerJson(respuestaTexto) {
+  var texto = String(respuestaTexto || '').trim();
+  var jsonMatch = texto.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('IA no devolvio JSON valido');
+  }
+  return JSON.parse(jsonMatch[0]);
+}
+
 function marcarTodoOK() {
   return {
     estado: 'OK',
@@ -52,119 +48,166 @@ function marcarTodoOK() {
   };
 }
 
-// Interpretar novedad con Haiku
 async function interpretarNovedad(texto, items) {
-  const prompt = `Eres asistente de inspección vehicular. El operario reportó una novedad: "${texto}"
+  var prompt = 'Eres asistente de inspeccion vehicular. El operario reporto una novedad: "' + texto + '"\n\n' +
+    'Items posibles del bloque: ' + items.join(', ') + '\n\n' +
+    'REGLA IMPORTANTE: Solo incluye en el JSON los items que el operario menciono explicitamente con una falla. ' +
+    'No inventes items ni cambies el nombre. Usa exactamente uno de los items de la lista.\n\n' +
+    'Clasifica el estado usando estas categorias segun el tipo de item:\n' +
+    '- Niveles de liquidos: Bajo / Vacio\n' +
+    '- Fugas: Con fugas\n' +
+    '- Llantas: Desgastada / Danada / Sin presion\n' +
+    '- Luces/Electricos: Intermitente / No funciona\n' +
+    '- Frenos/Pedales: Duro o flojo / No funciona\n' +
+    '- Equipo carretera: Incompleto / Falta\n' +
+    '- Cinturones/Espejos: Danado / Falta\n\n' +
+    'Responde SOLO en JSON sin texto adicional:\n' +
+    '{\n' +
+    '  "items": [\n' +
+    '    {"nombre": "nombre exacto del item segun la lista", "estado": "estado segun categoria"}\n' +
+    '  ],\n' +
+    '  "observacion": "texto original del operario"\n' +
+    '}';
 
-Ítems posibles del bloque: ${items.join(', ')}
-
-REGLA IMPORTANTE: Solo incluye en el JSON los ítems que el operario mencionó explícitamente con una falla. No incluyas ítems que no se mencionaron. Si el operario dijo "llanta desinflada", solo reporta el ítem de llantas.
-
-Clasifica el estado usando estas categorías según el tipo de ítem:
-- Niveles de líquidos: Bajo / Vacío
-- Fugas: Con fugas
-- Llantas: Desgastada / Dañada / Sin presión
-- Luces/Eléctricos: Intermitente / No funciona
-- Frenos/Pedales: Duro o flojo / No funciona
-- Equipo carretera: Incompleto / Falta
-- Cinturones/Espejos: Dañado / Falta
-
-Responde SOLO en JSON sin texto adicional:
-{
-  "items": [
-    {"nombre": "nombre exacto del ítem según la lista", "estado": "estado según categoría"}
-  ],
-  "observacion": "texto original del operario"
-}`;
-
-  const message = await anthropic.messages.create({
+  var message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const respuesta = message.content[0].text;
-  const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
-  
-  if (!jsonMatch) {
-    throw new Error('IA no devolvió JSON válido');
+  var parsed = extraerJson(message.content[0].text);
+  var itemsPermitidos = {};
+  for (var i = 0; i < items.length; i++) {
+    itemsPermitidos[items[i]] = true;
   }
 
-  return JSON.parse(jsonMatch[0]);
+  parsed.items = (parsed.items || []).filter(function(item) {
+    return item && itemsPermitidos[item.nombre];
+  });
+  parsed.observacion = texto;
+  return parsed;
 }
 
-// Describir foto sin validación estricta (acepta cualquier foto del vehículo)
-async function describirFoto(urlFoto, contexto) {
+async function analizarImagen(urlFoto, promptTexto) {
+  var imagen = await descargarImagen(urlFoto);
+  var message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 300,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: imagen.mediaType, data: imagen.base64 }
+        },
+        {
+          type: 'text',
+          text: promptTexto
+        }
+      ]
+    }]
+  });
+
+  return extraerJson(message.content[0].text);
+}
+
+async function extraerPlacaFoto(urlFoto) {
   try {
-    const { base64, mediaType } = await descargarImagen(urlFoto);
+    var prompt = 'Analiza la imagen de un vehiculo. Debes confirmar si se ve la parte frontal o frontal lateral del vehiculo y si la placa es legible. ' +
+      'Lee la placa visible exactamente como aparece. Si no ves una placa legible, responde valida=false.\n\n' +
+      'Responde SOLO en JSON:\n' +
+      '{"valida": true/false, "placa": "ABC123 o null", "comentario": "breve", "razon": "si no valida"}';
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 200,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64 }
-          },
-          {
-            type: 'text',
-            text: `Describe brevemente lo que ves en esta foto. Contexto: "${contexto}". Responde SOLO en JSON: {"comentario": "descripción de lo que ves"}`
-          }
-        ]
-      }]
-    });
+    var parsed = await analizarImagen(urlFoto, prompt);
+    var placa = utils.normalizarPlaca(parsed.placa || '');
 
-    const respuesta = message.content[0].text;
-    const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { valida: true, comentario: 'Foto recibida' };
-    const parsed = JSON.parse(jsonMatch[0]);
-    return { valida: true, comentario: parsed.comentario || 'Foto recibida' };
+    return {
+      valida: !!parsed.valida && !!placa,
+      placa: placa || null,
+      comentario: parsed.comentario || 'Foto frontal recibida',
+      razon: (!!parsed.valida && !!placa) ? '' : (parsed.razon || 'No pude leer la placa')
+    };
   } catch (error) {
-    console.error('Error describiendo foto:', error.message);
-    return { valida: true, comentario: 'Foto recibida' };
+    console.error('Error extrayendo placa:', error.message);
+    return {
+      valida: false,
+      placa: null,
+      comentario: '',
+      razon: 'No pude leer la placa de la foto. Intenta con una imagen mas clara.'
+    };
   }
 }
 
-// Validar foto con Sonnet Vision — solo para foto de verificación aleatoria
-async function validarFoto(urlFoto, descripcionEsperada, soloDescribir) {
-  if (soloDescribir) return describirFoto(urlFoto, descripcionEsperada);
+async function validarFotoPlaca(urlFoto, placaEsperada) {
   try {
-    const { base64, mediaType } = await descargarImagen(urlFoto);
+    var placaNormalizada = utils.normalizarPlaca(placaEsperada);
+    var prompt = 'Analiza la imagen de un vehiculo. Debes confirmar si se ve la parte frontal o frontal lateral del vehiculo y si la placa es legible. ' +
+      'Lee la placa visible exactamente como aparece. Si no ves una placa legible, responde valida=false. ' +
+      'La placa esperada es "' + placaNormalizada + '".\n\n' +
+      'Responde SOLO en JSON:\n' +
+      '{"valida": true/false, "placa_detectada": "ABC123 o null", "comentario": "breve", "razon": "si no valida"}';
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64 }
-          },
-          {
-            type: 'text',
-            text: `¿Esta foto muestra alguna parte de un vehículo relacionada con "${descripcionEsperada}"? Acepta si es cualquier parte del vehículo o sus componentes. Rechaza solo si claramente no es un vehículo ni sus partes. Responde SOLO en JSON: {"valida": true/false, "razon": "descripción breve", "comentario": "lo que ves en la foto"}`
-          }
-        ]
-      }]
-    });
+    var parsed = await analizarImagen(urlFoto, prompt);
+    var placaDetectada = utils.normalizarPlaca(parsed.placa_detectada || '');
+    var coincide = !!placaDetectada && placaDetectada === placaNormalizada;
 
-    const respuesta = message.content[0].text;
-    const jsonMatch = respuesta.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { valida: false, razon: 'Error de validación', comentario: '' };
-    return JSON.parse(jsonMatch[0]);
+    return {
+      valida: !!parsed.valida && coincide,
+      placaDetectada: placaDetectada || null,
+      comentario: parsed.comentario || 'Foto frontal recibida',
+      razon: coincide ? '' : (parsed.razon || ('La placa detectada fue ' + (placaDetectada || 'ilegible')))
+    };
   } catch (error) {
-    console.error('Error validando foto:', error.message);
-    return { valida: false, razon: 'Error al procesar imagen', comentario: error.message };
+    console.error('Error validando foto de placa:', error.message);
+    return {
+      valida: false,
+      placaDetectada: null,
+      comentario: '',
+      razon: 'No pude validar la foto frontal. Intenta con una imagen mas clara.'
+    };
+  }
+}
+
+async function extraerKilometrajeFoto(urlFoto) {
+  try {
+    var prompt = 'Analiza la foto del tablero u odometro de un vehiculo. ' +
+      'Extrae el kilometraje total visible como un numero entero en kilometros. ' +
+      'Solo valida si el numero se ve con claridad. Si no se ve claro o no es un odometro, responde valida=false.\n\n' +
+      'Responde SOLO en JSON:\n' +
+      '{"valida": true/false, "kilometraje": 123456 o null, "comentario": "breve", "razon": "si no valida"}';
+
+    var parsed = await analizarImagen(urlFoto, prompt);
+    var kilometraje = null;
+
+    if (typeof parsed.kilometraje === 'number' && isFinite(parsed.kilometraje)) {
+      kilometraje = Math.trunc(parsed.kilometraje);
+    } else if (parsed.kilometraje != null) {
+      var digits = String(parsed.kilometraje).replace(/[^0-9]/g, '');
+      kilometraje = digits ? parseInt(digits, 10) : null;
+    }
+
+    return {
+      valida: !!parsed.valida && kilometraje !== null,
+      kilometraje: kilometraje,
+      comentario: parsed.comentario || 'Kilometraje extraido',
+      razon: (!!parsed.valida && kilometraje !== null) ? '' : (parsed.razon || 'No pude leer el kilometraje')
+    };
+  } catch (error) {
+    console.error('Error extrayendo kilometraje:', error.message);
+    return {
+      valida: false,
+      kilometraje: null,
+      comentario: '',
+      razon: 'No pude leer el kilometraje de la foto. Intenta con una imagen mas nitida.'
+    };
   }
 }
 
 module.exports = {
   marcarTodoOK,
   interpretarNovedad,
-  validarFoto,
-  describirFoto,
+  extraerPlacaFoto,
+  validarFotoPlaca,
+  extraerKilometrajeFoto,
   descargarImagen
 };

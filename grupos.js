@@ -49,12 +49,9 @@ const GRUPOS = [
   }
 ];
 
-const FOTOS_VERIFICACION = [
-  'Tome foto del odometro mostrando el kilometraje',
-  'Tome foto del tablero encendido',
-  'Tome foto de las llantas delanteras',
-  'Tome foto de las llantas traseras',
-  'Tome foto del extintor'
-];
+const PASOS_INICIALES = {
+  fotoPlaca: 'Envia una foto frontal del vehiculo donde la placa se vea completa y legible.',
+  fotoOdometro: 'Envia una foto del odometro o tablero donde se vea claramente el kilometraje.'
+};
 
-module.exports = { GRUPOS, FOTOS_VERIFICACION };
+module.exports = { GRUPOS, PASOS_INICIALES };

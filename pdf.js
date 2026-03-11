@@ -3,161 +3,224 @@ var https = require('https');
 var http = require('http');
 var config = require('./config');
 var GRUPOS = require('./grupos').GRUPOS;
+var utils = require('./utils');
 var LOGO_BASE64 = require('./logo').LOGO_BASE64;
 
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
-    var isTwilio = url.indexOf('twilio.com') >= 0;
+    var isTwilio = url.indexOf('twilio.com') >= 0 || url.indexOf('api.twilio.com') >= 0;
     if (isTwilio) {
-      var creds = Buffer.from(process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN).toString('base64');
-      function seguir(u, n) {
-        if (n > 5) return reject(new Error('Demasiadas redirecciones'));
-        var o = new URL(u);
-        var req = https.request({ hostname: o.hostname, path: o.pathname + o.search, method: 'GET', headers: { 'Authorization': 'Basic ' + creds } }, function(res) {
-          if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) { res.resume(); return seguir(res.headers['location'], n + 1); }
+      var credentials = Buffer.from((config.TWILIO_ACCOUNT_SID || '') + ':' + (config.TWILIO_AUTH_TOKEN || '')).toString('base64');
+      function seguirUrl(currentUrl, saltos) {
+        if (saltos > 5) return reject(new Error('Demasiadas redirecciones'));
+        var urlObj = new URL(currentUrl);
+        var options = {
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + urlObj.search,
+          method: 'GET',
+          headers: { 'Authorization': 'Basic ' + credentials }
+        };
+        var req = https.request(options, function(res) {
+          if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+            res.resume();
+            return seguirUrl(res.headers['location'], saltos + 1);
+          }
           if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
-          var chunks = []; res.on('data', function(c) { chunks.push(c); }); res.on('end', function() { resolve(Buffer.concat(chunks)); });
-        }); req.on('error', reject); req.end();
+          var chunks = [];
+          res.on('data', function(c) { chunks.push(c); });
+          res.on('end', function() { resolve(Buffer.concat(chunks)); });
+        });
+        req.on('error', reject);
+        req.end();
       }
-      seguir(url, 0);
+      seguirUrl(url, 0);
     } else {
       var client = url.startsWith('https') ? https : http;
-      client.get(url, function(res) {
-        if (res.statusCode === 301 || res.statusCode === 302) { descargarImagen(res.headers.location).then(resolve).catch(reject); return; }
-        var chunks = []; res.on('data', function(c) { chunks.push(c); }); res.on('end', function() { resolve(Buffer.concat(chunks)); }); res.on('error', reject);
+      client.get(url, function(response) {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          descargarImagen(response.headers.location).then(resolve).catch(reject);
+          return;
+        }
+        var chunks = [];
+        response.on('data', function(c) { chunks.push(c); });
+        response.on('end', function() { resolve(Buffer.concat(chunks)); });
+        response.on('error', reject);
       }).on('error', reject);
     }
   });
 }
 
-function horaCol(date) {
-  var h = date.getHours(), m = date.getMinutes();
-  var ampm = h >= 12 ? 'p. m.' : 'a. m.';
-  return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
-}
-
 async function generarPDF(sesion) {
-  var fotosDesc = [];
+  var fotosDescargadas = [];
   if (sesion.fotos && sesion.fotos.length > 0) {
     for (var d = 0; d < sesion.fotos.length; d++) {
-      try { fotosDesc.push({ buffer: await descargarImagen(sesion.fotos[d].url), info: sesion.fotos[d] }); }
-      catch (e) { fotosDesc.push({ buffer: null, info: sesion.fotos[d] }); }
+      try {
+        var imgBuffer = await descargarImagen(sesion.fotos[d].url);
+        fotosDescargadas.push({ buffer: imgBuffer, info: sesion.fotos[d] });
+      } catch (e) {
+        console.error('Error descargando foto ' + d + ':', e.message);
+        fotosDescargadas.push({ buffer: null, info: sesion.fotos[d] });
+      }
     }
   }
 
   return new Promise(function(resolve, reject) {
     try {
-      // ===== COLORES =====
-      var NEGRO = '#1A1A1A', GRIS_OSC = '#333333', GRIS = '#666666';
-      var GRIS_CLR = '#999999', GRIS_FONDO = '#F5F5F5', GRIS_LIN = '#E0E0E0';
-      var VERDE = '#2E7D32', ROJO = '#C62828', ROJO_CLR = '#FFEBEE', AMARILLO = '#F9A825';
-      var BLANCO = '#FFFFFF';
+      // ===== CONSTANTES =====
+      var NEGRO      = '#1A1A1A';
+      var GRIS_OSC   = '#333333';
+      var GRIS       = '#666666';
+      var GRIS_CLR   = '#999999';
+      var GRIS_FONDO = '#F5F5F5';
+      var GRIS_LIN   = '#E0E0E0';
+      var VERDE      = '#2E7D32';
+      var ROJO       = '#C62828';
+      var ROJO_CLR   = '#FFEBEE';
+      var AMARILLO   = '#F9A825';
+      var PAGE_W     = 612;
+      var PAGE_H     = 792;
+      var MARGIN     = 45;
+      var CONTENT_W  = PAGE_W - MARGIN * 2;   // 522
+      var FOOTER_Y   = PAGE_H - 30;           // 762 — posición fija del pie
 
-      var W = 612, H = 792, M = 45, CW = W - M * 2;
-      var CONTENT_MAX = H - 60; // límite de contenido — debajo va el footer
+      var ahoraUTC = sesion.fecha ? new Date(sesion.fecha) : new Date();
+      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000)); // Colombia UTC-5
+      var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      var ahora = sesion.fecha ? new Date(sesion.fecha) : new Date();
-      var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      var fechaLarga = ahora.getDate() + ' de ' + meses[ahora.getMonth()] + ' de ' + ahora.getFullYear();
-      var fechaCorta = ahora.getDate() + '/' + meses[ahora.getMonth()].charAt(0).toUpperCase() + meses[ahora.getMonth()].slice(1) + ' ' + horaCol(ahora);
-
-      var doc = new PDFDocument({ size: 'LETTER', autoFirstPage: false });
+      // autoFirstPage: false — controlamos TODAS las páginas manualmente
+      var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: false });
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
       doc.on('error', reject);
 
-      var pagNum = 0;
+      var numPagina = 0;
 
-      // ===== FUNCIONES DE PÁGINA =====
-      function nuevaPagina() {
-        pagNum++;
-        doc.addPage({ size: 'LETTER', margin: 0 });
+      // Dibuja header/footer en la página actual sin mover el cursor de contenido
+      function decorarPagina(esPrimera) {
+        // Guardar posición actual del cursor
+        var savedX = doc.x;
+        var savedY = doc.y;
 
-        // Footer fijo en coordenada absoluta
-        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-          .text('Pag. ' + pagNum + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            M, H - 18, { width: CW, align: 'center', lineBreak: false });
+        // Sin barra superior — causa conflicto con márgenes PDFKit
 
-        if (pagNum > 1) {
-          // Mini header páginas 2+
-          try { doc.image(Buffer.from(LOGO_BASE64, 'base64'), M, 10, { width: 22, height: 20 }); } catch(e) {}
+        // Footer (coordenada absoluta fija, no mueve flujo de texto)
+        doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
+          .text(
+            'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
+            MARGIN, PAGE_H - 22, { width: CONTENT_W, align: 'center', lineBreak: false }
+          );
+
+        if (!esPrimera) {
+          try {
+            var lb = Buffer.from(LOGO_BASE64, 'base64');
+            doc.image(lb, MARGIN, 8, { width: 24, height: 22 });
+          } catch(e) {}
           doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 73, 13, { lineBreak: false });
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false });
           doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-            .text((sesion.placa || '') + '  |  ' + fechaLarga, 73, 23, { lineBreak: false });
-          doc.moveTo(M, 38).lineTo(W - M, 38).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+            .text((sesion.placa || '') + '  |  ' + fecha, 75, 21, { lineBreak: false });
+          doc.moveTo(MARGIN, 36).lineTo(PAGE_W - MARGIN, 36).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
         }
 
-        return pagNum === 1 ? M : 46;
+        // Restaurar posición del cursor
+        doc.x = savedX;
+        doc.y = savedY;
       }
 
-      function check(y, needed) {
-        if (y + needed > CONTENT_MAX) { return nuevaPagina(); }
+      // ===== HELPER: nueva página =====
+      function nuevaPagina(esPrimera) {
+        numPagina++;
+        doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+        decorarPagina(esPrimera);
+        return esPrimera ? (MARGIN + 10) : 46;
+      }
+
+      // ===== HELPER: verificar espacio disponible =====
+      function checkY(y, needed) {
+        if (y + needed > PAGE_H - 50) {
+          return nuevaPagina(false);
+        }
         return y;
       }
 
-      function linea(y) {
-        doc.moveTo(M + 10, y).lineTo(W - M, y).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
-        return y + 8;
-      }
-
       // ===== PÁGINA 1 =====
-      var y = nuevaPagina();
+      var y = nuevaPagina(true);
 
       // Header completo p1
-      try { doc.image(Buffer.from(LOGO_BASE64, 'base64'), M, 12, { width: 50, height: 45 }); } catch(e) {}
+      try {
+        var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
+        doc.image(logoBuffer, MARGIN, 12, { width: 50, height: 45 });
+      } catch (e) {}
+
       doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold').text('EDEMSA | CERO SYSTEM', 105, 18);
       doc.fill(GRIS_CLR).fontSize(7).font('Helvetica').text('Inspeccion Preoperacional de Vehiculo', 105, 30);
       doc.fill(GRIS_CLR).fontSize(7).font('Helvetica')
-        .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 })
-        .text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
-      doc.moveTo(M, 62).lineTo(W - M, 62).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+        .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 });
+      doc.text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
+      doc.moveTo(MARGIN, 62).lineTo(PAGE_W - MARGIN, 62).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
 
-      // Hero
+      // ===== HERO VEHÍCULO =====
       y = 72;
-      var v = sesion.vehiculo || {};
+      var vehiculo = sesion.vehiculo || {};
+      var marcaModelo = ((vehiculo.marca || '') + ' ' + (vehiculo.modelo || '')).trim();
+
       doc.fill(NEGRO).fontSize(20).font('Helvetica-Bold')
-        .text((v.marca || '') + ' ' + (v.modelo || ''), M, y, { width: 360, lineBreak: false });
+        .text(marcaModelo, MARGIN, y, { width: 360, lineBreak: false });
       y += 26;
-      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold').text(sesion.placa || '', M, y);
-      doc.fill(GRIS).fontSize(8).font('Helvetica').text('Año ' + (v.anio || ''), 420, 80, { align: 'right', width: 147 });
+
+      doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold')
+        .text(sesion.placa || '', MARGIN, y);
+
+      // Año a la derecha (sin tipo)
+      doc.fill(GRIS).fontSize(8).font('Helvetica')
+        .text('Año ' + (vehiculo.anio || 'N/R'), 420, 80, { align: 'right', width: 147 });
+
       y += 36;
-      doc.moveTo(M, y).lineTo(W - M, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 12;
 
-      // Tarjetas
-      var cond = sesion.conductor || {};
+      // ===== TARJETAS INFO =====
+      var conductor = sesion.conductor || {};
+      var nombreConductor = conductor.nombre || 'N/R';
+      var licenciaCat = conductor.licencia_categoria ? 'Cat. ' + conductor.licencia_categoria : 'N/R';
+      var diaNum = ahora.getDate();
+      var mesNombre = ahora.toLocaleDateString('es-CO', { month: 'long' });
+      var horaStr = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      var fechaCorta = diaNum + '/' + mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1) + ' ' + horaStr;
+
+      var cardW = 123;
       var cards = [
-        { label: 'PILOTO',   value: cond.nombre || 'N/R' },
-        { label: 'LICENCIA', value: cond.licencia_categoria ? 'Cat. ' + cond.licencia_categoria : 'N/R' },
+        { label: 'PILOTO',   value: nombreConductor },
+        { label: 'LICENCIA', value: licenciaCat },
         { label: 'ODOMETRO', value: (sesion.kilometraje || 0) + ' km' },
         { label: 'FECHA',    value: fechaCorta }
       ];
-      var cw = 123;
       for (var ci = 0; ci < cards.length; ci++) {
-        var cx = M + ci * (cw + 10);
-        doc.rect(cx, y, cw, 35).fill(GRIS_FONDO);
-        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica-Bold').text(cards[ci].label, cx + 8, y + 6, { width: cw - 16 });
-        doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold').text(cards[ci].value, cx + 8, y + 18, { width: cw - 16 });
+        var cx = MARGIN + ci * (cardW + 10);
+        doc.rect(cx, y, cardW, 35).fill(GRIS_FONDO);
+        doc.fill(GRIS_CLR).fontSize(6).font('Helvetica-Bold').text(cards[ci].label, cx + 8, y + 6, { width: cardW - 16 });
+        doc.fill(NEGRO).fontSize(9).font('Helvetica-Bold').text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 });
       }
       y += 48;
 
-      // Novedades
+      // ===== NOVEDADES =====
       var novedades = sesion.novedades || [];
       if (novedades.length > 0) {
-        y = check(y, 30);
-        doc.rect(M, y, CW, 18).fill(NEGRO);
-        doc.fill(BLANCO).fontSize(8).font('Helvetica-Bold').text('NOVEDADES CRITICAS REPORTADAS', M + 10, y + 5);
+        y = checkY(y, 30);
+        doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(8).font('Helvetica-Bold').text('NOVEDADES CRITICAS REPORTADAS', MARGIN + 10, y + 5);
         y += 25;
+
         for (var ni = 0; ni < novedades.length; ni++) {
-          y = check(y, 36);
+          y = checkY(y, 36);
           var nov = novedades[ni];
-          var nc = nov.critico ? ROJO : AMARILLO;
-          doc.rect(M, y, 3, 28).fill(nc);
-          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(nov.grupo || '', M + 10, y + 2);
-          doc.fill(nc).fontSize(8).font('Helvetica-Bold')
-            .text((nov.item || '') + (nov.nota || nov.estado ? ' (' + (nov.nota || nov.estado).toUpperCase() + ')' : ''), M + 10, y + 14);
+          var novColor = nov.critico ? ROJO : AMARILLO;
+          doc.rect(MARGIN, y, 3, 28).fill(novColor);
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(nov.grupo || '', MARGIN + 10, y + 2);
+          var estadoDesc = nov.nota || nov.estado || '';
+          doc.fill(novColor).fontSize(8).font('Helvetica-Bold')
+            .text((nov.item || '') + (estadoDesc ? ' (' + estadoDesc.toUpperCase() + ')' : ''), MARGIN + 10, y + 14);
           if (nov.critico) {
             doc.rect(480, y + 5, 80, 14).fill(ROJO_CLR);
             doc.fill(ROJO).fontSize(6).font('Helvetica-Bold').text('Alerta Supervisor', 485, y + 9);
@@ -166,124 +229,212 @@ async function generarPDF(sesion) {
         }
       }
 
-      // Bloques
+      // ===== BLOQUES DE INSPECCION =====
       for (var g = 0; g < GRUPOS.length; g++) {
         var grupo = GRUPOS[g];
-        y = check(y, 40);
-        doc.rect(M, y, CW, 16).fill(GRIS_FONDO);
-        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(grupo.nombre, M + 10, y + 4);
+        y = checkY(y, 40);
+
+        doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(grupo.nombre, MARGIN + 10, y + 4);
         y += 22;
 
-        var resp = sesion.respuestas && sesion.respuestas[grupo.id] ? sesion.respuestas[grupo.id] : null;
-        var mapa = {};
-        if (resp && resp.items) { for (var ri = 0; ri < resp.items.length; ri++) mapa[resp.items[ri].nombre] = resp.items[ri].estado; }
+        // Mapa de estados reportados
+        var respuesta = (sesion.respuestas && sesion.respuestas[grupo.id]) ? sesion.respuestas[grupo.id] : null;
+        var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
+        var mapaEstados = {};
+        for (var ri = 0; ri < itemsReportados.length; ri++) {
+          mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
+        }
 
         for (var j = 0; j < grupo.items.length; j++) {
-          y = check(y, 22);
-          var itm = grupo.items[j];
-          var ev = mapa.hasOwnProperty(itm.nombre) ? mapa[itm.nombre] : 'OK';
-          var et, ec;
-          if (typeof ev === 'number') {
-            et = ev===1?'OK':ev===2?'Atencion':ev===3?'Malo':'N/A';
-            ec = ev===1?VERDE:ev===2?AMARILLO:ev===3?ROJO:GRIS_CLR;
+          y = checkY(y, 22);
+          var itemDef = grupo.items[j];
+          var estadoVal = mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK';
+          var estadoTexto, estadoColor;
+
+          var clasificacion = utils.clasificarEstado(estadoVal);
+          estadoTexto = typeof estadoVal === 'number'
+            ? (estadoVal === 1 ? 'OK' : estadoVal === 2 ? 'Atencion' : estadoVal === 3 ? 'Malo' : 'N/A')
+            : (estadoVal || 'OK');
+
+          if (clasificacion === 'ok') {
+            estadoColor = VERDE;
+          } else if (clasificacion === 'advertencia') {
+            estadoColor = AMARILLO;
+          } else if (clasificacion === 'na') {
+            estadoColor = GRIS_CLR;
           } else {
-            et = ev || 'OK';
-            var el = et.toLowerCase();
-            if (el==='ok'||el==='funciona'||el==='completo'||el==='sin fugas') ec=VERDE;
-            else if (el==='bajo'||el==='desgastada'||el==='intermitente'||el==='incompleto'||el==='danado'||el==='duro o flojo'||el==='sin presion') ec=AMARILLO;
-            else ec=ROJO;
+            estadoColor = ROJO;
           }
-          doc.fill(NEGRO).fontSize(8).font('Helvetica').text(itm.nombre, M + 10, y);
-          doc.fill(ec).fontSize(8).font('Helvetica-Bold').text(et, 350, y);
-          if (ec === VERDE) { doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y); }
-          else { doc.rect(505, y-1, 52, 12).fill(ec); doc.fill(BLANCO).fontSize(6).font('Helvetica-Bold').text(ec===AMARILLO?'ATENCION':'CRITICO', 508, y+1); }
+
+          doc.fill(NEGRO).fontSize(8).font('Helvetica').text(itemDef.nombre, MARGIN + 10, y);
+          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold').text(estadoTexto, 350, y);
+          if (estadoColor === VERDE) {
+            doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y);
+          } else {
+            var badge = estadoColor === AMARILLO ? 'ATENCION' : 'CRITICO';
+            doc.rect(505, y - 1, 52, 12).fill(estadoColor);
+            doc.fill('#ffffff').fontSize(6).font('Helvetica-Bold').text(badge, 508, y + 1);
+          }
           y += 12;
-          y = linea(y);
+          doc.moveTo(MARGIN + 10, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+          y += 8;
         }
         y += 5;
       }
 
-      // Observaciones
-      if (sesion.observacion && sesion.observacion.toLowerCase() !== 'no') {
-        y = check(y, 50);
-        doc.rect(M, y, CW, 16).fill(GRIS_FONDO);
-        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text('OBSERVACIONES', M + 10, y + 4);
+      // ===== OBSERVACIONES =====
+      if (sesion.observacion) {
+        y = checkY(y, 50);
+        doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
+        doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text('OBSERVACIONES', MARGIN + 10, y + 4);
         y += 22;
-        doc.fill(GRIS_OSC).fontSize(8).font('Helvetica').text(sesion.observacion, M + 10, y, { width: CW - 20 });
-        y = doc.y + 15;
+        doc.fill(GRIS_OSC).fontSize(8).font('Helvetica').text(sesion.observacion, MARGIN + 10, y, { width: 500 });
+        y += 25;
       }
 
-      // Fotos
-      if (fotosDesc.length > 0) {
-        y = nuevaPagina();
-        doc.rect(M, y, CW, 18).fill(NEGRO);
-        doc.fill(BLANCO).fontSize(9).font('Helvetica-Bold').text('EVIDENCIA FOTOGRAFICA (VALIDACION IA)', M + 10, y + 4);
-        y += 28;
+      // ===== EVIDENCIA FOTOGRAFICA =====
+      if (fotosDescargadas.length > 0) {
+        y = nuevaPagina(false);
 
-        for (var fp = 0; fp < fotosDesc.length; fp++) {
-          y = check(y, 280);
-          var fd = fotosDesc[fp], foto = fd.info;
-          var esNov = foto.tipo === 'novedad';
-          var lc = esNov ? ROJO : VERDE;
+        doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
+        doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
+          .text('EVIDENCIA FOTOGRAFICA', MARGIN + 10, y + 4);
+        y += 30;
 
-          doc.rect(M, y, 70, 14).fill(lc);
-          doc.fill(BLANCO).fontSize(7).font('Helvetica-Bold').text(esNov ? 'NOVEDAD' : 'VERIFICACION', M + 5, y + 3);
-          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(foto.descripcion || '', M + 80, y + 2);
+        for (var fp = 0; fp < fotosDescargadas.length; fp++) {
+          y = checkY(y, 290);
+          var fotoData = fotosDescargadas[fp];
+          var foto = fotoData.info;
+          var esFotoNovedad = foto.tipo === 'novedad';
+          var labelColor = esFotoNovedad ? ROJO : (foto.tipo === 'inicio_odometro' ? VERDE : NEGRO);
+          var fotoLabel = 'EVIDENCIA';
+          if (foto.tipo === 'inicio_placa') fotoLabel = 'PLACA';
+          else if (foto.tipo === 'inicio_odometro') fotoLabel = 'ODOMETRO';
+          else if (foto.tipo === 'novedad') fotoLabel = 'NOVEDAD';
+          else if (foto.tipo === 'adicional') fotoLabel = 'ADICIONAL';
+
+          doc.rect(MARGIN, y, 80, 14).fill(labelColor);
+          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold').text(fotoLabel, MARGIN + 5, y + 3);
+          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(foto.descripcion || '', MARGIN + 90, y + 2);
           y += 20;
 
-          if (fd.buffer) {
-            try { doc.image(fd.buffer, 80, y, { fit: [380, 220], align: 'center' }); y += 230; }
-            catch(e) { doc.rect(80,y,380,40).strokeColor(GRIS_LIN).stroke(); doc.fill(GRIS_CLR).fontSize(7).text('[Foto no disponible]',220,y+14); y+=50; }
+          if (fotoData.buffer) {
+            try {
+              doc.image(fotoData.buffer, 80, y, { width: 380, height: 220, fit: [380, 220], align: 'center' });
+              y += 230;
+            } catch (imgErr) {
+              doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+              doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+              y += 70;
+            }
           } else {
-            doc.rect(80,y,380,40).strokeColor(GRIS_LIN).stroke(); doc.fill(GRIS_CLR).fontSize(7).text('[Foto no disponible]',220,y+14); y+=50;
+            doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+            doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+            y += 70;
           }
 
-          doc.fill(lc).fontSize(7).font('Helvetica').text('IA: ' + (foto.validacion || 'Foto recibida'), 80, y, { width: 380 });
-          y = doc.y + 18;
+          doc.fill(esFotoNovedad ? ROJO : '#333333').fontSize(7).font('Helvetica')
+            .text('Revision: ' + (foto.validacion || 'Pendiente de revision del supervisor'), 80, y, { width: 380 });
+          y += 30;
         }
       }
 
-      // Firma
-      y = check(y, 110);
+      // ===== FIRMA Y FOOTER FINAL =====
+      y = checkY(y, 120);
+      y += 15;
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 10;
-      doc.moveTo(M, y).lineTo(W-M, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke(); y += 10;
-      doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', M, y); y += 14;
-      var tel = sesion.telefono ? sesion.telefono.replace('whatsapp:','') : (cond.telefono||'N/R');
-      var idTx = 'CERO-'+(sesion.placa||'')+'-'+ahora.getFullYear()+('0'+(ahora.getMonth()+1)).slice(-2)+('0'+ahora.getDate()).slice(-2);
+
+      doc.fill(NEGRO).fontSize(7).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', MARGIN, y);
+      y += 14;
+
+      var telFirma = sesion.telefono ? sesion.telefono.replace('whatsapp:', '') : (conductor.telefono || 'N/R');
       doc.fill(GRIS_OSC).fontSize(7).font('Helvetica')
-        .text('Firma: Firmado digitalmente por '+(cond.nombre||'N/R')+' mediante WhatsApp ('+tel+')', M, y, {width:520}); y+=12;
-      doc.text('Timestamp: '+ahora.getDate()+'/'+(ahora.getMonth()+1)+'/'+ahora.getFullYear()+', '+horaCol(ahora)+' | ID Transaccion: '+idTx, M, y, {width:520}); y+=12;
-      doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', M, y, {width:520}); y+=28;
-      doc.moveTo(M,y).lineTo(W-M,y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke(); y+=8;
-      doc.rect(M,y,CW,35).fill(NEGRO);
-      doc.fill(BLANCO).fontSize(7).font('Helvetica')
-        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia fotografica', M+10, y+6, {width:390})
-        .text('y valida cada paso legalmente con firmas digitales.', M+10, y+17, {width:390});
-      doc.fill(BLANCO).fontSize(12).font('Helvetica-Bold').text('CERO', 490, y+10);
+        .text('Firma: Firmado digitalmente por ' + nombreConductor + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
+      y += 12;
+      var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
+      doc.text('Timestamp: ' + ahora.toLocaleString('es-CO') + ' | ID Transaccion: ' + idTx, MARGIN, y, { width: 520 });
+      y += 12;
+      doc.text('Base Legal: Cumple con Ley 527/1999 y Decreto 2364/2012. Firma electronica simple valida para PESV.', MARGIN, y, { width: 520 });
+      y += 30;
+
+      doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
+      y += 10;
+      doc.rect(MARGIN, y, CONTENT_W, 35).fill(NEGRO);
+      doc.fill('#ffffff').fontSize(7).font('Helvetica')
+        .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia fotografica', MARGIN + 10, y + 6, { width: 390 });
+      doc.text('y valida cada paso legalmente con firmas digitales.', MARGIN + 10, y + 17, { width: 390 });
+      doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
 
       doc.end();
 
-    } catch(err) { console.error('Error PDF:', err); reject(err); }
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      reject(error);
+    }
   });
 }
 
 async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
   try {
-    var buf = await generarPDF(sesion);
-    var nombre = 'preop_' + sesion.placa + '_' + Date.now() + '.pdf';
-    var up = await config.supabase.storage.from('preoperacionales').upload(nombre, buf, { contentType: 'application/pdf', upsert: false });
-    if (up.error) { console.error('Error subiendo PDF:', up.error); return null; }
-    var pdfUrl = config.supabase.storage.from('preoperacionales').getPublicUrl(nombre).data.publicUrl;
+    var pdfBuffer = await generarPDF(sesion);
+    var nombreArchivo = 'preop_' + sesion.placa + '_' + Date.now() + '.pdf';
+
+    var uploadResult = await config.supabase.storage
+      .from('preoperacionales')
+      .upload(nombreArchivo, pdfBuffer, { contentType: 'application/pdf', upsert: false });
+
+    if (uploadResult.error) {
+      console.error('Error subiendo PDF:', uploadResult.error);
+      return null;
+    }
+
+    var signedUrlResult = await config.supabase.storage
+      .from('preoperacionales')
+      .createSignedUrl(nombreArchivo, 60 * 60 * 24 * 7);
+
+    if (signedUrlResult.error || !signedUrlResult.data || !signedUrlResult.data.signedUrl) {
+      console.error('Error generando URL firmada:', signedUrlResult.error);
+      return null;
+    }
+
+    var pdfUrl = signedUrlResult.data.signedUrl;
+    console.log('PDF subido:', nombreArchivo);
+
     await config.supabase.from('preoperacionales').update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
-    var ahora = new Date();
-    var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    await config.twilioClient.messages.create({
-      from: config.TWILIO_WHATSAPP_NUMBER, to: telefono,
-      body: '\uD83D\uDCC4 *PDF Preoperacional*\n' + (sesion.placa||'') + ' | ' + ahora.getDate()+'/'+meses[ahora.getMonth()]+'/'+ahora.getFullYear() + '\n\nDescarga aqui:\n' + pdfUrl
-    });
-    console.log('PDF enviado a ' + telefono);
-    return pdfUrl;
-  } catch(e) { console.error('Error subirYEnviarPDF:', e); return null; }
+
+    var ultimoErrorEnvio = null;
+    for (var intento = 1; intento <= 2; intento++) {
+      try {
+        await config.twilioClient.messages.create({
+          from: config.TWILIO_WHATSAPP_NUMBER,
+          to: telefono,
+          body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + ahora_co() + '\n\nDescarga aqui:\n' + pdfUrl
+        });
+        console.log('PDF enviado a ' + telefono);
+        return pdfUrl;
+      } catch (envioError) {
+        ultimoErrorEnvio = envioError;
+        console.error('Intento ' + intento + ' de envio PDF fallido:', envioError.message);
+      }
+    }
+
+    if (ultimoErrorEnvio) {
+      console.error('Error enviando PDF:', ultimoErrorEnvio.message);
+    }
+    return null;
+
+  } catch (error) {
+    console.error('Error en subirYEnviarPDF:', error);
+    return null;
+  }
+}
+
+function ahora_co() {
+  var u = new Date();
+  var c = new Date(u.getTime() - 5 * 60 * 60 * 1000);
+  return c.toLocaleDateString('es-CO');
 }
 
 module.exports = { generarPDF, subirYEnviarPDF };
