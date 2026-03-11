@@ -88,13 +88,13 @@ async function generarPDF(sesion) {
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
       // autoFirstPage: false — controlamos TODAS las páginas manualmente
-      var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: false });
+      var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
       doc.on('end', function() { resolve(Buffer.concat(chunks)); });
       doc.on('error', reject);
 
-      var numPagina = 0;
+      var numPagina = 1;
 
       // Dibuja header/footer en la página actual sin mover el cursor de contenido
       function decorarPagina(esPrimera) {
@@ -108,7 +108,7 @@ async function generarPDF(sesion) {
         doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
           .text(
             'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            MARGIN, PAGE_H - 22, { width: CONTENT_W, align: 'center', lineBreak: false }
+            MARGIN, PAGE_H - 56, { width: CONTENT_W, align: 'center', lineBreak: false }
           );
 
         if (!esPrimera) {
@@ -130,10 +130,15 @@ async function generarPDF(sesion) {
 
       // ===== HELPER: nueva página =====
       function nuevaPagina(esPrimera) {
+        if (esPrimera) {
+          decorarPagina(true);
+          return MARGIN + 10;
+        }
+
         numPagina++;
         doc.addPage({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
-        decorarPagina(esPrimera);
-        return esPrimera ? (MARGIN + 10) : 46;
+        decorarPagina(false);
+        return 46;
       }
 
       // ===== HELPER: verificar espacio disponible =====
@@ -268,14 +273,8 @@ async function generarPDF(sesion) {
           }
 
           doc.fill(NEGRO).fontSize(8).font('Helvetica').text(itemDef.nombre, MARGIN + 10, y);
-          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold').text(estadoTexto, 350, y);
-          if (estadoColor === VERDE) {
-            doc.fill(VERDE).fontSize(8).font('Helvetica-Bold').text('OK', 520, y);
-          } else {
-            var badge = estadoColor === AMARILLO ? 'ATENCION' : 'CRITICO';
-            doc.rect(505, y - 1, 52, 12).fill(estadoColor);
-            doc.fill('#ffffff').fontSize(6).font('Helvetica-Bold').text(badge, 508, y + 1);
-          }
+          doc.fill(estadoColor).fontSize(8).font('Helvetica-Bold')
+            .text(estadoTexto, 405, y, { width: 135, align: 'right' });
           y += 12;
           doc.moveTo(MARGIN + 10, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
           y += 8;
@@ -295,7 +294,7 @@ async function generarPDF(sesion) {
 
       // ===== EVIDENCIA FOTOGRAFICA =====
       if (fotosDescargadas.length > 0) {
-        y = nuevaPagina(false);
+        y = checkY(y, 40);
 
         doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
         doc.fill('#ffffff').fontSize(9).font('Helvetica-Bold')
@@ -303,7 +302,7 @@ async function generarPDF(sesion) {
         y += 30;
 
         for (var fp = 0; fp < fotosDescargadas.length; fp++) {
-          y = checkY(y, 290);
+          y = checkY(y, 270);
           var fotoData = fotosDescargadas[fp];
           var foto = fotoData.info;
           var esFotoNovedad = foto.tipo === 'novedad';
@@ -314,29 +313,35 @@ async function generarPDF(sesion) {
           else if (foto.tipo === 'novedad') fotoLabel = 'NOVEDAD';
           else if (foto.tipo === 'adicional') fotoLabel = 'ADICIONAL';
 
-          doc.rect(MARGIN, y, 80, 14).fill(labelColor);
-          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold').text(fotoLabel, MARGIN + 5, y + 3);
-          doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(foto.descripcion || '', MARGIN + 90, y + 2);
+          var tituloFoto = foto.descripcion || '';
+          if (foto.tipo === 'adicional') {
+            tituloFoto = 'Evidencia adicional';
+          }
+
+          doc.rect(MARGIN, y, 86, 14).fill(labelColor);
+          doc.fill('#ffffff').fontSize(7).font('Helvetica-Bold').text(fotoLabel, MARGIN + 6, y + 3);
+          if (tituloFoto) {
+            doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
+              .text(tituloFoto, MARGIN + 96, y + 2, { width: 300 });
+          }
           y += 20;
 
           if (fotoData.buffer) {
             try {
-              doc.image(fotoData.buffer, 80, y, { width: 380, height: 220, fit: [380, 220], align: 'center' });
-              y += 230;
+              doc.image(fotoData.buffer, 100, y, { fit: [340, 220], align: 'center', valign: 'center' });
+              y += 228;
             } catch (imgErr) {
-              doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
-              doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+              doc.rect(100, y, 340, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+              doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 212, y + 22);
               y += 70;
             }
           } else {
-            doc.rect(80, y, 380, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
-            doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 220, y + 22);
+            doc.rect(100, y, 340, 60).strokeColor(GRIS_LIN).lineWidth(1).stroke();
+            doc.fill(GRIS_CLR).fontSize(8).font('Helvetica').text('[Foto no disponible]', 212, y + 22);
             y += 70;
           }
 
-          doc.fill(esFotoNovedad ? ROJO : '#333333').fontSize(7).font('Helvetica')
-            .text('Revision: ' + (foto.validacion || 'Pendiente de revision del supervisor'), 80, y, { width: 380 });
-          y += 30;
+          y += 12;
         }
       }
 
