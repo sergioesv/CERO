@@ -66,4 +66,16 @@ async function buscarPlacaSugerida(placaDetectada) {
       }
     }
 
-    if (mejor && mejor.distancia <= 1) return mejor.pl
+    if (mejor && mejor.distancia <= 1) return mejor.placa;
+  } catch (error) {
+    console.error('Error buscando placa sugerida:', error.message);
+  }
+
+  return null;
+}
+
+module.exports = {
+  cargarVehiculoYConductor,
+  buscarPlacaSugerida,
+  distanciaPlaca
+};
