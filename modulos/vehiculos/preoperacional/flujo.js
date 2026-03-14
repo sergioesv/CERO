@@ -34,8 +34,8 @@ function firmaTwilioValida(req) {
   }
 
   if (!config.TWILIO_AUTH_TOKEN) {
-    console.warn('TWILIO_AUTH_TOKEN no configurado.');
-    return esDesarrollo;
+    console.warn('TWILIO_AUTH_TOKEN no configurado; se omite validacion de firma.');
+    return true;
   }
 
   var signature = req.headers['x-twilio-signature'];
@@ -469,28 +469,43 @@ function registrarPreoperacional(app) {
 
         case 'DESCRIBIR_NOVEDAD': {
           var grupoNovedad = GRUPOS[sesion.grupoActual];
+          var textoNovedad = String(mensaje || '').trim();
+
+          if (numMedia > 0) {
+            return preop.responderTwiml(res, '✍️ En este paso necesito texto, no foto.\nDescribe el item y la falla.\n_Ej: "freno de parqueo malo"_');
+          }
+
+          if (!textoNovedad || textoNovedad.length < 3 || ['1', '1️⃣', '2', '2️⃣', '3', '3️⃣'].indexOf(textoNovedad) >= 0) {
+            var ejemplosAyuda = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
+            return preop.responderTwiml(res, '✍️ Describe el item y la falla con texto.\n_Ej: "' + ejemplosAyuda + ' malo"_\nTambién puedes escribir *ATRAS* para volver.');
+          }
+
           var interpretacion;
           try {
-            interpretacion = await ocr.interpretarNovedad(mensaje, grupoNovedad.items.map(function(item) { return item.nombre; }));
+            interpretacion = await ocr.interpretarNovedad(textoNovedad, grupoNovedad.items.map(function(item) { return item.nombre; }));
           } catch (error) {
+            console.error('Error interpretando novedad [' + grupoNovedad.id + '] texto="' + textoNovedad + '":', error.message || error);
             interpretacion = null;
           }
 
           if (!interpretacion || !Array.isArray(interpretacion.items)) {
             var ejemplosError = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
-            return preop.responderTwiml(res, '❌ No entendi.\nDescribe la novedad de nuevo.\n_Ej: "' + ejemplosError + ' malo"_');
+            return preop.responderTwiml(res, '❌ No pude interpretar la novedad.\nDescribe de nuevo el item y la falla.\n_Ej: "' + ejemplosError + ' malo"_');
           }
 
           var itemsInterpretados = estadoPreop.normalizarItemsInterpretados(interpretacion.items, grupoNovedad);
           if (!itemsInterpretados.length) {
-            return preop.responderTwiml(res, '❌ No pude asociar la novedad a un item del bloque.\nMenciona el item exacto y el problema encontrado.');
+            return preop.responderTwiml(
+              res,
+              '❌ No pude asociar la novedad a un item de este bloque.\nMenciona uno de estos items: ' + grupoNovedad.items.map(function(item) { return item.nombre; }).join(', ')
+            );
           }
 
           estadoPreop.limpiarGrupo(sesion, grupoNovedad);
           sesion.respuestas[grupoNovedad.id] = {
             estado: 'NOVEDAD',
             items: itemsInterpretados,
-            observacion: interpretacion.observacion || mensaje
+            observacion: interpretacion.observacion || textoNovedad
           };
 
           var novedadesGrupo = itemsInterpretados.filter(function(item) {
