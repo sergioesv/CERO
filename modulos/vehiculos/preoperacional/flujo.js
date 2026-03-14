@@ -55,6 +55,7 @@ async function manejarPreoperacional(req, res) {
       return res.status(403).send('Forbidden');
     }
    }
+}
 
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion);
