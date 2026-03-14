@@ -3,11 +3,8 @@
 
 const { obtenerSesion, eliminarSesion } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
+const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
 
-// Solo preoperacional por ahora - posoperacional sin implementar
-// const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
-
-// Estados del menú principal
 const MENU_ESTADOS = {
   INICIO: 'MENU_INICIO',
   SELECCION: 'MENU_SELECCION'
@@ -16,12 +13,10 @@ const MENU_ESTADOS = {
 async function webhookWhatsApp(req, res) {
   const telefono = req.body.From;
   const mensaje = req.body.Body?.trim() || '';
-  
+
   try {
-    // Obtener o crear sesión
     let sesion = await obtenerSesion(telefono);
-    
-    // Comando global MENU - siempre vuelve al inicio
+
     if (mensaje.toUpperCase() === 'MENU' || mensaje.toUpperCase() === 'INICIO') {
       await eliminarSesion(telefono);
       sesion = {
@@ -31,26 +26,21 @@ async function webhookWhatsApp(req, res) {
       };
       return responderMenu(res);
     }
-    
-    // Si no tiene tipo asignado, está en el menú
+
     if (!sesion.tipo) {
       return await manejarMenuPrincipal(req, res, sesion, mensaje);
     }
-    
-    // Enrutar al módulo correspondiente
+
     if (sesion.tipo === 'preoperacional') {
       return await flujoPreoperacional.manejarPreoperacional(req, res);
     }
-    
-    // Posoperacional desactivado temporalmente
-    // if (sesion.tipo === 'posoperacional') {
-    //   return await flujoPosoperacional.manejarPosoperacional(req, res);
-    // }
-    
-    // Si llegamos aquí, algo salió mal - resetear
+
+    if (sesion.tipo === 'posoperacional') {
+      return await flujoPosoperacional.manejarPosoperacional(req, res);
+    }
+
     await eliminarSesion(telefono);
     return responderMenu(res);
-    
   } catch (error) {
     console.error('❌ Error en webhook WhatsApp:', error);
     return responderError(res);
@@ -59,26 +49,26 @@ async function webhookWhatsApp(req, res) {
 
 async function manejarMenuPrincipal(req, res, sesion, mensaje) {
   const opcion = mensaje.trim();
-  
-  // Solo opción 1 disponible
+
   if (opcion === '1') {
-    // Preoperacional
     sesion.tipo = 'preoperacional';
     sesion.estado = 'INICIO';
     return await flujoPreoperacional.manejarPreoperacional(req, res);
   }
-  
-  // Opción 2 y 3 desactivadas temporalmente
-  if (opcion === '2' || opcion === '3') {
-    return responderTwiml(res, 
-      '🚧 Módulo en desarrollo.\n\n' +
-      'Por ahora solo está disponible:\n' +
-      '1️⃣ Preoperacional\n\n' +
-      'Escribe 1 para continuar.'
+
+  if (opcion === '2') {
+    sesion.tipo = 'posoperacional';
+    sesion.estado = 'POSOP_INICIO';
+    return await flujoPosoperacional.manejarPosoperacional(req, res);
+  }
+
+  if (opcion === '3') {
+    return responderTwiml(
+      res,
+      '🚧 Módulo combustible / tanqueo en la siguiente entrega.\n\nDisponibles ahora:\n1️⃣ Preoperacional\n2️⃣ Posoperacional\n\nEscribe 1 o 2 para continuar.'
     );
   }
-  
-  // Opción inválida - mostrar menú de nuevo
+
   return responderMenu(res);
 }
 
@@ -89,11 +79,11 @@ cero papel, cero accidentes
 Selecciona una opción:
 
 1️⃣ Preoperacional (inicio de jornada)
-
-_Otros módulos en desarrollo..._
+2️⃣ Posoperacional (cierre de jornada)
+3️⃣ Combustible / tanqueo
 
 Escribe el número:`;
-  
+
   return responderTwiml(res, menu);
 }
 
@@ -127,7 +117,7 @@ function escaparXml(texto) {
 function registrarCanalWhatsapp(app) {
   app.get('/', responderRaiz);
   app.post('/webhook', webhookWhatsApp);
-  
+
   console.log('✓ Canal WhatsApp registrado con menú principal');
 }
 
