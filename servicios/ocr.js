@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 const config = require('../config/config');
 const utils = require('../modulos/vehiculos/preoperacional/validaciones');
@@ -7,7 +7,48 @@ const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
 const GEMINI_TIMEOUT_MS = 9000;
 const MODELO = 'gemini-2.0-flash';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+function obtenerModeloGemini() {
+  if (!config.GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY no configurada');
+  }
+
+  const genAI = new GoogleGenerativeAI(config.GOOGLE_API_KEY);
+  return genAI.getGenerativeModel({ model: MODELO });
+}
+
+function extraerPrimerJson(texto) {
+  if (!texto || typeof texto !== 'string') {
+    throw new Error('IA no devolvio texto util');
+  }
+
+  const limpio = texto.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+
+  try {
+    return JSON.parse(limpio);
+  } catch (_) {}
+
+  let inicio = -1;
+  let profundidad = 0;
+
+  for (let i = 0; i < limpio.length; i++) {
+    const char = limpio[i];
+
+    if (char === '{') {
+      if (inicio === -1) inicio = i;
+      profundidad += 1;
+    } else if (char === '}') {
+      if (inicio !== -1) {
+        profundidad -= 1;
+        if (profundidad === 0) {
+          const candidato = limpio.slice(inicio, i + 1);
+          return JSON.parse(candidato);
+        }
+      }
+    }
+  }
+
+  throw new Error('IA no devolvio JSON valido');
+}
 
 async function descargarImagen(url) {
   try {
@@ -38,7 +79,7 @@ async function descargarImagen(url) {
 }
 
 async function llamarGemini(prompt, imageData) {
-  const model = genAI.getGenerativeModel({ model: MODELO });
+  const model = obtenerModeloGemini();
 
   try {
     const contentParts = [{ text: prompt }];
@@ -55,9 +96,7 @@ async function llamarGemini(prompt, imageData) {
 
     const response = await result.response;
     const texto = response.text();
-    const jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('IA no devolvio JSON valido');
-    return JSON.parse(jsonMatch[0]);
+    return extraerPrimerJson(texto);
   } catch (error) {
     if (error.message === 'TIMEOUT') throw new Error('Tiempo de analisis agotado.');
     throw error;
