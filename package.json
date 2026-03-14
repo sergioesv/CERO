@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.48.0",
     "axios": "^1.7.9",
     "express": "^4.21.2",
