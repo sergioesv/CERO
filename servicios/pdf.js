@@ -420,7 +420,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     var nombreArchivo = 'preop_' + sesion.placa + '_' + Date.now() + '.pdf';
 
     var uploadResult = await config.supabase.storage
-      .from('preoperacionales')
+.from(config.STORAGE_BUCKET_PREOPERACIONALES)
       .upload(nombreArchivo, pdfBuffer, { contentType: 'application/pdf', upsert: false });
 
     if (uploadResult.error) {
@@ -429,7 +429,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     }
 
     var signedUrlResult = await config.supabase.storage
-      .from('preoperacionales')
+.from(config.STORAGE_BUCKET_PREOPERACIONALES)
       .createSignedUrl(nombreArchivo, 60 * 60 * 24 * 7);
 
     if (signedUrlResult.error || !signedUrlResult.data || !signedUrlResult.data.signedUrl) {
@@ -440,7 +440,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     var pdfUrl = signedUrlResult.data.signedUrl;
     console.log('PDF subido:', nombreArchivo);
 
-    await config.supabase.from('preoperacionales').update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
+        await config.supabase.from(config.TABLES.preoperacionales).update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
 
     var ultimoErrorEnvio = null;
     for (var intento = 1; intento <= 2; intento++) {
