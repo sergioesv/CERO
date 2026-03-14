@@ -34,8 +34,8 @@ function firmaTwilioValida(req) {
   }
 
   if (!config.TWILIO_AUTH_TOKEN) {
-    console.warn('TWILIO_AUTH_TOKEN no configurado; se omite validacion de firma.');
-    return true;
+    console.warn('TWILIO_AUTH_TOKEN no configurado.');
+    return esDesarrollo;
   }
 
   var signature = req.headers['x-twilio-signature'];
@@ -277,7 +277,7 @@ function registrarPreoperacional(app) {
 
       if (msgUpper === 'REINICIAR') {
         sesiones.eliminarSesion(telefono);
-        sesion = sesiones.obtenerSesion(telefono);
+        sesion = await sesiones.obtenerSesion(telefono);
         sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
         return preop.responderTwiml(res, mensajes.mensajeInicio());
       }
