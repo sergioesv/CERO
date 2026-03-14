@@ -2,6 +2,11 @@ var preop = require('./validaciones');
 var PASOS_INICIALES = preop.PASOS_INICIALES;
 var GRUPOS = preop.GRUPOS;
 
+function normalizarKilometrajeManual(texto) {
+  var numerico = String(texto || '').replace(/[^0-9]/g, '');
+  return numerico ? parseInt(numerico, 10) : null;
+}
+
 function mensajeInicioPlaca() {
   return '📸 *Paso 1 de 2*\n' + PASOS_INICIALES.fotoPlaca;
 }
@@ -19,8 +24,7 @@ function mensajeFallbackPlaca(sesion, motivo) {
   var msg = '❌ *No pude validar la placa automaticamente*';
   if (sesion.placaDetectada) msg += '\nDetecte: *' + sesion.placaDetectada + '*';
   if (motivo) msg += '\n' + motivo;
-  msg += '\n\n1⃣ Enviar otra foto';
-  msg += '\n2⃣ Escribir la placa manualmente';
+  msg += '\n\n1⃣ Enviar otra foto\n2⃣ Escribir la placa manualmente';
   msg += '\n\n_Tip: acercate mas a la placa, evita el zoom digital y limpia la camara._';
   return msg;
 }
@@ -31,70 +35,45 @@ function mensajeConfirmacionPlacaSugerida(sesion, motivo) {
   if (sesion.placaSugerida) msg += '\nLa placa mas probable es: *' + sesion.placaSugerida + '*';
   if (motivo) msg += '\n' + motivo;
   msg += '\n\n1⃣ Confirmar ' + (sesion.placaSugerida || 'placa sugerida');
-  msg += '\n2⃣ Enviar otra foto';
-  msg += '\n3⃣ Escribir la placa manualmente';
+  msg += '\n2⃣ Enviar otra foto\n3⃣ Escribir la placa manualmente';
   return msg;
 }
 
 function mensajeConfirmacionOdometro(sesion, prefijo) {
   var msg = prefijo ? (prefijo + '\n\n') : '';
   var ultimo = sesion.vehiculo && sesion.vehiculo.kilometraje;
-
   if (sesion.kmDetectado != null) {
-    msg += '🔎 *Lectura del odometro*\n';
-    msg += 'Detecte: *' + sesion.kmDetectado + ' km*';
+    msg += '🔎 *Lectura del odometro*\nDetecte: *' + sesion.kmDetectado + ' km*';
     if (ultimo) msg += '\nUltimo registrado: *' + ultimo + ' km*';
-    msg += '\n\n1⃣ Confirmar';
-    msg += '\n2⃣ Corregir escribiendo el kilometraje';
-    msg += '\n3⃣ Enviar otra foto';
+    msg += '\n\n1⃣ Confirmar\n2⃣ Corregir escribiendo el kilometraje\n3⃣ Enviar otra foto';
     return msg;
   }
-
   msg += '❌ *No pude leer el kilometraje automaticamente*';
   if (ultimo) msg += '\nUltimo registrado: *' + ultimo + ' km*';
-  msg += '\n\n2⃣ Escribir el kilometraje manualmente';
-  msg += '\n3⃣ Enviar otra foto';
-  msg += '\n\n_Tip: acerca el celular al display, toca para enfocar y evita reflejos._';
+  msg += '\n\n2⃣ Escribir el kilometraje manualmente\n3⃣ Enviar otra foto';
   return msg;
 }
 
 function mensajeKilometrajeFueraRango(sesion, evaluacion, maxKmSalto) {
   var ultimo = sesion.vehiculo && sesion.vehiculo.kilometraje;
   var msg = '⚠️ *Lectura del odometro fuera de rango*';
-
-  if (sesion.kmDetectado != null) {
-    msg += '\nDetecte: *' + sesion.kmDetectado + ' km*';
-  }
-  if (ultimo || ultimo === 0) {
-    msg += '\nUltimo registrado: *' + ultimo + ' km*';
-  }
-
+  if (sesion.kmDetectado != null) msg += '\nDetecte: *' + sesion.kmDetectado + ' km*';
+  if (ultimo || ultimo === 0) msg += '\nUltimo registrado: *' + ultimo + ' km*';
   msg += '\nRango automatico: hasta *' + maxKmSalto + ' km* por encima del ultimo registro.';
-  if (evaluacion && evaluacion.mensajeCorto) {
-    msg += '\n' + evaluacion.mensajeCorto;
-  }
-  msg += '\n\n2⃣ Escribir el kilometraje correcto';
-  msg += '\n3⃣ Enviar otra foto';
-  msg += '\n\n_Tip: acerca el celular al display y procura que solo se vea el tablero._';
+  if (evaluacion && evaluacion.mensajeCorto) msg += '\n' + evaluacion.mensajeCorto;
+  msg += '\n\n2⃣ Escribir el kilometraje correcto\n3⃣ Enviar otra foto';
   return msg;
 }
 
 function mensajeFotoNovedad(sesion, prepararFotosNovedad, prefijo) {
   prepararFotosNovedad(sesion);
-
   if (!sesion.fotosNovedadPendientes.length) {
     sesion.estado = 'FOTO_ADICIONAL';
-    return (prefijo ? prefijo + '\n\n' : '') +
-      '📸 *Fotos adicionales?*\nEnvie fotos extra si quiere agregar evidencia\no escriba *no* para continuar';
+    return (prefijo ? prefijo + '\n\n' : '') + '📸 *Fotos adicionales?*\nEnvie fotos extra o escriba *no* para continuar';
   }
-
   var novedad = sesion.fotosNovedadPendientes[0];
   sesion.estado = 'FOTO_NOVEDAD';
-
-  return (prefijo ? prefijo + '\n\n' : '') +
-    '📸 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n' +
-    '*' + novedad.item + '*\n' +
-    '_' + (novedad.nota || novedad.estado || novedad.grupo) + '_';
+  return (prefijo ? prefijo + '\n\n' : '') + '📸 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + novedad.item + '*\n_' + (novedad.nota || novedad.estado || novedad.grupo) + '_';
 }
 
 function primerMensajeInspeccion(sesion) {
@@ -102,45 +81,26 @@ function primerMensajeInspeccion(sesion) {
 }
 
 function mensajeConfirmacionFinal(sesion) {
-  var textoFirma = '───────────────\n';
-  textoFirma += '📝 *CONFIRMAR PREOPERACIONAL*\n';
-  textoFirma += '───────────────\n';
-  textoFirma += '🚗 Vehiculo: *' + sesion.placa + '*\n';
-  textoFirma += '📏 Kilometraje: *' + sesion.kilometraje + ' km*\n';
-  textoFirma += '📸 Validacion inicial por foto: *OK*\n';
+  var txt = '───────────────\n📝 *CONFIRMAR PREOPERACIONAL*\n───────────────\n';
+  txt += '🚗 Vehiculo: *' + sesion.placa + '*\n📏 Kilometraje: *' + sesion.kilometraje + ' km*\n📸 Validacion inicial: *OK*\n';
   if (sesion.novedades.length > 0) {
-    textoFirma += '⚠️ Novedades: *' + sesion.novedades.length + '*\n';
-    sesion.novedades.forEach(function(n) {
-      textoFirma += '  • ' + n.item + ': ' + n.estado + '\n';
-    });
-  } else {
-    textoFirma += '✅ Sin novedades\n';
-  }
-  textoFirma += '📷 Fotos: *' + sesion.fotos.length + '*\n';
-  if (sesion.observacion) textoFirma += '💬 _' + sesion.observacion + '_\n';
-  textoFirma += '\n✍️ Escriba *SI* para firmar\no *ATRAS* para corregir';
-  return textoFirma;
+    txt += '⚠️ Novedades: *' + sesion.novedades.length + '*\n';
+    sesion.novedades.forEach(function(n) { txt += '  • ' + n.item + ': ' + n.estado + '\n'; });
+  } else { txt += '✅ Sin novedades\n'; }
+  txt += '📷 Fotos: *' + sesion.fotos.length + '*\n';
+  if (sesion.observacion) txt += '💬 _' + sesion.observacion + '_\n';
+  txt += '\n✍️ Escriba *SI* para firmar\no *ATRAS* para corregir';
+  return txt;
 }
 
 function mensajeFinalFirma(datosSesion, fechaTexto, novedadesCriticas, pdfUrl) {
-  var msgFinal = '───────────────\n';
-  msgFinal += '✅ *PREOPERACIONAL FIRMADO*\n';
-  msgFinal += '───────────────\n';
-  msgFinal += '🚗 *' + datosSesion.placa + '* | ' + fechaTexto + '\n';
-  msgFinal += '👤 ' + (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n';
-  msgFinal += '📏 ' + datosSesion.kilometraje + ' km\n';
-  if (novedadesCriticas.length > 0) {
-    msgFinal += '⚠️ *' + novedadesCriticas.length + ' item(es) critico(s)*\n';
-    msgFinal += '_Supervisor notificado_\n';
-  } else if (datosSesion.novedades.length > 0) {
-    msgFinal += '⚠️ ' + datosSesion.novedades.length + ' novedad(es)\n';
-  } else {
-    msgFinal += '✅ Sin novedades\n';
-  }
-  msgFinal += pdfUrl
-    ? '\n📄 PDF generado y enviado por WhatsApp.'
-    : '\n📄 El preoperacional quedo firmado, pero el PDF no se pudo enviar automaticamente.';
-  return msgFinal;
+  var msg = '───────────────\n✅ *PREOPERACIONAL FIRMADO*\n───────────────\n';
+  msg += '🚗 *' + datosSesion.placa + '* | ' + fechaTexto + '\n👤 ' + (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n📏 ' + datosSesion.kilometraje + ' km\n';
+  if (novedadesCriticas.length > 0) { msg += '⚠️ *' + novedadesCriticas.length + ' item(es) critico(s)*\n_Supervisor notificado_\n'; }
+  else if (datosSesion.novedades.length > 0) { msg += '⚠️ ' + datosSesion.novedades.length + ' novedad(es)\n'; }
+  else { msg += '✅ Sin novedades\n'; }
+  msg += pdfUrl ? '\n📄 PDF generado y enviado.' : '\n📄 Firmado, pero el PDF falló.';
+  return msg;
 }
 
 module.exports = {
