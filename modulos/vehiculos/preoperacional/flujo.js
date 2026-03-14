@@ -50,10 +50,11 @@ function firmaTwilioValida(req) {
 }
 
 async function manejarPreoperacional(req, res) {
-     // MOVER TODO el código que está en app.post aquí
+     app.post('/webhook', async function(req, res) {
+    if (!firmaTwilioValida(req)) {
+      return res.status(403).send('Forbidden');
+    }
    }
-
-
 
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion);
@@ -252,11 +253,6 @@ function manejarAtras(res, sesion) {
 function registrarPreoperacional(app)  {
      app.post('/webhook', manejarPreoperacional);
    }
-
-  app.post('/webhook', async function(req, res) {
-    if (!firmaTwilioValida(req)) {
-      return res.status(403).send('Forbidden');
-    }
 
     var mensaje = (req.body.Body || '').trim();
     var telefono = req.body.From || '';
