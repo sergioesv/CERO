@@ -1,4 +1,4 @@
-var flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
+const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
 
 function responderRaiz(req, res) {
   res.send('CERO modular corriendo');
