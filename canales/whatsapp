@@ -1,9 +1,11 @@
 // canales/whatsapp.js
 // Enrutador principal para el canal de WhatsApp con menú de selección
 
-const { obtenerSesion, actualizarSesion, limpiarSesion } = require('../servicios/sesiones');
+const { obtenerSesion, eliminarSesion } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
-const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
+
+// Solo preoperacional por ahora - posoperacional sin implementar
+// const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
 
 // Estados del menú principal
 const MENU_ESTADOS = {
@@ -21,13 +23,12 @@ async function webhookWhatsApp(req, res) {
     
     // Comando global MENU - siempre vuelve al inicio
     if (mensaje.toUpperCase() === 'MENU' || mensaje.toUpperCase() === 'INICIO') {
-      await limpiarSesion(telefono);
+      await eliminarSesion(telefono);
       sesion = {
         telefono,
         estado: MENU_ESTADOS.SELECCION,
         tipo: null
       };
-      await actualizarSesion(telefono, sesion);
       return responderMenu(res);
     }
     
@@ -41,12 +42,13 @@ async function webhookWhatsApp(req, res) {
       return await flujoPreoperacional.manejarPreoperacional(req, res);
     }
     
-    if (sesion.tipo === 'posoperacional') {
-      return await flujoPosoperacional.manejarPosoperacional(req, res);
-    }
+    // Posoperacional desactivado temporalmente
+    // if (sesion.tipo === 'posoperacional') {
+    //   return await flujoPosoperacional.manejarPosoperacional(req, res);
+    // }
     
     // Si llegamos aquí, algo salió mal - resetear
-    await limpiarSesion(telefono);
+    await eliminarSesion(telefono);
     return responderMenu(res);
     
   } catch (error) {
@@ -58,26 +60,22 @@ async function webhookWhatsApp(req, res) {
 async function manejarMenuPrincipal(req, res, sesion, mensaje) {
   const opcion = mensaje.trim();
   
-  // Validar opción
+  // Solo opción 1 disponible
   if (opcion === '1') {
     // Preoperacional
     sesion.tipo = 'preoperacional';
-    sesion.estado = 'INICIO'; // El módulo tomará el control
-    await actualizarSesion(sesion.telefono, sesion);
+    sesion.estado = 'INICIO';
     return await flujoPreoperacional.manejarPreoperacional(req, res);
   }
   
-  if (opcion === '2') {
-    // Posoperacional
-    sesion.tipo = 'posoperacional';
-    sesion.estado = 'POSOP_INICIO';
-    await actualizarSesion(sesion.telefono, sesion);
-    return await flujoPosoperacional.manejarPosoperacional(req, res);
-  }
-  
-  if (opcion === '3') {
-    // Tanqueo (futuro)
-    return responderTwiml(res, '🚧 Módulo de tanqueo en desarrollo.\n\nEscribe MENU para volver.');
+  // Opción 2 y 3 desactivadas temporalmente
+  if (opcion === '2' || opcion === '3') {
+    return responderTwiml(res, 
+      '🚧 Módulo en desarrollo.\n\n' +
+      'Por ahora solo está disponible:\n' +
+      '1️⃣ Preoperacional\n\n' +
+      'Escribe 1 para continuar.'
+    );
   }
   
   // Opción inválida - mostrar menú de nuevo
@@ -91,8 +89,8 @@ cero papel, cero accidentes
 Selecciona una opción:
 
 1️⃣ Preoperacional (inicio de jornada)
-2️⃣ Posoperacional (fin de jornada)
-3️⃣ Tanqueo
+
+_Otros módulos en desarrollo..._
 
 Escribe el número:`;
   
