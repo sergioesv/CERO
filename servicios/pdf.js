@@ -4,7 +4,7 @@ var http = require('http');
 var config = require('../config/config');
 var GRUPOS = require('../modulos/vehiculos/preoperacional/validaciones').GRUPOS;
 var utils = require('../modulos/vehiculos/preoperacional/validaciones');
-var LOGO_BASE64 = require('./logo').LOGO_BASE64;
+var { LOGO_PATH } = require('./logo');
 
 // FIX: extraer constantes de layout y estilo a un objeto centralizado
 const LAYOUT = {
@@ -131,30 +131,15 @@ async function generarPDF(sesion) {
 
       // Dibuja header/footer en la página actual sin mover el cursor de contenido
       function decorarPagina(esPrimera) {
-        // Guardar posición actual del cursor
-        var savedX = doc.x;
-        var savedY = doc.y;
-
-        // Sin barra superior — causa conflicto con márgenes PDFKit
-
-        // Footer (coordenada absoluta fija, no mueve flujo de texto)
-        doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
-          .text(
-            'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
-            MARGIN, PAGE_H - 56, { width: CONTENT_W, align: 'center', lineBreak: false }
-          );
-
-        if (!esPrimera) {
-          try {
-            var lb = Buffer.from(LOGO_BASE64, 'base64');
-            doc.image(lb, MARGIN, 8, { width: 24, height: 22 });
-          } catch(e) {}
-          doc.fill(NEGRO).fontSize(LAYOUT.fuentePie).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false }); // FIX: usar tamaño de fuente desde LAYOUT
-          doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
-            .text((sesion.placa || '') + '  |  ' + fecha, 75, 21, { lineBreak: false });
-          doc.moveTo(MARGIN, 36).lineTo(PAGE_W - MARGIN, 36).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
-        }
+    // ...
+    if (!esPrimera) {
+      try {
+        // PDFKit lee el archivo PNG directamente desde el disco
+        doc.image(LOGO_PATH, MARGIN, 8, { width: 24, height: 22 });
+      } catch(e) { console.error("Error logo header:", e.message); }
+      // ...
+    }
+}
 
         // Restaurar posición del cursor
         doc.x = savedX;
@@ -183,14 +168,16 @@ async function generarPDF(sesion) {
       }
 
       // ===== PÁGINA 1 =====
-      var y = nuevaPagina(true);
-
-      // Header completo p1
-      try {
-        var logoBuffer = Buffer.from(LOGO_BASE64, 'base64');
-        doc.image(logoBuffer, MARGIN, 12, { width: 50, height: 45 });
-      } catch (e) {}
-
+    var y = nuevaPagina(true); // [cite: 490]
+    
+    // Header completo p1
+    try {
+      // REFACTOR: Eliminamos Buffer.from(LOGO_BASE64...) [cite: 492]
+      // Usamos directamente la ruta del archivo PNG
+      doc.image(LOGO_PATH, MARGIN, 12, { width: 50, height: 45 });
+    } catch (e) {
+      console.error("Error al cargar el logo principal (Hero):", e.message);
+}
       doc.fill(NEGRO).fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold').text('EDEMSA | CERO SYSTEM', 105, 18); // FIX: usar tamaño base desde LAYOUT
       doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica').text('Inspeccion Preoperacional de Vehiculo', 105, 30); // FIX: usar tamaño de pie desde LAYOUT
       doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica') // FIX: usar tamaño de pie desde LAYOUT
