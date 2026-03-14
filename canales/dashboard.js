@@ -1,11 +1,12 @@
-var alertasData = require('../data/alertas');
-var preop = require('../modulos/vehiculos/preoperacional/validaciones');
+const alertasData = require('../data/alertas');
+const preop = require('../modulos/vehiculos/preoperacional/validaciones');
 
 function responderHealth(req, res) {
   res.json({
     ok: true,
     canal: 'dashboard',
     estado: 'base-lista',
+    timestamp: new Date().toISOString(),
     modulos: {
       vehiculos: ['preoperacional', 'posoperacional', 'tanqueo'],
       seguridadCampo: ['ats', 'revision-equipos', 'riesgos-locativos'],
@@ -17,13 +18,11 @@ function responderHealth(req, res) {
 function responderResumen(req, res) {
   res.json({
     ok: true,
-    gruposPreoperacional: preop.GRUPOS.map(function(grupo) {
-      return {
-        id: grupo.id,
-        nombre: grupo.nombre,
-        items: grupo.items.length
-      };
-    }),
+    gruposPreoperacional: preop.GRUPOS.map((grupo) => ({
+      id: grupo.id,
+      nombre: grupo.nombre,
+      items: grupo.items.length
+    })),
     alertas: {
       tabla: alertasData.TABLA,
       pendienteImplementacion: true
