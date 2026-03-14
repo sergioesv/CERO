@@ -49,14 +49,6 @@ function firmaTwilioValida(req) {
   }
 }
 
-async function manejarPreoperacional(req, res) {
-     app.post('/webhook', async function(req, res) {
-    if (!firmaTwilioValida(req)) {
-      return res.status(403).send('Forbidden');
-    }
-   }
-}
-
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion);
   var mensaje = (prefijo ? prefijo + '\n\n' : '') + resumen + '\n\n' + mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad);
@@ -251,9 +243,14 @@ function manejarAtras(res, sesion) {
   return preop.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
 }
 
-function registrarPreoperacional(app)  {
-     app.post('/webhook', manejarPreoperacional);
-   }
+
+// ============================================================================
+// MANEJADOR PRINCIPAL DEL PREOPERACIONAL - Exportable para el enrutador
+// ============================================================================
+async function manejarPreoperacional(req, res) {
+    if (!firmaTwilioValida(req)) {
+      return res.status(403).send('Forbidden');
+    }
 
     var mensaje = (req.body.Body || '').trim();
     var telefono = req.body.From || '';
@@ -648,10 +645,23 @@ function registrarPreoperacional(app)  {
       sesiones.desbloquear(telefono);
       sesiones.guardarCambios();
     }
-  });
 }
 
-   module.exports = { 
-     registrarPreoperacional,
-     manejarPreoperacional  
-   };
+// ============================================================================
+// REGISTRO DEL ENDPOINT (para compatibilidad)
+// ============================================================================
+function registrarPreoperacional(app) {
+  app.get('/', function(req, res) {
+    res.send('CERO v3 corriendo - validacion inicial por foto');
+  });
+  
+  app.post('/webhook', manejarPreoperacional);
+}
+
+// ============================================================================
+// EXPORTAR AMBAS FUNCIONES
+// ============================================================================
+module.exports = { 
+  registrarPreoperacional,
+  manejarPreoperacional  // ← NUEVA: para el enrutador con menú
+};
