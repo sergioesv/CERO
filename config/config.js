@@ -2,14 +2,13 @@ const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const twilio = require('twilio');
 
-// Limpieza de variables
 function clean(value) {
   if (typeof value !== 'string') return value;
   return value.trim().replace(/^["']|["']$/g, '');
 }
 
 // ═══════════════════════════════════════════════════════════
-// VALIDACIÓN FAIL-FAST - DETIENE EL PROCESO SI FALTA ALGO CRÍTICO
+// VALIDACIÓN FAIL-FAST
 // ═══════════════════════════════════════════════════════════
 
 const REQUIRED_VARS = [
@@ -23,15 +22,14 @@ const REQUIRED_VARS = [
 const missing = REQUIRED_VARS.filter(varName => !process.env[varName]);
 
 if (missing.length > 0) {
-  console.error('❌ ERROR CRÍTICO: Variables de entorno faltantes:');
+  console.error('❌ ERROR CRÍTICO: Variables faltantes:');
   missing.forEach(varName => console.error(`   - ${varName}`));
-  console.error('\nEl sistema NO puede arrancar sin estas credenciales.');
-  console.error('Revisa tu configuración en Railway o tu archivo .env\n');
-  process.exit(1); // ← FAIL-FAST: detiene el proceso inmediatamente
+  console.error('\nRevisa Railway o .env\n');
+  process.exit(1);
 }
 
 // ═══════════════════════════════════════════════════════════
-// CARGA DE VARIABLES (ya validadas)
+// CARGA DE VARIABLES
 // ═══════════════════════════════════════════════════════════
 
 const GOOGLE_API_KEY = clean(process.env.GOOGLE_API_KEY);
@@ -39,27 +37,20 @@ const SUPABASE_URL = clean(process.env.SUPABASE_URL);
 const SUPABASE_KEY = clean(process.env.SUPABASE_KEY);
 const TWILIO_ACCOUNT_SID = clean(process.env.TWILIO_ACCOUNT_SID);
 const TWILIO_AUTH_TOKEN = clean(process.env.TWILIO_AUTH_TOKEN);
-
-// Variables opcionales con fallbacks seguros
 const TWILIO_WEBHOOK_URL = clean(process.env.TWILIO_WEBHOOK_URL || process.env.PUBLIC_WEBHOOK_URL || '');
-const TWILIO_WHATSAPP_NUMBER = clean(process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886');
-const SESSION_STORE_FILE = clean(process.env.SESSION_STORE_FILE || './sesiones.json');
+const TWILIO_WHATSAPP_NUMBER = clean(process.env.TWILIO_WHATSAPP_NUMBER || '') || 'whatsapp:+14155238886';
+const SESSION_STORE_FILE = clean(process.env.SESSION_STORE_FILE || '');
 const MAX_KM_SALTO = parseInt(clean(process.env.MAX_KM_SALTO || '200'), 10) || 200;
 const STORAGE_BUCKET_PREOPERACIONALES = clean(
-  process.env.STORAGE_BUCKET_PREOPERACIONALES || 
-  process.env.SUPABASE_BUCKET_PREOPERACIONALES || 
+  process.env.STORAGE_BUCKET_PREOPERACIONALES ||
+  process.env.SUPABASE_BUCKET_PREOPERACIONALES ||
   'preoperacionales'
 );
 
-// Validación de URL de Supabase
 if (!SUPABASE_URL.includes('supabase.co')) {
-  console.error('❌ ERROR: SUPABASE_URL no parece válida:', SUPABASE_URL);
+  console.error('❌ SUPABASE_URL inválida:', SUPABASE_URL);
   process.exit(1);
 }
-
-// ═══════════════════════════════════════════════════════════
-// TABLAS DE BASE DE DATOS
-// ═══════════════════════════════════════════════════════════
 
 const TABLES = {
   vehiculos: clean(process.env.DB_TABLE_VEHICULOS || 'vehiculos'),
@@ -84,31 +75,27 @@ let supabase, twilioClient, genAI;
 
 try {
   supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-  console.log('✓ Cliente Supabase inicializado');
+  console.log('✓ Supabase inicializado');
 } catch (error) {
-  console.error('❌ Error al inicializar Supabase:', error.message);
+  console.error('❌ Error Supabase:', error.message);
   process.exit(1);
 }
 
 try {
   twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-  console.log('✓ Cliente Twilio inicializado');
+  console.log('✓ Twilio inicializado');
 } catch (error) {
-  console.error('❌ Error al inicializar Twilio:', error.message);
+  console.error('❌ Error Twilio:', error.message);
   process.exit(1);
 }
 
 try {
   genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-  console.log('✓ Cliente Google Gemini inicializado');
+  console.log('✓ Gemini inicializado');
 } catch (error) {
-  console.error('❌ Error al inicializar Gemini:', error.message);
+  console.error('❌ Error Gemini:', error.message);
   process.exit(1);
 }
-
-// ═══════════════════════════════════════════════════════════
-// EXPORTACIÓN
-// ═══════════════════════════════════════════════════════════
 
 module.exports = {
   supabase,
