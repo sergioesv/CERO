@@ -5,7 +5,7 @@ var procesando = new Map(); // FIX: se reemplaza el Set por un Map con timestamp
 
 var TIMEOUT_MS = 30 * 60 * 1000;
 var LOCK_TIMEOUT_MS = 5 * 60 * 1000; // FIX: timeout de bloqueo para evitar sesiones eternamente bloqueadas si un flujo async no libera.
-var SESSIONES_TABLE = process.env.DB_TABLE_SESIONES_ACTIVAS || 'sesiones_activas'; // FIX: la persistencia pasa de archivo local a tabla de Supabase.
+var SESSIONES_TABLE = config.TABLES.sesionesActivas; // FIX: usa la configuracion centralizada para la tabla de sesiones activas.
 var persistenciaEnCadena = Promise.resolve(); // FIX: cola serializada para evitar carreras entre escrituras concurrentes en Supabase.
 var cargasPendientes = new Map(); // FIX: evita lecturas duplicadas de la misma sesion cuando se carga desde Supabase.
 
