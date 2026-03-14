@@ -45,20 +45,13 @@ async function cargarVehiculoYConductor(placa, telefono) {
 }
 
 async function buscarPlacaSugerida(placaDetectada) {
-  // FIX: mantener normalización local antes de invocar la RPC para conservar el comportamiento actual.
   var placaBase = preop.normalizarPlaca(placaDetectada);
   if (!placaBase || placaBase.length < 5) return null;
 
-  // FIX: reemplazar la búsqueda masiva en memoria por la función RPC buscar_placa_similar en Supabase.
-  const { data, error } = await config.supabase
-    .rpc('buscar_placa_similar', { placa_input: placaBase });
-
-  // FIX: retornar null si la RPC falla o no encuentra coincidencias.
-  if (error || !data || !data.length) return null;
-
-  // FIX: devolver la placa más similar retornada por la función SQL.
-  return data[0].placa;
-}
+  try {
+    var resultado = await config.supabase
+      .from(config.TABLES.vehiculos)
+      .select('placa');
 
     if (resultado.error || !Array.isArray(resultado.data)) return null;
 
@@ -73,16 +66,4 @@ async function buscarPlacaSugerida(placaDetectada) {
       }
     }
 
-    if (mejor && mejor.distancia <= 1) return mejor.placa;
-  } catch (error) {
-    console.error('Error buscando placa sugerida:', error.message);
-  }
-
-  return null;
-}
-
-module.exports = {
-  cargarVehiculoYConductor,
-  buscarPlacaSugerida,
-  distanciaPlaca
-};
+    if (mejor && mejor.distancia <= 1) return mejor.pl
