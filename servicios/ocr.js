@@ -4,7 +4,8 @@ const config = require('../config/config');
 const utils = require('../modulos/vehiculos/preoperacional/validaciones');
 
 const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
-const GEMINI_TIMEOUT_MS = 9000; // Aumentamos ligeramente el margen
+const GEMINI_TIMEOUT_MS = 9000;
+const MODELO = 'gemini-2.0-flash';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
@@ -36,12 +37,8 @@ async function descargarImagen(url) {
   }
 }
 
-async function llamarGemini(prompt, modelName, imageData = null) {
-  const model = genAI.getGenerativeModel({ model: modelName });
-  const generationConfig = {
-    maxOutputTokens: 800,
-    temperature: 0, // 0 para máxima consistencia en extracción de datos
-  };
+async function llamarGemini(prompt, imageData) {
+  const model = genAI.getGenerativeModel({ model: MODELO });
 
   try {
     const contentParts = [{ text: prompt }];
@@ -52,26 +49,23 @@ async function llamarGemini(prompt, modelName, imageData = null) {
     }
 
     const result = await Promise.race([
-      model.generateContent(contentParts, generationConfig),
+      model.generateContent(contentParts),
       new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), GEMINI_TIMEOUT_MS))
     ]);
 
     const response = await result.response;
     const texto = response.text();
     const jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('IA no devolvió JSON válido');
+    if (!jsonMatch) throw new Error('IA no devolvio JSON valido');
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    if (error.message === 'TIMEOUT') throw new Error('Tiempo de análisis agotado.');
+    if (error.message === 'TIMEOUT') throw new Error('Tiempo de analisis agotado.');
     throw error;
   }
 }
 
-/**
- * FIXED: Prompt mejorado para detectar MÚLTIPLES novedades y clasificarlas correctamente.
- */
 async function interpretarNovedad(texto, items) {
-  const prompt = `Eres un experto en inspección vehicular. El operario reportó: "${texto}"
+  const prompt = `Eres un experto en inspeccion vehicular. El operario reporto: "${texto}"
   
   Items posibles del bloque: ${items.join(', ')}
   
@@ -82,7 +76,7 @@ async function interpretarNovedad(texto, items) {
      - Niveles: Bajo / Vacio
      - Fugas: Con fugas
      - Llantas: Desgastada / Danada / Sin presion
-     - Eléctrico: Intermitente / No funciona
+     - Electrico: Intermitente / No funciona
      - General: Danado / Falta / Mal estado
   
   Responde SOLO este JSON:
@@ -92,22 +86,19 @@ async function interpretarNovedad(texto, items) {
     ],
     "observacion": "${texto}"
   }`;
-  
-  const parsed = await llamarGemini(prompt, "gemini-1.5-flash");
-  
+
+  const parsed = await llamarGemini(prompt);
   const itemsPermitidos = new Set(items);
-  // Filtramos para asegurar que Gemini no invente nombres
   parsed.items = (parsed.items || []).filter(item => itemsPermitidos.has(item.nombre));
-  
   return parsed;
 }
 
 async function extraerPlacaFoto(urlFoto) {
   try {
     const imagen = await descargarImagen(urlFoto);
-    const prompt = `Analiza la foto. ¿Se ve la placa frontal? 
+    const prompt = `Analiza la foto. Se ve la placa frontal del vehiculo?
     Responde SOLO JSON: {"valida": true, "placa": "ABC123", "razon": ""}`;
-    const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
+    const parsed = await llamarGemini(prompt, imagen);
     const placa = utils.normalizarPlaca(parsed.placa || '');
     return { valida: !!parsed.valida && !!placa, placa: placa || null, razon: parsed.razon || '' };
   } catch (error) {
@@ -118,10 +109,10 @@ async function extraerPlacaFoto(urlFoto) {
 async function extraerKilometrajeFoto(urlFoto) {
   try {
     const imagen = await descargarImagen(urlFoto);
-    const prompt = `Analiza el odómetro. Extrae el kilometraje total (número entero).
+    const prompt = `Analiza el odometro. Extrae el kilometraje total (numero entero).
     Responde SOLO JSON: {"valida": true, "kilometraje": 123456}`;
-    const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
-    let km = parsed.kilometraje ? Math.trunc(Number(parsed.kilometraje)) : null;
+    const parsed = await llamarGemini(prompt, imagen);
+    const km = parsed.kilometraje ? Math.trunc(Number(parsed.kilometraje)) : null;
     return { valida: !!parsed.valida && km !== null, kilometraje: km, razon: parsed.razon || '' };
   } catch (error) {
     return { valida: false, kilometraje: null, razon: error.message };
