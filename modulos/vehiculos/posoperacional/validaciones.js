@@ -1,0 +1,4 @@
+module.exports = {
+  CAMPOS_BASE: [],
+  TABLA_OBJETIVO_ENV: 'DB_TABLE_POSOPERACIONALES'
+};
