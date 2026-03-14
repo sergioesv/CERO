@@ -21,7 +21,7 @@ const SUPABASE_KEY = clean(process.env.SUPABASE_KEY);
 const TWILIO_ACCOUNT_SID = clean(process.env.TWILIO_ACCOUNT_SID);
 const TWILIO_AUTH_TOKEN = clean(process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_WEBHOOK_URL = clean(process.env.TWILIO_WEBHOOK_URL || process.env.PUBLIC_WEBHOOK_URL || '');
-const TWILIO_WHATSAPP_NUMBER = clean(process.env.TWILIO_WHATSAPP_NUMBER) || 'whatsapp:+14155238886'; [cite: 36]
+const TWILIO_WHATSAPP_NUMBER = clean(process.env.TWILIO_WHATSAPP_NUMBER) || 'whatsapp:+14155238886'; 
 
 // Configuración de Sesiones y Reglas [cite: 30-31]
 const SESSION_STORE_FILE = clean(process.env.SESSION_STORE_FILE || '');
@@ -43,8 +43,8 @@ const TABLES = {
 };
 
 // Inicialización de Clientes
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); [cite: 35]
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN); [cite: 35]
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); 
+const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN); 
 
 // Exportación del módulo
 module.exports = {
