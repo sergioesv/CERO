@@ -49,6 +49,12 @@ function firmaTwilioValida(req) {
   }
 }
 
+async function manejarPreoperacional(req, res) {
+     // MOVER TODO el código que está en app.post aquí
+   }
+
+
+
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion);
   var mensaje = (prefijo ? prefijo + '\n\n' : '') + resumen + '\n\n' + mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad);
@@ -243,10 +249,9 @@ function manejarAtras(res, sesion) {
   return preop.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
 }
 
-function registrarPreoperacional(app) {
-  app.get('/', function(req, res) {
-    res.send('CERO v3 corriendo - validacion inicial por foto');
-  });
+function registrarPreoperacional(app)  {
+     app.post('/webhook', manejarPreoperacional);
+   }
 
   app.post('/webhook', async function(req, res) {
     if (!firmaTwilioValida(req)) {
@@ -649,4 +654,7 @@ function registrarPreoperacional(app) {
   });
 }
 
-module.exports = { registrarPreoperacional };
+   module.exports = { 
+     registrarPreoperacional,
+     manejarPreoperacional  
+   };
