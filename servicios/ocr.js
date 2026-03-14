@@ -1,270 +1,157 @@
-var axios = require('axios');
-var config = require('../config/config');
-var utils = require('../modulos/vehiculos/preoperacional/validaciones');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require('axios');
+const config = require('../config/config');
+const utils = require('../modulos/vehiculos/preoperacional/validaciones');
 
-var anthropic = config.anthropic;
-var TWILIO_ACCOUNT_SID = config.TWILIO_ACCOUNT_SID;
-var TWILIO_AUTH_TOKEN = config.TWILIO_AUTH_TOKEN;
+// Configuración de Dominios y Timeouts
+const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com']; [cite: 381]
+const GEMINI_TIMEOUT_MS = 8000; // Mantenemos 8s para responder antes del límite de Twilio [cite: 383]
 
-// FIX: centralizar dominios permitidos para bloquear SSRF en descargas de imagen.
-var DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
-// FIX: fijar un timeout unico de 8s para todas las llamadas a Anthropic y responder antes del limite de Twilio.
-var ANTHROPIC_TIMEOUT_MS = 8000;
+// Inicialización de Gemini con la nueva API Key
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+/**
+ * Descarga la imagen desde Twilio con validación de seguridad (SSRF)
+ */
 async function descargarImagen(url) {
   try {
-    // FIX: validar el hostname contra una allowlist antes de descargar la imagen.
-    var urlObj = new URL(url);
-    var permitido = DOMINIOS_PERMITIDOS.some(function(dominioPermitido) {
-      return urlObj.hostname.endsWith(dominioPermitido);
-    });
+    const urlObj = new URL(url); [cite: 384]
+    const permitido = DOMINIOS_PERMITIDOS.some(dom => urlObj.hostname.endsWith(dom)); [cite: 384]
+    
+    if (!permitido) throw new Error('URL de origen no permitida'); [cite: 385]
 
-    if (!permitido) {
-      throw new Error('URL de origen no permitida');
-    }
-
-    var isTwilio = DOMINIOS_PERMITIDOS.some(function(dominioPermitido) {
-      return urlObj.hostname.endsWith(dominioPermitido);
-    });
-    var requestConfig = {
+    const requestConfig = {
       responseType: 'arraybuffer',
-      maxRedirects: 10,
-      // FIX: limitar la espera de Axios a 15s para evitar requests colgadas.
-      timeout: 15000,
+      timeout: 15000, [cite: 388]
       headers: {}
     };
 
-    if (isTwilio && TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-      var credentials = Buffer.from(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN).toString('base64');
-      requestConfig.headers.Authorization = 'Basic ' + credentials;
+    // Autenticación básica si es Twilio
+    if (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN) {
+      const credentials = Buffer.from(`${config.TWILIO_ACCOUNT_SID}:${config.TWILIO_AUTH_TOKEN}`).toString('base64'); [cite: 389]
+      requestConfig.headers.Authorization = `Basic ${credentials}`; [cite: 390]
     }
 
-    var response = await axios.get(url, requestConfig);
+    const response = await axios.get(url, requestConfig); [cite: 390]
     return {
       base64: Buffer.from(response.data).toString('base64'),
-      mediaType: response.headers['content-type'] || 'image/jpeg'
+      mediaType: response.headers['content-type'] || 'image/jpeg' [cite: 391, 392]
     };
   } catch (error) {
     console.error('Error descargando imagen:', error.message);
-    throw new Error(error.message === 'URL de origen no permitida' ? error.message : 'No se pudo descargar la imagen');
+    throw new Error('No se pudo descargar la imagen'); [cite: 393]
   }
 }
 
-function extraerJson(respuestaTexto) {
-  var texto = String(respuestaTexto || '').trim();
-  var jsonMatch = texto.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('IA no devolvio JSON valido');
-  }
-  return JSON.parse(jsonMatch[0]);
-}
-
-function marcarTodoOK() {
-  return {
-    estado: 'OK',
-    items: [],
-    observacion: null
+/**
+ * Función centralizada para llamadas a Gemini (Reemplaza crearMensajeAnthropic)
+ */
+async function llamarGemini(prompt, modelName, imageData = null) {
+  const model = genAI.getGenerativeModel({ model: modelName });
+  
+  // Configuración de seguridad y generación
+  const generationConfig = {
+    maxOutputTokens: 500,
+    temperature: 0.1, // Baja temperatura para mayor precisión en OCR
   };
-}
-
-// FIX: encapsular anthropic.messages.create con AbortController y timeout de 8 segundos para todas las llamadas.
-async function crearMensajeAnthropic(payload) {
-  var controller = new AbortController();
-  var timeoutId = setTimeout(function() {
-    controller.abort();
-  }, ANTHROPIC_TIMEOUT_MS);
 
   try {
-    return await anthropic.messages.create({
-      ...payload,
-      signal: controller.signal
-    });
-  } catch (error) {
-    var fueTimeout = controller.signal.aborted || error.name === 'AbortError' || error.code === 'ABORT_ERR';
-
-    if (fueTimeout) {
-      throw new Error('Tiempo de análisis agotado. Intenta de nuevo.');
+    const contentParts = [{ text: prompt }];
+    
+    if (imageData) {
+      contentParts.push({
+        inlineData: {
+          data: imageData.base64,
+          mimeType: imageData.mediaType
+        }
+      });
     }
 
+    // Ejecución con timeout
+    const result = await Promise.race([
+      model.generateContent(contentParts, generationConfig),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), GEMINI_TIMEOUT_MS))
+    ]);
+
+    const response = await result.response;
+    const texto = response.text();
+    
+    // Extraer JSON de la respuesta
+    const jsonMatch = texto.match(/\{[\s\S]*\}/); [cite: 394]
+    if (!jsonMatch) throw new Error('IA no devolvió JSON válido'); [cite: 395]
+    
+    return JSON.parse(jsonMatch[0]); [cite: 395]
+  } catch (error) {
+    if (error.message === 'TIMEOUT') throw new Error('Tiempo de análisis agotado. Intenta de nuevo.'); [cite: 402]
     throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
 async function interpretarNovedad(texto, items) {
-  var prompt = 'Eres asistente de inspeccion vehicular. El operario reporto una novedad: "' + texto + '"\n\n' +
-    'Items posibles del bloque: ' + items.join(', ') + '\n\n' +
-    'REGLA IMPORTANTE: Solo incluye en el JSON los items que el operario menciono explicitamente con una falla. ' +
-    'No inventes items ni cambies el nombre. Usa exactamente uno de los items de la lista.\n\n' +
-    'Clasifica el estado usando estas categorias segun el tipo de item:\n' +
-    '- Niveles de liquidos: Bajo / Vacio\n' +
-    '- Fugas: Con fugas\n' +
-    '- Llantas: Desgastada / Danada / Sin presion\n' +
-    '- Luces/Electricos: Intermitente / No funciona\n' +
-    '- Frenos/Pedales: Duro o flojo / No funciona\n' +
-    '- Equipo carretera: Incompleto / Falta\n' +
-    '- Cinturones/Espejos: Danado / Falta\n\n' +
-    'Responde SOLO en JSON sin texto adicional:\n' +
-    '{\n' +
-    '  "items": [\n' +
-    '    {"nombre": "nombre exacto del item segun la lista", "estado": "estado segun categoria"}\n' +
-    '  ],\n' +
-    '  "observacion": "texto original del operario"\n' +
-    '}';
-
-  var message = await crearMensajeAnthropic({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 500,
-    messages: [{ role: 'user', content: prompt }]
-  });
-
-  var parsed = extraerJson(message.content[0].text);
-  var itemsPermitidos = {};
-  for (var i = 0; i < items.length; i++) {
-    itemsPermitidos[items[i]] = true;
-  }
-
-  parsed.items = (parsed.items || []).filter(function(item) {
-    return item && itemsPermitidos[item.nombre];
-  });
-  parsed.observacion = texto;
+  const prompt = `Eres asistente de inspeccion vehicular. Operario reportó: "${texto}"
+  Items posibles: ${items.join(', ')}
+  Responde SOLO en JSON:
+  {
+    "items": [{"nombre": "item exacto", "estado": "estado categorizado"}],
+    "observacion": "${texto}"
+  }`; [cite: 405, 408]
+  
+  // Usamos Gemini 1.5 Flash por ser el más rápido y barato para texto
+  const parsed = await llamarGemini(prompt, "gemini-1.5-flash");
+  
+  const itemsPermitidos = new Set(items);
+  parsed.items = (parsed.items || []).filter(item => itemsPermitidos.has(item.nombre)); [cite: 411]
   return parsed;
-}
-
-async function analizarImagen(urlFoto, promptTexto, model) {
-  var imagen = await descargarImagen(urlFoto);
-  var message = await crearMensajeAnthropic({
-    // FIX: permitir seleccionar el modelo segun la funcion que consume el analisis.
-    model: model,
-    max_tokens: 300,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type: imagen.mediaType, data: imagen.base64 }
-        },
-        {
-          type: 'text',
-          text: promptTexto
-        }
-      ]
-    }]
-  });
-
-  return extraerJson(message.content[0].text);
 }
 
 async function extraerPlacaFoto(urlFoto) {
   try {
-    var prompt = 'Analiza la imagen de un vehiculo. Debes confirmar si se ve la parte frontal o frontal lateral del vehiculo y si la placa es legible. ' +
-      'Lee la placa visible exactamente como aparece. Si no ves una placa legible, responde valida=false.\n\n' +
-      'Responde SOLO en JSON:\n' +
-      '{"valida": true/false, "placa": "ABC123 o null", "comentario": "breve", "razon": "si no valida"}';
-
-    // FIX: usar Claude Haiku 4.5 para OCR visual de placa y reducir costo/latencia.
-    var parsed = await analizarImagen(urlFoto, prompt, 'claude-haiku-4-5-20251001');
-    var placa = utils.normalizarPlaca(parsed.placa || '');
+    const imagen = await descargarImagen(urlFoto); [cite: 412]
+    const prompt = `Analiza la imagen del vehículo. Lee la placa visible.
+    Responde SOLO JSON: {"valida": true/false, "placa": "ABC123 o null", "razon": "si no valida"}`; [cite: 415, 418]
+    
+    // Gemini 1.5 Flash es excelente para OCR rápido de placas [cite: 419]
+    const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
+    const placa = utils.normalizarPlaca(parsed.placa || ''); [cite: 420]
 
     return {
-      valida: !!parsed.valida && !!placa,
-      placa: placa || null,
-      comentario: parsed.comentario || 'Foto frontal recibida',
-      razon: (!!parsed.valida && !!placa) ? '' : (parsed.razon || 'No pude leer la placa')
+      valida: !!parsed.valida && !!placa, [cite: 421]
+      placa: placa || null, [cite: 421, 422]
+      razon: parsed.razon || 'No pude leer la placa' [cite: 423]
     };
   } catch (error) {
-    console.error('Error extrayendo placa:', error.message);
-    return {
-      valida: false,
-      placa: null,
-      comentario: '',
-      // FIX: propagar el mensaje de timeout de Anthropic cuando aplique.
-      razon: error.message === 'Tiempo de análisis agotado. Intenta de nuevo.'
-        ? error.message
-        : 'No pude leer la placa de la foto. Intenta con una imagen mas clara.'
-    };
-  }
-}
-
-async function validarFotoPlaca(urlFoto, placaEsperada) {
-  try {
-    var placaNormalizada = utils.normalizarPlaca(placaEsperada);
-    var prompt = 'Analiza la imagen de un vehiculo. Debes confirmar si se ve la parte frontal o frontal lateral del vehiculo y si la placa es legible. ' +
-      'Lee la placa visible exactamente como aparece. Si no ves una placa legible, responde valida=false. ' +
-      'La placa esperada es "' + placaNormalizada + '".\n\n' +
-      'Responde SOLO en JSON:\n' +
-      '{"valida": true/false, "placa_detectada": "ABC123 o null", "comentario": "breve", "razon": "si no valida"}';
-
-    // FIX: usar Claude Haiku 4.5 para validar la foto de placa con menor costo operativo.
-    var parsed = await analizarImagen(urlFoto, prompt, 'claude-haiku-4-5-20251001');
-    var placaDetectada = utils.normalizarPlaca(parsed.placa_detectada || '');
-    var coincide = !!placaDetectada && placaDetectada === placaNormalizada;
-
-    return {
-      valida: !!parsed.valida && coincide,
-      placaDetectada: placaDetectada || null,
-      comentario: parsed.comentario || 'Foto frontal recibida',
-      razon: coincide ? '' : (parsed.razon || ('La placa detectada fue ' + (placaDetectada || 'ilegible')))
-    };
-  } catch (error) {
-    console.error('Error validando foto de placa:', error.message);
-    return {
-      valida: false,
-      placaDetectada: null,
-      comentario: '',
-      // FIX: propagar el mensaje de timeout de Anthropic cuando aplique.
-      razon: error.message === 'Tiempo de análisis agotado. Intenta de nuevo.'
-        ? error.message
-        : 'No pude validar la foto frontal. Intenta con una imagen mas clara.'
-    };
+    return { valida: false, placa: null, razon: error.message }; [cite: 425]
   }
 }
 
 async function extraerKilometrajeFoto(urlFoto) {
   try {
-    var prompt = 'Analiza la foto del tablero u odometro de un vehiculo. ' +
-      'Extrae el kilometraje total visible como un numero entero en kilometros. ' +
-      'Solo valida si el numero se ve con claridad. Si no se ve claro o no es un odometro, responde valida=false.\n\n' +
-      'Responde SOLO en JSON:\n' +
-      '{"valida": true/false, "kilometraje": 123456 o null, "comentario": "breve", "razon": "si no valida"}';
-
-    // FIX: mantener Claude Sonnet para kilometraje por su mayor precision numerica.
-    var parsed = await analizarImagen(urlFoto, prompt, 'claude-sonnet-4-20250514');
-    var kilometraje = null;
-
-    if (typeof parsed.kilometraje === 'number' && isFinite(parsed.kilometraje)) {
-      kilometraje = Math.trunc(parsed.kilometraje);
-    } else if (parsed.kilometraje != null) {
-      var digits = String(parsed.kilometraje).replace(/[^0-9]/g, '');
-      kilometraje = digits ? parseInt(digits, 10) : null;
-    }
+    const imagen = await descargarImagen(urlFoto); [cite: 412]
+    const prompt = `Analiza el odómetro. Extrae el kilometraje total como número entero.
+    Responde SOLO JSON: {"valida": true/false, "kilometraje": 12345 o null}`; [cite: 442, 444]
+    
+    // Gemini 1.5 Flash ya es muy preciso, pero podrías usar "gemini-1.5-pro" si fallara [cite: 445]
+    const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
+    let kilometraje = parsed.kilometraje ? Math.trunc(Number(parsed.kilometraje)) : null; [cite: 446]
 
     return {
-      valida: !!parsed.valida && kilometraje !== null,
+      valida: !!parsed.valida && kilometraje !== null, [cite: 449]
       kilometraje: kilometraje,
-      comentario: parsed.comentario || 'Kilometraje extraido',
-      razon: (!!parsed.valida && kilometraje !== null) ? '' : (parsed.razon || 'No pude leer el kilometraje')
+      razon: parsed.razon || 'No pude leer el kilometraje' [cite: 450]
     };
   } catch (error) {
-    console.error('Error extrayendo kilometraje:', error.message);
-    return {
-      valida: false,
-      kilometraje: null,
-      comentario: '',
-      // FIX: propagar el mensaje de timeout de Anthropic cuando aplique.
-      razon: error.message === 'Tiempo de análisis agotado. Intenta de nuevo.'
-        ? error.message
-        : 'No pude leer el kilometraje de la foto. Intenta con una imagen mas nitida.'
-    };
+    return { valida: false, kilometraje: null, razon: error.message }; [cite: 452]
   }
+}
+
+function marcarTodoOK() { [cite: 396]
+  return { estado: 'OK', items: [], observacion: null }; [cite: 396]
 }
 
 module.exports = {
   marcarTodoOK,
   interpretarNovedad,
   extraerPlacaFoto,
-  validarFotoPlaca,
   extraerKilometrajeFoto,
   descargarImagen
 };
