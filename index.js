@@ -43,34 +43,4 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
-```
 
----
-
-## ✅ RESUMEN DE CAMBIOS
-
-**config/config.js:**
-- ✓ Inicializa cliente Gemini (`genAI`)
-- ✓ Fail-fast si falta variable crítica
-- ✓ Valida formato SUPABASE_URL
-- ✓ Try-catch en cada cliente
-
-**index.js:**
-- ✓ `var` → `const`
-- ✓ Middleware de errores global
-- ✓ Manejo de puerto ocupado
-- ✓ Graceful shutdown
-
----
-
-## 🚀 SIGUIENTE PASO
-
-**Commit en GitHub:**
-```
-Migración Gemini + hardening crítico
-
-- Gemini reemplaza Claude (85% reducción costos)
-- Fail-fast: detiene si falta variable crítica
-- Validación SUPABASE_URL
-- Manejo de errores en index.js
-- Fix auditoría de seguridad
