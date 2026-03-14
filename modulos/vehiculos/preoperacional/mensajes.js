@@ -145,7 +145,6 @@ function mensajeFinalFirma(datosSesion, fechaTexto, novedadesCriticas, pdfUrl) {
 
 module.exports = {
   normalizarKilometrajeManual,
-  mensajeInicioPlaca,
   mensajeInicioOdometro,
   mensajeInicio,
   mensajeFallbackPlaca,
