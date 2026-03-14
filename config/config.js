@@ -43,8 +43,8 @@ const TABLES = {
 };
 
 // Inicialización de Clientes
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); [cite: 35]
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN); [cite: 35]
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); 
+const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN); 
 
 // Exportación del módulo
 module.exports = {
