@@ -3,71 +3,54 @@ const axios = require('axios');
 const config = require('../config/config');
 const utils = require('../modulos/vehiculos/preoperacional/validaciones');
 
-// Configuración de Dominios y Timeouts
-const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com']; [cite: 381]
-const GEMINI_TIMEOUT_MS = 8000; // Mantenemos 8s para responder antes del límite de Twilio [cite: 383]
+const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
+const GEMINI_TIMEOUT_MS = 9000; // Aumentamos ligeramente el margen
 
-// Inicialización de Gemini con la nueva API Key
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-/**
- * Descarga la imagen desde Twilio con validación de seguridad (SSRF)
- */
 async function descargarImagen(url) {
   try {
-    const urlObj = new URL(url); [cite: 384]
-    const permitido = DOMINIOS_PERMITIDOS.some(dom => urlObj.hostname.endsWith(dom)); [cite: 384]
-    
-    if (!permitido) throw new Error('URL de origen no permitida'); [cite: 385]
+    const urlObj = new URL(url);
+    const permitido = DOMINIOS_PERMITIDOS.some(dom => urlObj.hostname.endsWith(dom));
+    if (!permitido) throw new Error('URL de origen no permitida');
 
     const requestConfig = {
       responseType: 'arraybuffer',
-      timeout: 15000, [cite: 388]
+      timeout: 12000,
       headers: {}
     };
 
-    // Autenticación básica si es Twilio
     if (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN) {
-      const credentials = Buffer.from(`${config.TWILIO_ACCOUNT_SID}:${config.TWILIO_AUTH_TOKEN}`).toString('base64'); [cite: 389]
-      requestConfig.headers.Authorization = `Basic ${credentials}`; [cite: 390]
+      const credentials = Buffer.from(`${config.TWILIO_ACCOUNT_SID}:${config.TWILIO_AUTH_TOKEN}`).toString('base64');
+      requestConfig.headers.Authorization = `Basic ${credentials}`;
     }
 
-    const response = await axios.get(url, requestConfig); [cite: 390]
+    const response = await axios.get(url, requestConfig);
     return {
       base64: Buffer.from(response.data).toString('base64'),
-      mediaType: response.headers['content-type'] || 'image/jpeg' [cite: 391, 392]
+      mediaType: response.headers['content-type'] || 'image/jpeg'
     };
   } catch (error) {
     console.error('Error descargando imagen:', error.message);
-    throw new Error('No se pudo descargar la imagen'); [cite: 393]
+    throw new Error('No se pudo descargar la imagen');
   }
 }
 
-/**
- * Función centralizada para llamadas a Gemini (Reemplaza crearMensajeAnthropic)
- */
 async function llamarGemini(prompt, modelName, imageData = null) {
   const model = genAI.getGenerativeModel({ model: modelName });
-  
-  // Configuración de seguridad y generación
   const generationConfig = {
-    maxOutputTokens: 500,
-    temperature: 0.1, // Baja temperatura para mayor precisión en OCR
+    maxOutputTokens: 800,
+    temperature: 0, // 0 para máxima consistencia en extracción de datos
   };
 
   try {
     const contentParts = [{ text: prompt }];
-    
     if (imageData) {
       contentParts.push({
-        inlineData: {
-          data: imageData.base64,
-          mimeType: imageData.mediaType
-        }
+        inlineData: { data: imageData.base64, mimeType: imageData.mediaType }
       });
     }
 
-    // Ejecución con timeout
     const result = await Promise.race([
       model.generateContent(contentParts, generationConfig),
       new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), GEMINI_TIMEOUT_MS))
@@ -75,77 +58,78 @@ async function llamarGemini(prompt, modelName, imageData = null) {
 
     const response = await result.response;
     const texto = response.text();
-    
-    // Extraer JSON de la respuesta
-    const jsonMatch = texto.match(/\{[\s\S]*\}/); [cite: 394]
-    if (!jsonMatch) throw new Error('IA no devolvió JSON válido'); [cite: 395]
-    
-    return JSON.parse(jsonMatch[0]); [cite: 395]
+    const jsonMatch = texto.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('IA no devolvió JSON válido');
+    return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    if (error.message === 'TIMEOUT') throw new Error('Tiempo de análisis agotado. Intenta de nuevo.'); [cite: 402]
+    if (error.message === 'TIMEOUT') throw new Error('Tiempo de análisis agotado.');
     throw error;
   }
 }
 
+/**
+ * FIXED: Prompt mejorado para detectar MÚLTIPLES novedades y clasificarlas correctamente.
+ */
 async function interpretarNovedad(texto, items) {
-  const prompt = `Eres asistente de inspeccion vehicular. Operario reportó: "${texto}"
-  Items posibles: ${items.join(', ')}
-  Responde SOLO en JSON:
-  {
-    "items": [{"nombre": "item exacto", "estado": "estado categorizado"}],
-    "observacion": "${texto}"
-  }`; [cite: 405, 408]
+  const prompt = `Eres un experto en inspección vehicular. El operario reportó: "${texto}"
   
-  // Usamos Gemini 1.5 Flash por ser el más rápido y barato para texto
+  Items posibles del bloque: ${items.join(', ')}
+  
+  REGLAS:
+  1. Identifica TODOS los items mencionados con falla.
+  2. Usa EXACTAMENTE el nombre del item de la lista de items posibles.
+  3. Clasifica el estado:
+     - Niveles: Bajo / Vacio
+     - Fugas: Con fugas
+     - Llantas: Desgastada / Danada / Sin presion
+     - Eléctrico: Intermitente / No funciona
+     - General: Danado / Falta / Mal estado
+  
+  Responde SOLO este JSON:
+  {
+    "items": [
+      {"nombre": "Nombre Exacto", "estado": "Estado Categorizado"}
+    ],
+    "observacion": "${texto}"
+  }`;
+  
   const parsed = await llamarGemini(prompt, "gemini-1.5-flash");
   
   const itemsPermitidos = new Set(items);
-  parsed.items = (parsed.items || []).filter(item => itemsPermitidos.has(item.nombre)); [cite: 411]
+  // Filtramos para asegurar que Gemini no invente nombres
+  parsed.items = (parsed.items || []).filter(item => itemsPermitidos.has(item.nombre));
+  
   return parsed;
 }
 
 async function extraerPlacaFoto(urlFoto) {
   try {
-    const imagen = await descargarImagen(urlFoto); [cite: 412]
-    const prompt = `Analiza la imagen del vehículo. Lee la placa visible.
-    Responde SOLO JSON: {"valida": true/false, "placa": "ABC123 o null", "razon": "si no valida"}`; [cite: 415, 418]
-    
-    // Gemini 1.5 Flash es excelente para OCR rápido de placas [cite: 419]
+    const imagen = await descargarImagen(urlFoto);
+    const prompt = `Analiza la foto. ¿Se ve la placa frontal? 
+    Responde SOLO JSON: {"valida": true, "placa": "ABC123", "razon": ""}`;
     const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
-    const placa = utils.normalizarPlaca(parsed.placa || ''); [cite: 420]
-
-    return {
-      valida: !!parsed.valida && !!placa, [cite: 421]
-      placa: placa || null, [cite: 421, 422]
-      razon: parsed.razon || 'No pude leer la placa' [cite: 423]
-    };
+    const placa = utils.normalizarPlaca(parsed.placa || '');
+    return { valida: !!parsed.valida && !!placa, placa: placa || null, razon: parsed.razon || '' };
   } catch (error) {
-    return { valida: false, placa: null, razon: error.message }; [cite: 425]
+    return { valida: false, placa: null, razon: error.message };
   }
 }
 
 async function extraerKilometrajeFoto(urlFoto) {
   try {
-    const imagen = await descargarImagen(urlFoto); [cite: 412]
-    const prompt = `Analiza el odómetro. Extrae el kilometraje total como número entero.
-    Responde SOLO JSON: {"valida": true/false, "kilometraje": 12345 o null}`; [cite: 442, 444]
-    
-    // Gemini 1.5 Flash ya es muy preciso, pero podrías usar "gemini-1.5-pro" si fallara [cite: 445]
+    const imagen = await descargarImagen(urlFoto);
+    const prompt = `Analiza el odómetro. Extrae el kilometraje total (número entero).
+    Responde SOLO JSON: {"valida": true, "kilometraje": 123456}`;
     const parsed = await llamarGemini(prompt, "gemini-1.5-flash", imagen);
-    let kilometraje = parsed.kilometraje ? Math.trunc(Number(parsed.kilometraje)) : null; [cite: 446]
-
-    return {
-      valida: !!parsed.valida && kilometraje !== null, [cite: 449]
-      kilometraje: kilometraje,
-      razon: parsed.razon || 'No pude leer el kilometraje' [cite: 450]
-    };
+    let km = parsed.kilometraje ? Math.trunc(Number(parsed.kilometraje)) : null;
+    return { valida: !!parsed.valida && km !== null, kilometraje: km, razon: parsed.razon || '' };
   } catch (error) {
-    return { valida: false, kilometraje: null, razon: error.message }; [cite: 452]
+    return { valida: false, kilometraje: null, razon: error.message };
   }
 }
 
-function marcarTodoOK() { [cite: 396]
-  return { estado: 'OK', items: [], observacion: null }; [cite: 396]
+function marcarTodoOK() {
+  return { estado: 'OK', items: [], observacion: null };
 }
 
 module.exports = {
