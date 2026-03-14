@@ -265,7 +265,7 @@ function registrarPreoperacional(app) {
     }
 
     try {
-      sesion = sesiones.obtenerSesion(telefono);
+      sesion = await sesiones.obtenerSesion(telefono);
       console.log('[' + preop.ocultarTelefono(telefono) + '] Estado=' + sesion.estado + ' Texto=' + mensaje.length + ' chars Media=' + numMedia);
       var msgUpper = mensaje.toUpperCase();
       var msgLower = mensaje.toLowerCase();
