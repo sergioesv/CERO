@@ -4,6 +4,7 @@
 const { obtenerSesion, eliminarSesion } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
 const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
+const flujoTanqueo = require('../modulos/vehiculos/tanqueo/flujo');
 
 const MENU_ESTADOS = {
   INICIO: 'MENU_INICIO',
@@ -39,6 +40,10 @@ async function webhookWhatsApp(req, res) {
       return await flujoPosoperacional.manejarPosoperacional(req, res);
     }
 
+    if (sesion.tipo === 'tanqueo') {
+      return await flujoTanqueo.manejarTanqueo(req, res);
+    }
+
     await eliminarSesion(telefono);
     return responderMenu(res);
   } catch (error) {
@@ -63,10 +68,9 @@ async function manejarMenuPrincipal(req, res, sesion, mensaje) {
   }
 
   if (opcion === '3') {
-    return responderTwiml(
-      res,
-      '🚧 Módulo combustible / tanqueo en la siguiente entrega.\n\nDisponibles ahora:\n1️⃣ Preoperacional\n2️⃣ Posoperacional\n\nEscribe 1 o 2 para continuar.'
-    );
+    sesion.tipo = 'tanqueo';
+    sesion.estado = 'TANQUEO_INICIO';
+    return await flujoTanqueo.manejarTanqueo(req, res);
   }
 
   return responderMenu(res);
