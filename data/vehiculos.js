@@ -25,42 +25,75 @@ function distanciaPlaca(a, b) {
 }
 
 function normalizarTelefono(valor) {
-  return String(valor || '').replace(/[^0-9]/g, '');
+  return String(valor || '')
+    .replace(/^whatsapp:/i, '')
+    .replace(/[^0-9]/g, '')
+    .trim();
 }
 
-function construirCandidatosTelefono(telefono) {
-  var limpio = normalizarTelefono(telefono);
-  var candidatos = [];
+function posiblesTelefonos(telefono) {
+  var base = normalizarTelefono(telefono);
+  var lista = [];
 
-  if (limpio) candidatos.push(limpio);
-
-  if (limpio.indexOf('57') === 0 && limpio.length > 10) {
-    candidatos.push(limpio.slice(2));
+  function agregar(valor) {
+    if (!valor) return;
+    if (lista.indexOf(valor) >= 0) return;
+    lista.push(valor);
   }
 
-  if (limpio.length === 10) {
-    candidatos.push('57' + limpio);
+  agregar(base);
+  agregar('+' + base);
+  agregar('whatsapp:' + base);
+  agregar('whatsapp:+' + base);
+
+  if (base.length === 12 && base.indexOf('57') === 0) {
+    var local = base.slice(2);
+    agregar(local);
+    agregar('+' + local);
+    agregar('whatsapp:' + local);
+    agregar('whatsapp:+' + local);
   }
 
-  return candidatos.filter(function(valor, index, arr) {
-    return valor && arr.indexOf(valor) === index;
-  });
+  if (base.length === 10) {
+    agregar('57' + base);
+    agregar('+57' + base);
+    agregar('whatsapp:57' + base);
+    agregar('whatsapp:+57' + base);
+  }
+
+  return lista;
 }
 
 async function buscarConductorPorTelefono(telefono) {
-  var candidatos = construirCandidatosTelefono(telefono);
+  var candidatos = posiblesTelefonos(telefono);
   if (!candidatos.length) return null;
 
-  for (var i = 0; i < candidatos.length; i++) {
-    var candidato = candidatos[i];
-    var resultado = await config.supabase
-      .from(config.TABLES.conductores)
-      .select('*')
-      .eq('telefono', candidato)
-      .maybeSingle();
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .select('*')
+    .in('telefono', candidatos)
+    .eq('activo', true)
+    .limit(5);
 
-    if (!resultado.error && resultado.data) {
-      return resultado.data;
+  if (!resultado.error && Array.isArray(resultado.data) && resultado.data.length) {
+    return resultado.data[0];
+  }
+
+  var todos = await config.supabase
+    .from(config.TABLES.conductores)
+    .select('*')
+    .eq('activo', true)
+    .limit(2000);
+
+  if (todos.error || !Array.isArray(todos.data)) {
+    return null;
+  }
+
+  var base = normalizarTelefono(telefono);
+  for (var i = 0; i < todos.data.length; i++) {
+    var conductor = todos.data[i];
+    if (normalizarTelefono(conductor.telefono) === base) {
+      return conductor;
     }
   }
 
@@ -68,10 +101,12 @@ async function buscarConductorPorTelefono(telefono) {
 }
 
 async function cargarVehiculoYConductor(placa, telefono) {
+  var placaNormalizada = preop.normalizarPlaca(placa);
+
   var resultado = await config.supabase
     .from(config.TABLES.vehiculos)
     .select('*')
-    .eq('placa', placa)
+    .eq('placa', placaNormalizada)
     .single();
 
   if (resultado.error || !resultado.data) {
@@ -79,7 +114,6 @@ async function cargarVehiculoYConductor(placa, telefono) {
   }
 
   var conductor = await buscarConductorPorTelefono(telefono);
-
   return { error: null, vehiculo: resultado.data, conductor: conductor || null };
 }
 
@@ -116,8 +150,8 @@ async function buscarPlacaSugerida(placaDetectada) {
 module.exports = {
   cargarVehiculoYConductor,
   buscarPlacaSugerida,
-  distanciaPlaca,
+  buscarConductorPorTelefono,
   normalizarTelefono,
-  construirCandidatosTelefono,
-  buscarConductorPorTelefono
+  posiblesTelefonos,
+  distanciaPlaca
 };
