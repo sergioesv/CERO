@@ -1,14 +1,18 @@
-var sesiones = require('../../../servicios/sesiones');
+var config = require('../../../config/config');
+var visual = require('../compartido/validacionVisual');
 var storage = require('../../../servicios/storage');
 var vehiculosData = require('../../../data/vehiculos');
 var tanqueosData = require('../../../data/tanqueos');
 var validaciones = require('./validaciones');
+
+var sesiones = require('../../../servicios/sesiones');
 
 var ESTADOS = {
   INICIO: 'TANQUEO_INICIO',
   ESPERANDO_PLACA: 'TANQUEO_ESPERANDO_PLACA',
   ESPERANDO_FOTO_FACTURA: 'TANQUEO_ESPERANDO_FOTO_FACTURA',
   ESPERANDO_FOTO_ODOMETRO: 'TANQUEO_ESPERANDO_FOTO_ODOMETRO',
+  CONFIRMACION_KM: 'TANQUEO_CONFIRMACION_KM',
   ESPERANDO_KM_MANUAL: 'TANQUEO_ESPERANDO_KM_MANUAL',
   ESPERANDO_COMBUSTIBLE: 'TANQUEO_ESPERANDO_COMBUSTIBLE',
   ESPERANDO_CANTIDAD: 'TANQUEO_ESPERANDO_CANTIDAD',
@@ -25,6 +29,8 @@ function reiniciarSesionTanqueo(sesion) {
   sesion.vehiculo = null;
   sesion.conductor = null;
   sesion.kilometraje = null;
+  sesion.kmDetectado = null;
+  sesion.kmLecturaFueraRango = false;
   sesion.kmReferenciaMeta = null;
   sesion.kmReferencia = null;
   sesion.diferenciaKm = null;
@@ -67,24 +73,43 @@ function mensajeSolicitudKilometrajeManual(kmReferenciaMeta) {
   return '⌨️ Escribe el kilometraje que aparece en la foto del odómetro.' + referencia;
 }
 
-function mensajeTipoCombustible() {
-  return '⛽ Tipo de combustible:\n1️⃣ Diesel\n2️⃣ Gasolina\n3️⃣ Gas\n4️⃣ AdBlue\n5️⃣ Otro';
+function mensajeConfirmacionKilometraje(sesion) {
+  var msg = '🔎 *Lectura del odómetro*\n';
+  msg += 'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
+
+  if (typeof sesion.kmReferencia === 'number') {
+    msg += '\nÚltimo registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*';
+    if (typeof sesion.diferenciaKm === 'number') {
+      msg += '\nDiferencia: *' + (sesion.diferenciaKm >= 0 ? '+' : '') + sesion.diferenciaKm.toLocaleString('es-CO') + ' km*';
+    }
+  }
+
+  msg += '\n\n1⃣ Confirmar';
+  msg += '\n2⃣ Corregir escribiendo el kilometraje';
+  msg += '\n3⃣ Enviar otra foto';
+  return msg;
 }
 
-function mensajeCantidad() {
-  return '🔢 Escribe la cantidad abastecida.\n\nEjemplos:\n*45*\n*45.5*\n*12 gal*';
-}
+function mensajeAlertaKilometraje(sesion) {
+  var alerta = (sesion.alertasKm || [])[0];
+  var msg = '⚠️ *Lectura del odómetro fuera de rango*\n';
 
-function mensajeValor() {
-  return '💰 Escribe el valor total pagado.\n\nEjemplo: *218400*';
-}
+  if (alerta) {
+    msg += (alerta.mensaje || alerta) + '\n';
+  }
 
-function mensajeEstacion() {
-  return '🏪 Escribe la estación de servicio.\n\nSi no aplica, escribe *no*.';
-}
+  if (typeof sesion.kmReferencia === 'number') {
+    msg += 'Último registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*\n';
+  }
 
-function mensajeObservaciones() {
-  return '📝 Escribe una observación final.\n\nSi no hay, escribe *no*.';
+  msg += 'Nuevo detectado: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
+  if (typeof sesion.diferenciaKm === 'number') {
+    msg += '\nDiferencia: *' + (sesion.diferenciaKm >= 0 ? '+' : '') + sesion.diferenciaKm.toLocaleString('es-CO') + ' km*';
+  }
+
+  msg += '\n\n2⃣ Escribir kilometraje manual';
+  msg += '\n3⃣ Enviar otra foto';
+  return msg;
 }
 
 function construirResumen(sesion, telefono) {
@@ -143,15 +168,18 @@ async function manejarAtras(res, sesion) {
       storage.limpiarFotosPorTipo(sesion, ['factura']);
       return validaciones.responderTwiml(res, '◀️ Volvemos a la foto del recibo.\n\n' + mensajeSolicitudFactura());
 
+    case ESTADOS.CONFIRMACION_KM:
     case ESTADOS.ESPERANDO_KM_MANUAL:
       sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
       sesion.fotoOdometroTemporal = null;
+      sesion.kmDetectado = null;
+      sesion.kmLecturaFueraRango = false;
       storage.limpiarFotosPorTipo(sesion, ['odometro']);
       return validaciones.responderTwiml(res, '◀️ Volvemos a la foto del odómetro.\n\n' + mensajeSolicitudOdometro(sesion.kmReferenciaMeta));
 
     case ESTADOS.ESPERANDO_COMBUSTIBLE:
-      sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta));
+      sesion.estado = ESTADOS.CONFIRMACION_KM;
+      return validaciones.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + (sesion.kmLecturaFueraRango ? mensajeAlertaKilometraje(sesion) : mensajeConfirmacionKilometraje(sesion)));
 
     case ESTADOS.ESPERANDO_CANTIDAD:
       sesion.estado = ESTADOS.ESPERANDO_COMBUSTIBLE;
@@ -354,12 +382,53 @@ async function manejarTanqueo(req, res) {
         break;
       }
       registrarFotoOdometro(sesion, mediaUrl);
-      sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
-      respuesta = '✅ Foto del odómetro cargada.\n\n' + mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta);
+      var resultadoVisualKm = await visual.resolverFotoOdometroOperativa(
+        mediaUrl,
+        sesion.kmReferenciaMeta,
+        config.MAX_KM_SALTO
+      );
+      if (resultadoVisualKm.tipo === 'manual') {
+        sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
+        respuesta = '⚠️ No pude leer el odómetro con seguridad.\n\n' + mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta);
+        break;
+      }
+      sesion.kmDetectado = resultadoVisualKm.kilometraje;
+      sesion.kmReferencia = resultadoVisualKm.evaluacion.kmReferencia;
+      sesion.diferenciaKm = resultadoVisualKm.evaluacion.diferenciaKm;
+      sesion.inconsistenciaKm = resultadoVisualKm.evaluacion.inconsistenciaKm;
+      sesion.alertasKm = resultadoVisualKm.evaluacion.alertasKm;
+      sesion.kmLecturaFueraRango = resultadoVisualKm.tipo === 'fuera_rango';
+      sesion.estado = ESTADOS.CONFIRMACION_KM;
+      respuesta = sesion.kmLecturaFueraRango ? mensajeAlertaKilometraje(sesion) : mensajeConfirmacionKilometraje(sesion);
+      break;
+
+    case ESTADOS.CONFIRMACION_KM:
+      if (mensaje === '1' && !sesion.kmLecturaFueraRango && typeof sesion.kmDetectado === 'number') {
+        aplicarKilometraje(sesion, sesion.kmDetectado);
+        sesion.estado = ESTADOS.ESPERANDO_COMBUSTIBLE;
+        respuesta = '✅ Kilometraje confirmado: *' + sesion.kilometraje + ' km*\n\n' + mensajeTipoCombustible();
+        break;
+      }
+      if (mensaje === '2') {
+        sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
+        respuesta = mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta);
+        break;
+      }
+      if (mensaje === '3') {
+        sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+        sesion.kmDetectado = null;
+        sesion.kmLecturaFueraRango = false;
+        storage.limpiarFotosPorTipo(sesion, ['odometro']);
+        respuesta = mensajeSolicitudOdometro(sesion.kmReferenciaMeta);
+        break;
+      }
+      respuesta = sesion.kmLecturaFueraRango
+        ? 'Responde con *2* para escribir el kilometraje o *3* para enviar otra foto.'
+        : 'Responde con *1*, *2* o *3*.';
       break;
 
     case ESTADOS.ESPERANDO_KM_MANUAL:
-      var kilometraje = validaciones.parsearKilometraje(mensaje);
+      var kilometraje = visual.parsearKilometraje(mensaje);
       if (kilometraje === null) {
         respuesta = '❌ Kilometraje inválido.\n\nEscribe solo números. Ejemplo: *47889*';
         break;
