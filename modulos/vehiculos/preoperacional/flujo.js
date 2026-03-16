@@ -6,8 +6,156 @@ var mensajes = require('./mensajes');
 var cierre = require('./cierre');
 var GRUPOS = estadoPreop.GRUPOS;
 var sesiones = require('../../../servicios/sesiones');
-var visual = require('../compartido/validacionVisual');
+var ocr = require('../../../servicios/ocr');
 var storage = require('../../../servicios/storage');
+var vehiculosData = require('../../../data/vehiculos');
+
+
+function mensajeMenuPrincipal() {
+  return '🚗 *SISTEMA CERO*\n' +
+    'cero papel, cero accidentes\n\n' +
+    'Selecciona una opcion:\n\n' +
+    '1️⃣ Preoperacional (inicio de jornada)\n' +
+    '2️⃣ Posoperacional (cierre de jornada)\n' +
+    '3️⃣ Combustible / tanqueo\n\n' +
+    'Escribe el numero:';
+}
+
+function volverAMenuPrincipal(res, telefono) {
+  sesiones.eliminarSesion(telefono);
+  return preop.responderTwiml(res, mensajeMenuPrincipal());
+}
+
+function esOpcion(valor, opciones) {
+  return opciones.indexOf(String(valor || '').trim().toLowerCase()) >= 0;
+}
+
+function normalizarTextoBase(texto) {
+  return String(texto == null ? '' : texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function aliasExtrasPorItem(nombre) {
+  var clave = normalizarTextoBase(nombre);
+  if (clave === 'aceite motor') return ['aceite', 'motor', 'aceite motor', 'derrame aceite', 'aceite derramado'];
+  if (clave === 'refrigerante') return ['refrigerante', 'agua', 'agua visible', 'fuga de agua', 'agua derramada'];
+  if (clave === 'liquido frenos') return ['liquido frenos', 'liquido de frenos', 'freno', 'frenos', 'liquido'];
+  if (clave === 'fugas visibles') return ['fuga', 'fugas', 'goteo', 'goteando', 'botando', 'derrame', 'derramado', 'visible', 'visibles'];
+  if (clave === 'luces delanteras traseras') return ['luz', 'luces', 'faro', 'farola', 'delantera', 'trasera'];
+  if (clave === 'stops y direccionales') return ['stop', 'stops', 'direccional', 'direccionales', 'cocuyo', 'cocuyos'];
+  if (clave === 'pito y alarma reversa') return ['pito', 'alarma', 'reversa', 'bocina', 'corneta'];
+  if (clave === 'tablero instrumentos') return ['tablero', 'instrumento', 'instrumentos', 'testigo', 'indicador'];
+  if (clave === 'baterias') return ['bateria', 'baterias'];
+  if (clave === 'freno de parqueo') return ['freno', 'parqueo', 'mano'];
+  if (clave === 'estado llantas') return ['llanta', 'llantas', 'neumatico', 'neumaticos', 'rueda', 'ruedas'];
+  if (clave === 'pernos de ruedas') return ['perno', 'pernos', 'rueda', 'ruedas', 'tuerca', 'tuercas'];
+  if (clave === 'llanta repuesto') return ['repuesto', 'llanta repuesto', 'rueda repuesto'];
+  if (clave === 'cinturones seguridad') return ['cinturon', 'cinturones', 'seguridad'];
+  if (clave === 'retrovisores') return ['retrovisor', 'retrovisores', 'espejo', 'espejos'];
+  if (clave === 'pedales') return ['pedal', 'pedales'];
+  if (clave === 'vidrios y limpiabrisas') return ['vidrio', 'vidrios', 'limpiabrisas', 'plumilla', 'plumillas', 'parabrisas'];
+  if (clave === 'aseo y elementos sueltos') return ['aseo', 'limpieza', 'suelto', 'sueltos', 'elementos'];
+  if (clave === 'aire acondicionado') return ['aire', 'acondicionado', 'ac'];
+  if (clave === 'equipo carretera') return ['equipo', 'carretera', 'botiquin', 'extintor', 'cono', 'conos'];
+  return [];
+}
+
+function puntuarItemLocal(segmento, itemNombre) {
+  var normalizado = normalizarTextoBase(segmento);
+  var nombreNormalizado = normalizarTextoBase(itemNombre);
+  var alias = [nombreNormalizado].concat(aliasExtrasPorItem(itemNombre));
+  var score = 0;
+
+  for (var i = 0; i < alias.length; i++) {
+    var termino = normalizarTextoBase(alias[i]);
+    if (!termino) continue;
+    if (normalizado.indexOf(termino) >= 0) {
+      score += termino.indexOf(' ') >= 0 ? 3 : 2;
+    }
+  }
+
+  return score;
+}
+
+function detectarEstadoLocal(texto) {
+  var t = normalizarTextoBase(texto);
+  if (!t) return 'Mal estado';
+  if (/fuga|fugas|goteo|goteando|botando|derrame|derramado/.test(t)) return 'Con fugas';
+  if (/no funciona|no prende|apagad|fundid|sin luz|sin luces/.test(t)) return 'No funciona';
+  if (/bajo|vacio|vacia|faltante|falta|sin /.test(t)) return 'Bajo';
+  if (/desgastad|lisa|lisas/.test(t)) return 'Desgastada';
+  if (/sin aire|sin presion|desinflad|pinchad/.test(t)) return 'Sin presion';
+  if (/flojo|floja/.test(t)) return 'Flojo';
+  if (/danad|roto|rota|quebrad|partid|averiad|malo|mala|falla/.test(t)) return 'Mal estado';
+  return 'Mal estado';
+}
+
+function interpretarNovedadLocal(texto, grupo) {
+  var observacion = String(texto || '').trim();
+  var segmentos = observacion
+    .replace(/[\n\r]+/g, ', ')
+    .split(/,|;|\.|\s+y\s+|\s+e\s+|\//i)
+    .map(function(parte) { return parte.trim(); })
+    .filter(Boolean);
+
+  if (!segmentos.length && observacion) segmentos = [observacion];
+
+  var vistos = {};
+  var salida = [];
+
+  for (var i = 0; i < segmentos.length; i++) {
+    var segmento = segmentos[i];
+    var mejorItem = null;
+    var mejorScore = 0;
+
+    for (var j = 0; j < grupo.items.length; j++) {
+      var itemNombre = grupo.items[j].nombre;
+      var score = puntuarItemLocal(segmento, itemNombre);
+      if (score > mejorScore) {
+        mejorScore = score;
+        mejorItem = itemNombre;
+      }
+    }
+
+    if (!mejorItem || mejorScore <= 0 || vistos[mejorItem]) continue;
+    vistos[mejorItem] = true;
+    salida.push({
+      nombre: mejorItem,
+      estado: detectarEstadoLocal(segmento)
+    });
+  }
+
+  if (!salida.length && observacion) {
+    var mejorItemGeneral = null;
+    var mejorScoreGeneral = 0;
+    for (var k = 0; k < grupo.items.length; k++) {
+      var nombreItem = grupo.items[k].nombre;
+      var scoreGeneral = puntuarItemLocal(observacion, nombreItem);
+      if (scoreGeneral > mejorScoreGeneral) {
+        mejorScoreGeneral = scoreGeneral;
+        mejorItemGeneral = nombreItem;
+      }
+    }
+
+    if (mejorItemGeneral && mejorScoreGeneral > 0) {
+      salida.push({
+        nombre: mejorItemGeneral,
+        estado: detectarEstadoLocal(observacion)
+      });
+    }
+  }
+
+  return {
+    items: salida,
+    observacion: observacion,
+    fuente: 'reglas_locales'
+  };
+}
 
 function obtenerUrlWebhook(req) {
   if (config.TWILIO_WEBHOOK_URL) {
@@ -54,8 +202,8 @@ function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   return preop.responderTwiml(res, mensaje);
 }
 
-async function iniciarSesionConVehiculo(sesion, telefono, placa, fotoUrl, validacionTexto, cargaPrevia) {
-  var carga = cargaPrevia || await require('../../../data/vehiculos').cargarVehiculoYConductor(placa, telefono);
+async function iniciarSesionConVehiculo(sesion, telefono, placa, fotoUrl, validacionTexto) {
+  var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
 
   if (carga.error || !carga.vehiculo) {
     return { ok: false, tipo: 'no_encontrado' };
@@ -90,44 +238,48 @@ async function iniciarSesionConVehiculo(sesion, telefono, placa, fotoUrl, valida
 }
 
 async function procesarFotoFrontal(res, sesion, telefono, fotoUrl) {
-  var resultado = await visual.resolverPlacaFotoOperativa(fotoUrl, telefono);
-  sesion.fotoPlacaTemporal = fotoUrl;
-  sesion.placaDetectada = resultado.placaDetectada || null;
-  sesion.placaSugerida = resultado.placaSugerida || null;
-  sesion.cargaSugeridaTemporal = resultado.carga || null;
+  var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
+  var placaDetectada = preop.normalizarPlaca(lecturaPlaca.placa || '');
 
-  if (resultado.tipo === 'exacta') {
-    var inicioExacto = await iniciarSesionConVehiculo(
-      sesion,
-      telefono,
-      resultado.placaDetectada,
-      fotoUrl,
-      'Placa validada por foto: ' + resultado.placaDetectada,
-      resultado.carga
-    );
-    if (inicioExacto.ok) return preop.responderTwiml(res, inicioExacto.mensaje);
-    if (inicioExacto.tipo === 'bloqueado') return preop.responderTwiml(res, inicioExacto.mensaje);
+  if (lecturaPlaca.valida && placaDetectada) {
+    var inicio = await iniciarSesionConVehiculo(sesion, telefono, placaDetectada, fotoUrl, 'Placa validada por foto: ' + placaDetectada);
+    if (inicio.ok) return preop.responderTwiml(res, inicio.mensaje);
+    if (inicio.tipo === 'bloqueado') return preop.responderTwiml(res, inicio.mensaje);
   }
 
-  if (resultado.tipo === 'sugerida') {
-    sesion.estado = 'PLACA_CONFIRMACION_SUGERIDA';
-    return preop.responderTwiml(
-      res,
-      mensajes.mensajeConfirmacionPlacaSugerida(sesion, 'La lectura no coincide exactamente con la base. Confirma la placa si es correcta.')
-    );
+  sesion.fotoPlacaTemporal = fotoUrl;
+  sesion.placaDetectada = placaDetectada || null;
+  sesion.placaSugerida = null;
+
+  if (placaDetectada) {
+    var placaSugerida = await vehiculosData.buscarPlacaSugerida(placaDetectada);
+    if (placaSugerida && placaSugerida !== placaDetectada) {
+      sesion.placaSugerida = placaSugerida;
+      sesion.estado = 'PLACA_CONFIRMACION_SUGERIDA';
+      return preop.responderTwiml(
+        res,
+        mensajes.mensajeConfirmacionPlacaSugerida(sesion, 'La lectura no coincide exactamente con la base. Confirma la placa si es correcta.')
+      );
+    }
   }
 
   sesion.estado = 'PLACA_FALLBACK';
-  var motivo = resultado.razon || 'La placa no se pudo validar con seguridad.';
-  if (resultado.placaDetectada && resultado.lectura && resultado.lectura.valida) {
-    motivo = 'La placa *' + resultado.placaDetectada + '* no existe en la base.';
+  var motivo = lecturaPlaca.razon || 'La placa no se pudo validar con seguridad.';
+  if (placaDetectada && lecturaPlaca.valida) {
+    motivo = 'La placa *' + placaDetectada + '* no existe en la base.';
   }
   return preop.responderTwiml(res, mensajes.mensajeFallbackPlaca(sesion, motivo));
 }
 
 function registrarKilometrajeConfirmado(sesion, km, origen) {
   sesion.kilometraje = km;
-  visual.registrarFotoOdometro(sesion, sesion.fotoOdometroTemporal, km, origen || ('Kilometraje registrado: ' + km + ' km'), 'Foto del odometro', 'inicio_odometro');
+  storage.guardarFotoUnica(sesion, {
+    tipo: 'inicio_odometro',
+    url: sesion.fotoOdometroTemporal,
+    descripcion: 'Foto del odometro',
+    validacion: origen || ('Kilometraje registrado: ' + km + ' km'),
+    validada: true
+  });
   sesion.kmDetectado = null;
   sesion.kmLecturaFueraRango = false;
   sesion.fotoOdometroTemporal = null;
@@ -136,34 +288,49 @@ function registrarKilometrajeConfirmado(sesion, km, origen) {
 }
 
 function evaluarKilometrajeContraHistorico(sesion, km) {
-  return visual.evaluarKilometrajeContraReferencia(
-    km,
-    { kilometraje: sesion.vehiculo && typeof sesion.vehiculo.kilometraje === 'number' ? sesion.vehiculo.kilometraje : null },
-    config.MAX_KM_SALTO
-  );
+  var ultimo = sesion.vehiculo && sesion.vehiculo.kilometraje;
+  if (!ultimo && ultimo !== 0) {
+    return { ok: true, tipo: 'sin_historico', mensaje: '', mensajeCorto: '' };
+  }
+
+  if (km < ultimo) {
+    return {
+      ok: false,
+      tipo: 'menor',
+      mensaje: '❌ Kilometraje invalido.\nUltimo registrado: *' + ultimo + ' km*\nDebe ser igual o mayor.',
+      mensajeCorto: 'El valor detectado quedo por debajo del ultimo registro.'
+    };
+  }
+
+  if (km > (ultimo + config.MAX_KM_SALTO)) {
+    return {
+      ok: false,
+      tipo: 'alto',
+      mensaje: '⚠️ Kilometraje fuera del rango automatico.\nUltimo registrado: *' + ultimo + ' km*\nSalto detectado: *' + (km - ultimo) + ' km*',
+      mensajeCorto: 'El salto detectado fue de *' + (km - ultimo) + ' km*.'
+    };
+  }
+
+  return { ok: true, tipo: 'ok', mensaje: '', mensajeCorto: '' };
 }
 
 async function procesarFotoOdometro(res, sesion, fotoUrl) {
   sesion.fotoOdometroTemporal = fotoUrl;
-  var resultado = await visual.resolverFotoOdometroOperativa(
-    fotoUrl,
-    { kilometraje: sesion.vehiculo && typeof sesion.vehiculo.kilometraje === 'number' ? sesion.vehiculo.kilometraje : null },
-    config.MAX_KM_SALTO
-  );
-
-  sesion.kmDetectado = resultado.kilometraje;
-  sesion.kmLecturaFueraRango = resultado.tipo === 'fuera_rango';
+  var lecturaKm = await ocr.extraerKilometrajeFoto(fotoUrl);
+  sesion.kmDetectado = lecturaKm && lecturaKm.kilometraje != null ? lecturaKm.kilometraje : null;
+  sesion.kmLecturaFueraRango = false;
   sesion.estado = 'ODOMETRO_CONFIRMACION';
 
-  if (resultado.tipo === 'confirmar') {
+  if (sesion.kmDetectado != null) {
+    var evaluacion = evaluarKilometrajeContraHistorico(sesion, sesion.kmDetectado);
+    if (!evaluacion.ok) {
+      sesion.kmLecturaFueraRango = true;
+      return preop.responderTwiml(res, mensajes.mensajeKilometrajeFueraRango(sesion, evaluacion, config.MAX_KM_SALTO));
+    }
     return preop.responderTwiml(res, mensajes.mensajeConfirmacionOdometro(sesion));
   }
 
-  if (resultado.tipo === 'fuera_rango') {
-    return preop.responderTwiml(res, mensajes.mensajeKilometrajeFueraRango(sesion, resultado.evaluacion, config.MAX_KM_SALTO));
-  }
-
-  return preop.responderTwiml(res, mensajes.mensajeConfirmacionOdometro(sesion, (resultado.lectura && resultado.lectura.razon) || 'La imagen no es clara.'));
+  return preop.responderTwiml(res, mensajes.mensajeConfirmacionOdometro(sesion, lecturaKm.razon || 'La imagen no es clara.'));
 }
 
 function manejarAtras(res, sesion) {
@@ -265,6 +432,10 @@ async function manejarPreoperacional(req, res) {
         return manejarAtras(res, sesion);
       }
 
+      if (msgUpper === 'MENU') {
+        return volverAMenuPrincipal(res, telefono);
+      }
+
       switch (sesion.estado) {
         case 'INICIO':
         case 'ESPERANDO_PLACA':
@@ -276,12 +447,17 @@ async function manejarPreoperacional(req, res) {
           if (totalFotos > 1) {
             console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
           }
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
           if (numMedia === 0) return preop.responderTwiml(res, mensajes.mensajeInicio());
           return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
         }
 
         case 'PLACA_CONFIRMACION_SUGERIDA': {
           if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
+            return volverAMenuPrincipal(res, telefono);
+          }
 
           if ((msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') && sesion.placaSugerida) {
             // FIX: restaurar la inicializacion con placa sugerida que se perdió al unir el archivo.
@@ -290,8 +466,7 @@ async function manejarPreoperacional(req, res) {
               telefono,
               sesion.placaSugerida,
               sesion.fotoPlacaTemporal,
-              'Placa confirmada desde sugerencia: ' + sesion.placaSugerida + (sesion.placaDetectada ? (' (lectura inicial: ' + sesion.placaDetectada + ')') : ''),
-              sesion.cargaSugeridaTemporal || null
+              'Placa confirmada desde sugerencia: ' + sesion.placaSugerida + (sesion.placaDetectada ? (' (lectura inicial: ' + sesion.placaDetectada + ')') : '')
             );
             if (inicioSugerido.ok) return preop.responderTwiml(res, inicioSugerido.mensaje);
             if (inicioSugerido.tipo === 'bloqueado') return preop.responderTwiml(res, inicioSugerido.mensaje);
@@ -312,6 +487,7 @@ async function manejarPreoperacional(req, res) {
 
         case 'PLACA_FALLBACK': {
           if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
           if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'foto') {
             sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
             return preop.responderTwiml(res, mensajes.mensajeInicio());
@@ -325,27 +501,27 @@ async function manejarPreoperacional(req, res) {
 
         case 'PLACA_MANUAL': {
           if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
-
-          var placaManual = await visual.resolverPlacaManualOperativa(mensaje, telefono);
-          if (placaManual.tipo === 'formato_invalido') {
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
+          var placaManual = preop.normalizarPlaca(mensaje);
+          if (!placaManual) return preop.responderTwiml(res, '⌨️ Escribe la placa sin espacios.\nEjemplo: *IDL354*');
+          // FIX: validar el formato de la placa manual antes de consultar el vehiculo en la base.
+          var FORMATO_PLACA_CO = /^[A-Z]{3}[0-9]{3}$/;
+          // FIX: rechazar placas que no cumplan el patron 3 letras + 3 numeros.
+          if (!FORMATO_PLACA_CO.test(placaManual)) {
             return preop.responderTwiml(res,
               'Formato inválido. La placa debe ser 3 letras + 3 números (ej: ABC123).');
           }
 
-          if (placaManual.tipo === 'exacta') {
-            var inicioManual = await iniciarSesionConVehiculo(
-              sesion,
-              telefono,
-              placaManual.placaDetectada,
-              sesion.fotoPlacaTemporal,
-              'Placa registrada manualmente: ' + placaManual.placaDetectada,
-              placaManual.carga
-            );
-            if (inicioManual.ok) return preop.responderTwiml(res, inicioManual.mensaje);
-            if (inicioManual.tipo === 'bloqueado') return preop.responderTwiml(res, inicioManual.mensaje);
-          }
-
-          return preop.responderTwiml(res, '❌ La placa *' + (placaManual.placaDetectada || '') + '* no existe en la base.\nRevisa con el supervisor o envia otra foto.');
+          var inicioManual = await iniciarSesionConVehiculo(
+            sesion,
+            telefono,
+            placaManual,
+            sesion.fotoPlacaTemporal,
+            'Placa registrada manualmente: ' + placaManual
+          );
+          if (inicioManual.ok) return preop.responderTwiml(res, inicioManual.mensaje);
+          if (inicioManual.tipo === 'bloqueado') return preop.responderTwiml(res, inicioManual.mensaje);
+          return preop.responderTwiml(res, '❌ La placa *' + placaManual + '* no existe en la base.\nRevisa con el supervisor o envia otra foto.');
         }
 
         case 'ESPERANDO_FOTO_ODOMETRO': {
@@ -355,12 +531,16 @@ async function manejarPreoperacional(req, res) {
           if (totalFotos > 1) {
             console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
           }
+          if (esOpcion(msgLower, ['4', '4️⃣'])) return manejarAtras(res, sesion);
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
           if (numMedia === 0) return preop.responderTwiml(res, mensajes.mensajeInicioOdometro(sesion.vehiculo));
           return await procesarFotoOdometro(res, sesion, mediaUrls[0]);
         }
 
         case 'ODOMETRO_CONFIRMACION': {
           if (numMedia > 0) return await procesarFotoOdometro(res, sesion, mediaUrls[0]);
+          if (esOpcion(msgLower, ['4', '4️⃣'])) return manejarAtras(res, sesion);
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
 
           if (!sesion.kmLecturaFueraRango && sesion.kmDetectado != null && (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar')) {
             registrarKilometrajeConfirmado(sesion, sesion.kmDetectado, 'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km');
@@ -388,7 +568,10 @@ async function manejarPreoperacional(req, res) {
 
         case 'ODOMETRO_MANUAL': {
           if (numMedia > 0) return await procesarFotoOdometro(res, sesion, mediaUrls[0]);
-          var kmManual = visual.parsearKilometraje(mensaje);
+          if (esOpcion(msgLower, ['4', '4️⃣'])) return manejarAtras(res, sesion);
+          if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
+          var kmManual = mensajes.normalizarKilometrajeManual ? mensajes.normalizarKilometrajeManual(mensaje) : String(mensaje || '').replace(/[^0-9]/g, '');
+          kmManual = typeof kmManual === 'number' ? kmManual : (kmManual ? parseInt(kmManual, 10) : null);
           if (kmManual == null) {
             return preop.responderTwiml(res, '⌨️ Escribe el kilometraje usando solo numeros.\nEjemplo: *127892*');
           }
@@ -455,7 +638,11 @@ async function manejarPreoperacional(req, res) {
             return preop.responderTwiml(res, '✍️ En este paso necesito texto, no foto.\nDescribe el item y la falla.\n_Ej: "freno de parqueo malo"_');
           }
 
-          if (!textoNovedad || textoNovedad.length < 3 || ['1', '1️⃣', '2', '2️⃣', '3', '3️⃣'].indexOf(textoNovedad) >= 0) {
+          if (textoNovedad === '3' || textoNovedad === '3️⃣' || textoNovedad.toUpperCase() === 'ATRAS') {
+            return manejarAtras(res, sesion);
+          }
+
+          if (!textoNovedad || textoNovedad.length < 3 || ['1', '1️⃣', '2', '2️⃣'].indexOf(textoNovedad) >= 0) {
             var ejemplosAyuda = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
             return preop.responderTwiml(res, '✍️ Describe el item y la falla con texto.\n_Ej: "' + ejemplosAyuda + ' malo"_\nTambién puedes escribir *ATRAS* para volver.');
           }
