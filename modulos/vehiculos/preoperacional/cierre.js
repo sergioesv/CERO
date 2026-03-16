@@ -4,12 +4,53 @@ var inspeccionesData = require('../../../data/inspecciones');
 var alertasReglas = require('../../alertas/reglas');
 var alertasNotificador = require('../../alertas/notificador');
 
+function construirAlertasKm(sesion, kmReferencia, diferenciaKm) {
+  var alertas = [];
+
+  if (kmReferencia == null) {
+    return alertas;
+  }
+
+  if (sesion.kilometraje < kmReferencia) {
+    alertas.push({
+      tipo: 'kilometraje_menor',
+      mensaje: 'El kilometraje reportado es menor al ultimo registrado.',
+      ultimo_registrado: kmReferencia,
+      reportado: sesion.kilometraje,
+      diferencia: diferenciaKm
+    });
+  }
+
+  return alertas;
+}
+
+function construirNovedadesPreoperacional(sesion) {
+  return (sesion.novedades || []).map(function(n) {
+    return {
+      grupo: n.grupo,
+      item: n.item,
+      estado: n.estado,
+      nota: n.nota || n.estado || '',
+      critico: !!n.critico
+    };
+  });
+}
+
 function construirDatosPreoperacional(sesion, ahora) {
+  var kmReferencia = sesion.vehiculo && typeof sesion.vehiculo.kilometraje === 'number'
+    ? sesion.vehiculo.kilometraje
+    : null;
+  var diferenciaKm = kmReferencia == null ? null : sesion.kilometraje - kmReferencia;
+  var alertasKm = construirAlertasKm(sesion, kmReferencia, diferenciaKm);
+
   return {
-    vehiculo_id: sesion.vehiculo.id,
-    conductor_id: sesion.conductor ? sesion.conductor.id : null,
-    placa: sesion.placa,
+    vehiculo_placa: sesion.placa,
+    conductor_id: sesion.conductor && sesion.conductor.id ? sesion.conductor.id : null,
     kilometraje: sesion.kilometraje,
+    km_referencia: kmReferencia,
+    diferencia_km: diferenciaKm,
+    inconsistencia_km: alertasKm.length > 0,
+    alertas_km: alertasKm,
     fecha: ahora.toISOString().split('T')[0],
     hora: ahora.toTimeString().split(' ')[0],
     estado: 'completado',
@@ -17,10 +58,7 @@ function construirDatosPreoperacional(sesion, ahora) {
     electrico_luces: sesion.respuestas.electrico_luces || null,
     frenos_direccion_llantas: sesion.respuestas.frenos_direccion_llantas || null,
     cabina_equipo: sesion.respuestas.cabina_equipo || null,
-    novedades: sesion.novedades.map(function(n) {
-      var prefix = n.critico ? '⚠️ CRITICO ' : '';
-      return prefix + n.grupo + ': ' + n.item + ' - ' + (n.nota || n.estado || '');
-    }),
+    novedades: construirNovedadesPreoperacional(sesion),
     observaciones: sesion.observacion,
     firma_operario: true,
     firma_timestamp: ahora.toISOString()
@@ -53,6 +91,15 @@ function construirDatosSesionPdf(sesion, grupos, telefono, ahora) {
 async function guardarPreoperacionalCompleto(sesion, telefono, grupos) {
   var ahoraUTC = new Date();
   var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000));
+
+  if (!sesion.placa || !sesion.vehiculo || !sesion.vehiculo.id) {
+    return { error: new Error('Sesion incompleta: vehiculo no identificado.') };
+  }
+
+  if (!sesion.conductor || !sesion.conductor.id) {
+    return { error: new Error('Sesion incompleta: conductor no identificado para el telefono actual.') };
+  }
+
   var datosPreoperacional = construirDatosPreoperacional(sesion, ahora);
 
   var resPreop = await inspeccionesData.crearPreoperacional(datosPreoperacional);
