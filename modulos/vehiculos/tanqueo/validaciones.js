@@ -1,157 +1,173 @@
-
 var config = require('../../../config/config');
 var preop = require('../preoperacional/validaciones');
 
-var COMBUSTIBLES = {
-  '1': 'gasolina',
-  '2': 'diesel',
-  '3': 'gas',
-  '4': 'adblue',
-  '5': 'otro',
-  gasolina: 'gasolina',
-  diesel: 'diesel',
-  diésel: 'diesel',
-  acpm: 'diesel',
-  gas: 'gas',
-  gnv: 'gas',
-  glp: 'gas',
-  adblue: 'adblue',
-  urea: 'adblue',
-  otro: 'otro'
-};
+var TIPOS_COMBUSTIBLE = ['diesel', 'gasolina', 'gas', 'adblue', 'otro'];
 
-function normalizarCombustible(texto) {
-  var clave = String(texto || '').trim().toLowerCase();
-  return COMBUSTIBLES[clave] || null;
+function responderTwiml(res, mensaje) {
+  res.set('Content-Type', 'text/xml');
+  res.send(
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Response><Message>' + escaparXml(mensaje) + '</Message></Response>'
+  );
 }
 
-function parsearEntero(texto) {
+function escaparXml(texto) {
+  return String(texto || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function normalizarPlaca(texto) {
+  return preop.normalizarPlaca(texto);
+}
+
+function normalizarTelefono(telefono) {
+  return String(telefono || '').replace(/^whatsapp:/i, '').trim();
+}
+
+function parsearKilometraje(texto) {
   var limpio = String(texto || '').replace(/[^0-9]/g, '');
   if (!limpio) return null;
 
   var numero = parseInt(limpio, 10);
-  return isNaN(numero) ? null : numero;
+  if (isNaN(numero) || numero < 0) return null;
+
+  return numero;
 }
 
-function parsearDecimalFlexible(texto) {
-  var bruto = String(texto || '').trim();
-  var match = bruto.match(/[0-9.,]+/);
-  if (!match) return null;
+function parsearDecimal(texto) {
+  var valor = String(texto || '').trim().toLowerCase();
+  if (!valor) return null;
 
-  var numero = match[0].replace(/\s+/g, '');
-  var tieneComa = numero.indexOf(',') >= 0;
-  var tienePunto = numero.indexOf('.') >= 0;
+  valor = valor.replace(/\$/g, '');
+  valor = valor.replace(/\s+/g, '');
 
-  if (tieneComa && tienePunto) {
-    if (numero.lastIndexOf(',') > numero.lastIndexOf('.')) {
-      numero = numero.replace(/\./g, '').replace(',', '.');
-    } else {
-      numero = numero.replace(/,/g, '');
-    }
-  } else if (tieneComa) {
-    if ((numero.match(/,/g) || []).length > 1) {
-      var partesComa = numero.split(',');
-      var ultimaComa = partesComa.pop();
-      if (ultimaComa.length === 3) {
-        numero = partesComa.join('') + ultimaComa;
-      } else {
-        numero = partesComa.join('') + '.' + ultimaComa;
-      }
-    } else {
-      var posComa = numero.indexOf(',');
-      if ((numero.length - posComa - 1) === 3) {
-        numero = numero.replace(',', '');
-      } else {
-        numero = numero.replace(',', '.');
-      }
-    }
-  } else if (tienePunto) {
-    if ((numero.match(/\./g) || []).length > 1) {
-      var partesPunto = numero.split('.');
-      var ultimoPunto = partesPunto.pop();
-      if (ultimoPunto.length === 3) {
-        numero = partesPunto.join('') + ultimoPunto;
-      } else {
-        numero = partesPunto.join('') + '.' + ultimoPunto;
-      }
-    } else {
-      var posPunto = numero.indexOf('.');
-      if ((numero.length - posPunto - 1) === 3) {
-        numero = numero.replace('.', '');
-      }
-    }
+  if (valor.indexOf(',') >= 0 && valor.indexOf('.') >= 0) {
+    valor = valor.replace(/\./g, '').replace(/,/g, '.');
+  } else if (valor.indexOf(',') >= 0) {
+    valor = valor.replace(/,/g, '.');
   }
 
-  var valor = parseFloat(numero);
-  return isNaN(valor) ? null : valor;
+  valor = valor.replace(/[^0-9.\-]/g, '');
+  if (!valor) return null;
+
+  var numero = parseFloat(valor);
+  if (isNaN(numero)) return null;
+
+  return numero;
 }
 
-function parsearCantidadYUnidad(texto) {
-  var valor = parsearDecimalFlexible(texto);
-  if (valor === null) return null;
+function parsearCantidad(texto) {
+  var original = String(texto || '').trim().toLowerCase();
+  var valor = parsearDecimal(original);
+  if (valor === null || valor <= 0) {
+    return { ok: false, mensaje: '❌ Cantidad inválida.\n\nEjemplos válidos:\n*45*\n*45.5*\n*12 gal*' };
+  }
 
-  var normalizado = String(texto || '').trim().toLowerCase();
   var unidad = 'litros';
-
-  if (normalizado.indexOf('gal') >= 0) {
+  if (/gal|gln|galon|galones/.test(original)) {
     unidad = 'galones';
   }
 
   return {
+    ok: true,
     cantidad: valor,
-    unidad: unidad
+    unidadMedida: unidad
   };
 }
 
-function validarKilometrajeTanqueo(kilometraje, referenciaMeta, maxKmSalto) {
-  var kmReferencia = referenciaMeta && typeof referenciaMeta.kilometraje === 'number'
-    ? referenciaMeta.kilometraje
-    : null;
+function parsearValor(texto) {
+  var valor = parsearDecimal(texto);
+  if (valor === null || valor < 0) return null;
+  return valor;
+}
 
-  var diferenciaKm = kmReferencia === null ? null : kilometraje - kmReferencia;
-  var alertas = [];
-  var inconsistencia = false;
+function validarTipoCombustible(texto) {
+  var limpio = String(texto || '').trim().toLowerCase();
 
-  if (kmReferencia !== null && kilometraje < kmReferencia) {
-    inconsistencia = true;
-    alertas.push('El kilometraje informado es menor al último registrado (' + kmReferencia + ' km).');
-  }
-
-  if (kmReferencia !== null && diferenciaKm !== null && diferenciaKm > maxKmSalto) {
-    inconsistencia = true;
-    alertas.push('El salto de kilometraje es de ' + diferenciaKm + ' km y supera el máximo permitido de ' + maxKmSalto + ' km.');
-  }
-
-  return {
-    kilometraje: kilometraje,
-    kmReferencia: kmReferencia,
-    diferenciaKm: diferenciaKm,
-    alertas: alertas,
-    inconsistencia: inconsistencia
+  var equivalencias = {
+    '1': 'diesel',
+    '2': 'gasolina',
+    '3': 'gas',
+    '4': 'adblue',
+    '5': 'otro',
+    diesel: 'diesel',
+    diésel: 'diesel',
+    acpm: 'diesel',
+    gasolina: 'gasolina',
+    corriente: 'gasolina',
+    extra: 'gasolina',
+    gas: 'gas',
+    gnv: 'gas',
+    adblue: 'adblue',
+    urea: 'adblue',
+    otro: 'otro'
   };
+
+  var normalizado = equivalencias[limpio] || null;
+  if (!normalizado || TIPOS_COMBUSTIBLE.indexOf(normalizado) === -1) {
+    return {
+      ok: false,
+      mensaje: '❌ Tipo de combustible inválido.\n\nResponde:\n1️⃣ Diesel\n2️⃣ Gasolina\n3️⃣ Gas\n4️⃣ AdBlue\n5️⃣ Otro'
+    };
+  }
+
+  return { ok: true, valor: normalizado };
 }
 
-function validarCantidad(cantidad) {
-  return typeof cantidad === 'number' && !isNaN(cantidad) && cantidad > 0;
+function evaluarKilometrajeContraReferencia(kilometraje, referenciaMeta) {
+  var respuesta = {
+    kmReferencia: referenciaMeta && typeof referenciaMeta.kilometraje === 'number'
+      ? referenciaMeta.kilometraje
+      : null,
+    diferenciaKm: null,
+    inconsistenciaKm: false,
+    alertasKm: []
+  };
+
+  if (respuesta.kmReferencia === null) {
+    return respuesta;
+  }
+
+  respuesta.diferenciaKm = kilometraje - respuesta.kmReferencia;
+
+  if (kilometraje < respuesta.kmReferencia) {
+    respuesta.inconsistenciaKm = true;
+    respuesta.alertasKm.push(
+      'Kilometraje menor al último registro (' + respuesta.kmReferencia + ' km)'
+    );
+  }
+
+  if (respuesta.diferenciaKm > config.MAX_KM_SALTO) {
+    respuesta.inconsistenciaKm = true;
+    respuesta.alertasKm.push(
+      'Salto de kilometraje mayor a ' + config.MAX_KM_SALTO + ' km'
+    );
+  }
+
+  return respuesta;
 }
 
-function validarValor(valor) {
-  return typeof valor === 'number' && !isNaN(valor) && valor > 0;
+function formatearValorMoneda(valor) {
+  var numero = Number(valor || 0);
+  return '$' + numero.toLocaleString('es-CO', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 }
 
 module.exports = {
-  CAMPOS_BASE: ['vehiculo_placa', 'conductor_id', 'tipo_combustible', 'cantidad', 'valor_total', 'kilometraje'],
-  TABLA_OBJETIVO_ENV: 'DB_TABLE_TANQUEOS',
-  MAX_KM_SALTO_TANQUEO: config.MAX_KM_SALTO,
-  responderTwiml: preop.responderTwiml,
-  escaparXml: preop.escaparXml,
-  normalizarPlaca: preop.normalizarPlaca,
-  normalizarCombustible: normalizarCombustible,
-  parsearEntero: parsearEntero,
-  parsearCantidadYUnidad: parsearCantidadYUnidad,
-  validarKilometrajeTanqueo: validarKilometrajeTanqueo,
-  validarCantidad: validarCantidad,
-  validarValor: validarValor
+  TIPOS_COMBUSTIBLE: TIPOS_COMBUSTIBLE,
+  responderTwiml: responderTwiml,
+  normalizarPlaca: normalizarPlaca,
+  normalizarTelefono: normalizarTelefono,
+  parsearKilometraje: parsearKilometraje,
+  parsearCantidad: parsearCantidad,
+  parsearValor: parsearValor,
+  validarTipoCombustible: validarTipoCombustible,
+  evaluarKilometrajeContraReferencia: evaluarKilometrajeContraReferencia,
+  formatearValorMoneda: formatearValorMoneda
 };
-
-
