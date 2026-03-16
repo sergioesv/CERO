@@ -1,7 +1,7 @@
 var config = require('../../../config/config');
 var sesiones = require('../../../servicios/sesiones');
 var storage = require('../../../servicios/storage');
-var ocr = require('../../../servicios/ocr');
+var visual = require('../compartido/validacionVisual');
 var vehiculosData = require('../../../data/vehiculos');
 var posoperacionalesData = require('../../../data/posoperacionales');
 var validaciones = require('./validaciones');
@@ -130,23 +130,24 @@ async function manejarFotoOdometro(sesion, mediaUrl) {
   }
 
   sesion.fotoOdometroTemporal = mediaUrl;
-  var lectura = await ocr.extraerKilometrajeFoto(mediaUrl);
+  var resultado = await visual.resolverFotoOdometroOperativa(
+    mediaUrl,
+    sesion.kmReferenciaMeta,
+    validaciones.MAX_KM_SALTO_POSOP
+  );
 
-  if (!lectura.valida || typeof lectura.kilometraje !== 'number') {
+  if (resultado.tipo === 'manual') {
     sesion.estado = ESTADOS.KM_MANUAL;
     return '⚠️ No pude leer el odómetro con seguridad.\n\nEscribe el kilometraje manualmente.';
   }
 
-  aplicarResultadoKilometraje(sesion, lectura.kilometraje, 'ocr');
+  aplicarResultadoKilometraje(sesion, resultado.kilometraje, 'ocr');
   sesion.estado = ESTADOS.CONFIRMACION_KM;
   return mensajeConfirmacionSegunKilometraje(sesion);
 }
 
 function parsearKilometraje(mensaje) {
-  var limpio = String(mensaje || '').replace(/[^0-9]/g, '');
-  if (!limpio) return null;
-  var numero = parseInt(limpio, 10);
-  return isNaN(numero) ? null : numero;
+  return visual.parsearKilometraje(mensaje);
 }
 
 async function manejarKilometrajeManual(sesion, mensaje) {
