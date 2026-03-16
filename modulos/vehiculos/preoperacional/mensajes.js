@@ -3,12 +3,19 @@ var PASOS_INICIALES = preop.PASOS_INICIALES;
 var GRUPOS = preop.GRUPOS;
 
 function mensajeInicioPlaca() {
-  return '📸 *Paso 1 de 2*\n' + PASOS_INICIALES.fotoPlaca;
+  var msg = '📸 *Paso 1 de 2*\n' + PASOS_INICIALES.fotoPlaca;
+  msg += '\n\n9⃣ Menu principal';
+  return msg;
 }
 
 function mensajeInicioOdometro(vehiculo) {
-  return '📸 *Paso 2 de 2*\n' + PASOS_INICIALES.fotoOdometro +
-    (vehiculo && (vehiculo.kilometraje || vehiculo.kilometraje === 0) ? ('\n\nUltimo registrado: *' + vehiculo.kilometraje + ' km*') : '');
+  var msg = '📸 *Paso 2 de 2*\n' + PASOS_INICIALES.fotoOdometro;
+  if (vehiculo && (vehiculo.kilometraje || vehiculo.kilometraje === 0)) {
+    msg += '\n\nUltimo registrado: *' + vehiculo.kilometraje + ' km*';
+  }
+  msg += '\n\n4⃣ Atras';
+  msg += '\n9⃣ Menu principal';
+  return msg;
 }
 
 function mensajeInicio() {
@@ -21,6 +28,7 @@ function mensajeFallbackPlaca(sesion, motivo) {
   if (motivo) msg += '\n' + motivo;
   msg += '\n\n1⃣ Enviar otra foto';
   msg += '\n2⃣ Escribir la placa manualmente';
+  msg += '\n9⃣ Menu principal';
   msg += '\n\n_Tip: acercate mas a la placa, evita el zoom digital y limpia la camara._';
   return msg;
 }
@@ -33,6 +41,7 @@ function mensajeConfirmacionPlacaSugerida(sesion, motivo) {
   msg += '\n\n1⃣ Confirmar ' + (sesion.placaSugerida || 'placa sugerida');
   msg += '\n2⃣ Enviar otra foto';
   msg += '\n3⃣ Escribir la placa manualmente';
+  msg += '\n9⃣ Menu principal';
   return msg;
 }
 
@@ -47,6 +56,8 @@ function mensajeConfirmacionOdometro(sesion, prefijo) {
     msg += '\n\n1⃣ Confirmar';
     msg += '\n2⃣ Corregir escribiendo el kilometraje';
     msg += '\n3⃣ Enviar otra foto';
+    msg += '\n4⃣ Atras';
+    msg += '\n9⃣ Menu principal';
     return msg;
   }
 
@@ -54,6 +65,8 @@ function mensajeConfirmacionOdometro(sesion, prefijo) {
   if (ultimo || ultimo === 0) msg += '\nUltimo registrado: *' + ultimo + ' km*';
   msg += '\n\n2⃣ Escribir el kilometraje manualmente';
   msg += '\n3⃣ Enviar otra foto';
+  msg += '\n4⃣ Atras';
+  msg += '\n9⃣ Menu principal';
   msg += '\n\n_Tip: acerca el celular al display, toca para enfocar y evita reflejos._';
   return msg;
 }
@@ -75,6 +88,8 @@ function mensajeKilometrajeFueraRango(sesion, evaluacion, maxKmSalto) {
   }
   msg += '\n\n2⃣ Escribir el kilometraje correcto';
   msg += '\n3⃣ Enviar otra foto';
+  msg += '\n4⃣ Atras';
+  msg += '\n9⃣ Menu principal';
   msg += '\n\n_Tip: acerca el celular al display y procura que solo se vea el tablero._';
   return msg;
 }
