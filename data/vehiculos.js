@@ -24,6 +24,49 @@ function distanciaPlaca(a, b) {
   return total;
 }
 
+function normalizarTelefono(valor) {
+  return String(valor || '').replace(/[^0-9]/g, '');
+}
+
+function construirCandidatosTelefono(telefono) {
+  var limpio = normalizarTelefono(telefono);
+  var candidatos = [];
+
+  if (limpio) candidatos.push(limpio);
+
+  if (limpio.indexOf('57') === 0 && limpio.length > 10) {
+    candidatos.push(limpio.slice(2));
+  }
+
+  if (limpio.length === 10) {
+    candidatos.push('57' + limpio);
+  }
+
+  return candidatos.filter(function(valor, index, arr) {
+    return valor && arr.indexOf(valor) === index;
+  });
+}
+
+async function buscarConductorPorTelefono(telefono) {
+  var candidatos = construirCandidatosTelefono(telefono);
+  if (!candidatos.length) return null;
+
+  for (var i = 0; i < candidatos.length; i++) {
+    var candidato = candidatos[i];
+    var resultado = await config.supabase
+      .from(config.TABLES.conductores)
+      .select('*')
+      .eq('telefono', candidato)
+      .maybeSingle();
+
+    if (!resultado.error && resultado.data) {
+      return resultado.data;
+    }
+  }
+
+  return null;
+}
+
 async function cargarVehiculoYConductor(placa, telefono) {
   var resultado = await config.supabase
     .from(config.TABLES.vehiculos)
@@ -35,13 +78,9 @@ async function cargarVehiculoYConductor(placa, telefono) {
     return { error: resultado.error || new Error('Vehiculo no encontrado'), vehiculo: null, conductor: null };
   }
 
-  var resConductor = await config.supabase
-    .from(config.TABLES.conductores)
-    .select('*')
-    .eq('telefono', telefono.replace('whatsapp:', ''))
-    .single();
+  var conductor = await buscarConductorPorTelefono(telefono);
 
-  return { error: null, vehiculo: resultado.data, conductor: resConductor.data || null };
+  return { error: null, vehiculo: resultado.data, conductor: conductor || null };
 }
 
 async function buscarPlacaSugerida(placaDetectada) {
@@ -77,5 +116,8 @@ async function buscarPlacaSugerida(placaDetectada) {
 module.exports = {
   cargarVehiculoYConductor,
   buscarPlacaSugerida,
-  distanciaPlaca
+  distanciaPlaca,
+  normalizarTelefono,
+  construirCandidatosTelefono,
+  buscarConductorPorTelefono
 };
