@@ -1,6 +1,9 @@
 // canales/whatsapp.js
-// Enrutador principal para el canal de WhatsApp con menú de selección
-// v2 — incluye detección automática de conductor no registrado y flujo de inscripción
+// Enrutador principal para el canal de WhatsApp.
+// Navegación numérica unificada:
+//   9 (o MENU / INICIO) → menú principal directo, sin mensaje intermedio
+//   0 (o ATRAS)         → delega al módulo activo para retroceder un paso
+//   CANCELAR            → alias de 9 (menú principal)
 
 'use strict';
 
@@ -23,14 +26,19 @@ async function webhookWhatsApp(req, res) {
   try {
     let sesion = await obtenerSesion(telefono);
 
-    // ── Comando global MENU / INICIO: reinicia cualquier flujo activo ─────
-    if (msgUpper === 'MENU' || msgUpper === 'INICIO') {
+    // ── 9 / MENU / INICIO / CANCELAR → menú directo, sin mensaje intermedio ──
+    if (
+      mensaje === '9'       ||
+      msgUpper === 'MENU'   ||
+      msgUpper === 'INICIO' ||
+      msgUpper === 'CANCELAR'
+    ) {
       await eliminarSesion(telefono);
       guardarCambios();
       return responderMenu(res);
     }
 
-    // ── Enrutar según el tipo de flujo activo en sesión ───────────────────
+    // ── Enrutar según el tipo de flujo activo ─────────────────────────────────
     if (sesion.tipo === 'inscripcion') {
       return await flujoInscripcion.manejarInscripcion(req, res);
     }
@@ -47,7 +55,7 @@ async function webhookWhatsApp(req, res) {
       return await flujoTanqueo.manejarTanqueo(req, res);
     }
 
-    // ── Sin tipo activo → menú principal con verificación de registro ─────
+    // ── Sin tipo activo → verificar registro y mostrar menú ───────────────────
     return await manejarMenuPrincipal(req, res, sesion, mensaje);
 
   } catch (error) {
@@ -60,49 +68,44 @@ async function webhookWhatsApp(req, res) {
 // MENÚ PRINCIPAL CON VERIFICACIÓN DE REGISTRO
 // ============================================================================
 
-/**
- * Antes de procesar cualquier opción verifica que el número esté registrado
- * como conductor activo. Si no lo está, inicia el flujo de inscripción.
- */
 async function manejarMenuPrincipal(req, res, sesion, mensaje) {
   const telefono = req.body.From;
-  const opcion   = mensaje.trim();
 
   // Verificar si el operario está registrado en el sistema
   const conductor = await vehiculosData.buscarConductorPorTelefono(telefono);
 
   if (!conductor) {
-    // Número desconocido — iniciar inscripción automáticamente
+    // Número desconocido → inscripción automática
     console.log('[WHATSAPP] Número no registrado, iniciando inscripción:', telefono);
     sesion.tipo        = 'inscripcion';
-    sesion.inscripcion = null; // flujoInscripcion lo inicializa en el primer mensaje
+    sesion.inscripcion = null;
     guardarCambios();
     return await flujoInscripcion.manejarInscripcion(req, res);
   }
 
-  // Conductor registrado — procesar selección del menú
-  if (opcion === '1') {
+  // Selección del menú principal
+  if (mensaje === '1') {
     sesion.tipo   = 'preoperacional';
     sesion.estado = 'INICIO';
     guardarCambios();
     return await flujoPreoperacional.manejarPreoperacional(req, res);
   }
 
-  if (opcion === '2') {
+  if (mensaje === '2') {
     sesion.tipo   = 'posoperacional';
     sesion.estado = 'POSOP_INICIO';
     guardarCambios();
     return await flujoPosoperacional.manejarPosoperacional(req, res);
   }
 
-  if (opcion === '3') {
+  if (mensaje === '3') {
     sesion.tipo   = 'tanqueo';
     sesion.estado = 'TANQUEO_INICIO';
     guardarCambios();
     return await flujoTanqueo.manejarTanqueo(req, res);
   }
 
-  // Opción no reconocida — mostrar menú
+  // Opción no reconocida → mostrar menú
   return responderMenu(res);
 }
 
@@ -128,7 +131,7 @@ function responderRaiz(req, res) {
 }
 
 function responderError(res) {
-  return responderTwiml(res, '❌ Ocurrió un error.\n\nEscribe MENU para reiniciar.');
+  return responderTwiml(res, '❌ Ocurrió un error.\n\nEscribe *9* o *MENU* para reiniciar.');
 }
 
 function responderTwiml(res, mensaje) {
