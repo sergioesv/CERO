@@ -47,35 +47,46 @@ function reiniciarSesionTanqueo(sesion) {
   sesion.fotos = [];
 }
 
+// ── Pie de navegación estándar ────────────────────────────────────────────────
+var PIE_NAV = '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
+
 function mensajeInicio() {
-  return '⛽ *Registro de tanqueo*\n\nEscribe la placa del vehículo.\n\nTambién puedes escribir *CANCELAR* para salir.';
+  return (
+    '⛽ *Registro de tanqueo*\n\n' +
+    'Escribe la placa del vehículo.' +
+    PIE_NAV
+  );
 }
 
 function mensajeSolicitudFactura() {
-  return '📸 Envía ahora la *foto del recibo* o factura del tanqueo.';
+  return (
+    '📸 Envía la *foto del recibo* o factura del tanqueo.' +
+    PIE_NAV
+  );
 }
 
 function mensajeSolicitudOdometro(kmReferenciaMeta) {
-  var referencia = '';
+  var msg = '📸 Envía la *foto del odómetro*.';
   if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
-    referencia = '\n\nÚltimo kilometraje de referencia: *' + kmReferenciaMeta.kilometraje + ' km*';
+    msg += '\n\nÚltimo registrado: *' + kmReferenciaMeta.kilometraje + ' km*';
   }
-
-  return '📸 Envía ahora la *foto del kilometraje / odómetro*.' + referencia;
+  msg += PIE_NAV;
+  return msg;
 }
 
 function mensajeSolicitudKilometrajeManual(kmReferenciaMeta) {
-  var referencia = '';
+  var msg = '⌨️ Escribe el kilometraje que aparece en el odómetro.';
   if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
-    referencia = '\n\nReferencia actual: *' + kmReferenciaMeta.kilometraje + ' km*';
+    msg += '\n\nReferencia: *' + kmReferenciaMeta.kilometraje + ' km*';
   }
-
-  return '⌨️ Escribe el kilometraje que aparece en la foto del odómetro.' + referencia;
+  msg += PIE_NAV;
+  return msg;
 }
 
 function mensajeConfirmacionKilometraje(sesion) {
-  var msg = '🔎 *Lectura del odómetro*\n';
-  msg += 'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
+  var msg =
+    '🔎 *Lectura del odómetro*\n' +
+    'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
 
   if (typeof sesion.kmReferencia === 'number') {
     msg += '\nÚltimo registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*';
@@ -84,40 +95,87 @@ function mensajeConfirmacionKilometraje(sesion) {
     }
   }
 
-  msg += '\n\n1⃣ Confirmar';
-  msg += '\n2⃣ Corregir escribiendo el kilometraje';
-  msg += '\n3⃣ Enviar otra foto';
+  msg +=
+    '\n\n1️⃣ Confirmar\n' +
+    '2️⃣ Corregir el kilometraje\n' +
+    '3️⃣ Enviar otra foto';
+  msg += PIE_NAV;
   return msg;
 }
 
 function mensajeAlertaKilometraje(sesion) {
   var alerta = (sesion.alertasKm || [])[0];
   var msg = '⚠️ *Lectura del odómetro fuera de rango*\n';
-
-  if (alerta) {
-    msg += (alerta.mensaje || alerta) + '\n';
-  }
+  if (alerta) msg += (alerta.mensaje || alerta) + '\n';
 
   if (typeof sesion.kmReferencia === 'number') {
     msg += 'Último registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*\n';
   }
 
-  msg += 'Nuevo detectado: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
+  msg += 'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
   if (typeof sesion.diferenciaKm === 'number') {
     msg += '\nDiferencia: *' + (sesion.diferenciaKm >= 0 ? '+' : '') + sesion.diferenciaKm.toLocaleString('es-CO') + ' km*';
   }
 
-  msg += '\n\n2⃣ Escribir kilometraje manual';
-  msg += '\n3⃣ Enviar otra foto';
+  msg +=
+    '\n\n1️⃣ Escribir el kilometraje correcto\n' +
+    '2️⃣ Enviar otra foto';
+  msg += PIE_NAV;
   return msg;
+}
+
+function mensajeTipoCombustible() {
+  return (
+    '⛽ *Tipo de combustible*\n\n' +
+    '1️⃣ Diésel\n' +
+    '2️⃣ Gasolina\n' +
+    '3️⃣ Gas\n' +
+    '4️⃣ AdBlue\n' +
+    '5️⃣ Otro' +
+    PIE_NAV
+  );
+}
+
+function mensajeCantidad() {
+  return (
+    '🔢 *Cantidad de combustible*\n\n' +
+    'Escribe la cantidad en litros o galones.\n' +
+    'Ejemplos: *45* · *45.5* · *12 gal*' +
+    PIE_NAV
+  );
+}
+
+function mensajeValor() {
+  return (
+    '💰 *Valor total del tanqueo*\n\n' +
+    'Escribe solo el número en pesos.\n' +
+    'Ejemplo: *218400*' +
+    PIE_NAV
+  );
+}
+
+function mensajeEstacion() {
+  return (
+    '🏪 *Estación de servicio*\n\n' +
+    'Escribe el nombre de la estación\no *no* si no aplica.' +
+    PIE_NAV
+  );
+}
+
+function mensajeObservaciones() {
+  return (
+    '💬 *Observaciones del tanqueo*\n\n' +
+    'Escribe una observación\no *no* si no aplica.' +
+    PIE_NAV
+  );
 }
 
 function construirResumen(sesion, telefono) {
   var lineas = [];
-  lineas.push('⛽ *Confirmación de tanqueo*');
-  lineas.push('');
+  lineas.push('───────────────');
+  lineas.push('⛽ *RESUMEN DEL TANQUEO*');
+  lineas.push('───────────────');
   lineas.push('🚗 Placa: *' + sesion.placa + '*');
-  lineas.push('📱 Reportado desde: *' + validaciones.normalizarTelefono(telefono) + '*');
   lineas.push('🧾 Recibo: *OK*');
   lineas.push('📸 Odómetro: *OK*');
   lineas.push('🛣️ Kilometraje: *' + sesion.kilometraje + ' km*');
@@ -144,10 +202,8 @@ function construirResumen(sesion, telefono) {
   }
 
   lineas.push('');
-  lineas.push('1️⃣ Guardar');
-  lineas.push('2️⃣ Reiniciar este tanqueo');
-  lineas.push('');
-  lineas.push('También puedes escribir *ATRAS* o *CANCELAR*.');
+  lineas.push('✍️ Escribe *SI* para guardar');
+  lineas.push('◀️ *ATRAS* para corregir  •  ✖️ *CANCELAR* para anular');
 
   return lineas.join('\n');
 }
@@ -202,23 +258,23 @@ async function manejarAtras(res, sesion) {
       return validaciones.responderTwiml(res, '◀️ Volvemos a observaciones.\n\n' + mensajeObservaciones());
 
     default:
-      return validaciones.responderTwiml(res, 'No se puede retroceder desde aquí.\nEscribe *CANCELAR* para salir.');
+      return validaciones.responderTwiml(res, 'No hay paso anterior desde aquí.\n\nEscribe *CANCELAR* para salir.');
   }
 }
 
 async function iniciarConPlaca(sesion, telefono, mensaje) {
   var placa = validaciones.normalizarPlaca(mensaje);
   if (!placa || placa.length < 5 || placa.length > 10) {
-    return '❌ Placa inválida.\n\nEjemplo: *TKJ933*';
+    return '❌ Placa inválida.\n\nEjemplo: *TKJ933*' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
   }
 
   var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
   if (carga.error || !carga.vehiculo) {
-    return '❌ El vehículo *' + placa + '* no existe en la base.\n\nVerifica la placa.';
+    return '❌ El vehículo *' + placa + '* no existe en el sistema.\n\nVerifica la placa.' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
   }
 
   if (carga.vehiculo.bloqueado) {
-    return '🚫 *Vehículo bloqueado*\n' + placa + '\n' + (carga.vehiculo.motivo_bloqueo || 'Contacta al supervisor.');
+    return '🚫 *Vehículo bloqueado*\n' + placa + '\n' + (carga.vehiculo.motivo_bloqueo || 'Contacta al supervisor.') + '\n\n✖️ *CANCELAR*';
   }
 
   sesion.placa = placa;
@@ -227,7 +283,7 @@ async function iniciarConPlaca(sesion, telefono, mensaje) {
   sesion.kmReferenciaMeta = await tanqueosData.obtenerReferenciaKilometraje(placa);
   sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
 
-  return '✅ Vehículo *' + placa + '* listo para tanqueo.\n\n' + mensajeSolicitudFactura();
+  return '✅ Vehículo *' + placa + '* listo para el tanqueo.\n\n' + mensajeSolicitudFactura();
 }
 
 function registrarFotoFactura(sesion, mediaUrl) {
@@ -332,12 +388,12 @@ async function manejarTanqueo(req, res) {
 
   if (mensajeMayus === 'MENU' || mensajeMayus === 'INICIO') {
     sesiones.eliminarSesion(telefono);
-    return validaciones.responderTwiml(res, '🏠 Volviendo al menú principal.\n\nEscribe cualquier mensaje para ver el menú.');
+    return validaciones.responderTwiml(res, '✅ Tanqueo cancelado.\n\nEscribe cualquier mensaje para ver el menú.');
   }
 
   if (mensajeMayus === 'CANCELAR') {
     sesiones.eliminarSesion(telefono);
-    return validaciones.responderTwiml(res, '❌ Tanqueo cancelado.\n\nEscribe *MENU* para volver al inicio.');
+    return validaciones.responderTwiml(res, '✖️ Tanqueo cancelado.\n\nEscribe *MENU* para volver al inicio.');
   }
 
   if (mensajeMayus === 'REINICIAR') {
@@ -368,7 +424,7 @@ async function manejarTanqueo(req, res) {
 
     case ESTADOS.ESPERANDO_FOTO_FACTURA:
       if (!mediaUrl) {
-        respuesta = '📸 Necesito la foto del recibo para continuar.';
+        respuesta = '📸 Envía la foto del recibo para continuar.' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
         break;
       }
       registrarFotoFactura(sesion, mediaUrl);
@@ -378,7 +434,7 @@ async function manejarTanqueo(req, res) {
 
     case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
       if (!mediaUrl) {
-        respuesta = '📸 Necesito la foto del odómetro para continuar.';
+        respuesta = '📸 Envía la foto del odómetro para continuar.' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
         break;
       }
       registrarFotoOdometro(sesion, mediaUrl);
@@ -423,8 +479,8 @@ async function manejarTanqueo(req, res) {
         break;
       }
       respuesta = sesion.kmLecturaFueraRango
-        ? 'Responde con *2* para escribir el kilometraje o *3* para enviar otra foto.'
-        : 'Responde con *1*, *2* o *3*.';
+        ? 'Escribe el kilometraje correcto o envía otra foto.' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+        : 'Responde con *1*, *2* o *3*.' + '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
       break;
 
     case ESTADOS.ESPERANDO_KM_MANUAL:
@@ -489,7 +545,7 @@ async function manejarTanqueo(req, res) {
       break;
 
     case ESTADOS.CONFIRMACION_FINAL:
-      if (mensaje === '1') {
+      if (mensaje.toUpperCase() === 'SI') {
         var guardado = await guardarTanqueo(sesion, telefono);
         if (guardado.error) {
           respuesta = mensajeErrorPersistencia(guardado.error);
@@ -498,20 +554,16 @@ async function manejarTanqueo(req, res) {
         sesiones.eliminarSesion(telefono);
         return validaciones.responderTwiml(
           res,
-          '✅ Tanqueo guardado correctamente para *' + guardado.tanqueo.vehiculo_placa + '*.' +
-          '\n\nKilometraje actualizado: *' + guardado.tanqueo.kilometraje + ' km*.' +
-          '\n\nEscribe *MENU* para volver al inicio.'
+          '───────────────\n' +
+          '✅ *TANQUEO GUARDADO*\n' +
+          '───────────────\n' +
+          '🚗 *' + guardado.tanqueo.vehiculo_placa + '*\n' +
+          '🛣️ Kilometraje: *' + guardado.tanqueo.kilometraje + ' km*\n\n' +
+          'Escribe *MENU* para volver al inicio.'
         );
       }
 
-      if (mensaje === '2') {
-        reiniciarSesionTanqueo(sesion);
-        sesion.estado = ESTADOS.ESPERANDO_PLACA;
-        respuesta = '🔄 Reiniciamos este tanqueo.\n\n' + mensajeInicio();
-        break;
-      }
-
-      respuesta = 'Responde con *1* para guardar o *2* para reiniciar.';
+      respuesta = 'Escribe *SI* para guardar\no *ATRAS* para corregir\no *CANCELAR* para anular.';
       break;
 
     default:
