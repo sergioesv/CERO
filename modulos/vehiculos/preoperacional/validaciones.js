@@ -77,9 +77,9 @@ function formatGrupoMsg(grupo, prefijo) {
   msg += '*' + grupo.nombre + '*\n';
   msg += grupo.abreviado + '\n';
   msg += '───────────────\n';
-  msg += '1⃣ Todo OK\n';
-  msg += '2⃣ Novedad\n';
-  msg += '3⃣ Atras';
+  msg += '1️⃣ Todo OK\n';
+  msg += '2️⃣ Novedad\n\n';
+  msg += '0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
   return msg;
 }
 
