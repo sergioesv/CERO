@@ -2,7 +2,7 @@
 // Textos de UX del flujo posoperacional.
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto
-//   Navegación → ◀️ *ATRAS*  •  ✖️ *CANCELAR*
+//   Navegación → Escribe ATRAS o CANCELAR (texto, no botones)
 //   Confirmar  → Escribe *SI* para firmar
 //   Separadores → solo en resúmenes/confirmación final
 //   Tono       → informal, español correcto
@@ -11,7 +11,7 @@
 
 // ── Pie de navegación estándar ────────────────────────────────────────────────
 
-var PIE_NAV = '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
+var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 
 // ============================================================================
 // INICIO
@@ -98,7 +98,7 @@ function mensajePreguntaNovedades() {
     '🛠️ *¿Hubo novedades al finalizar la jornada?*\n\n' +
     '1️⃣ Sí\n' +
     '2️⃣ No' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
@@ -110,7 +110,7 @@ function mensajeSolicitarNovedad() {
     '• El rodillo de las llantas suena raro\n' +
     '• Parachoques rayado\n\n' +
     '_Escribe una novedad por mensaje._' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
@@ -130,7 +130,7 @@ function mensajeConfirmarNovedadInterpretada(novedades) {
     '\n1️⃣ Confirmar\n' +
     '2️⃣ Escribir de nuevo\n' +
     '3️⃣ Cancelar esta novedad' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
@@ -142,7 +142,7 @@ function mensajeSolicitarFotoNovedad(novedad, pendientes) {
     'Ítem: *' + novedad.item + '*\n' +
     'Detalle: _' + (novedad.texto_original || novedad.estado || 'Con novedad') + '_\n\n' +
     'Envía una foto clara de la novedad.' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
@@ -151,7 +151,7 @@ function mensajeAgregarOtraNovedad() {
     '➕ *¿Registrar otra novedad?*\n\n' +
     '1️⃣ Sí\n' +
     '2️⃣ No, continuar' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
@@ -163,7 +163,7 @@ function mensajeObservaciones() {
   return (
     '💬 *Observación final*\n\n' +
     'Escribe una observación o *no* si no aplica.' +
-    '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
   );
 }
 
