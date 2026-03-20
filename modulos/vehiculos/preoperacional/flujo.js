@@ -289,7 +289,10 @@ function registrarKilometrajeConfirmado(sesion, km, origen) {
 
 function evaluarKilometrajeContraHistorico(sesion, km) {
   var ultimo = sesion.vehiculo && sesion.vehiculo.kilometraje;
-  if (!ultimo && ultimo !== 0) {
+
+  // Sin referencia real: null, undefined, o 0 (vehiculo recien cargado sin preoperacional previo).
+  // En ese caso no hay con que comparar — se acepta cualquier km positivo.
+  if (!ultimo) {
     return { ok: true, tipo: 'sin_historico', mensaje: '', mensajeCorto: '' };
   }
 
@@ -297,8 +300,8 @@ function evaluarKilometrajeContraHistorico(sesion, km) {
     return {
       ok: false,
       tipo: 'menor',
-      mensaje: '❌ Kilometraje invalido.\nUltimo registrado: *' + ultimo + ' km*\nDebe ser igual o mayor.',
-      mensajeCorto: 'El valor detectado quedo por debajo del ultimo registro.'
+      mensaje: '❌ Kilometraje inválido.\nÚltimo registrado: *' + ultimo + ' km*\nDebe ser igual o mayor.',
+      mensajeCorto: 'El valor detectado quedó por debajo del último registro.'
     };
   }
 
@@ -306,7 +309,7 @@ function evaluarKilometrajeContraHistorico(sesion, km) {
     return {
       ok: false,
       tipo: 'alto',
-      mensaje: '⚠️ Kilometraje fuera del rango automatico.\nUltimo registrado: *' + ultimo + ' km*\nSalto detectado: *' + (km - ultimo) + ' km*',
+      mensaje: '⚠️ Kilometraje fuera del rango automático.\nÚltimo registrado: *' + ultimo + ' km*\nSalto detectado: *' + (km - ultimo) + ' km*',
       mensajeCorto: 'El salto detectado fue de *' + (km - ultimo) + ' km*.'
     };
   }
@@ -387,7 +390,7 @@ function manejarAtras(res, sesion) {
     return preop.responderTwiml(res, '◀️ 💬 Observacion final?\nSi no hay, escribe *no*.');
   }
 
-  return preop.responderTwiml(res, 'No se puede retroceder desde aqui.\nEscribe *CANCELAR* para salir.');
+  return preop.responderTwiml(res, 'No hay paso anterior.\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_');
 }
 
 
@@ -416,24 +419,26 @@ async function manejarPreoperacional(req, res) {
       var msgUpper = mensaje.toUpperCase();
       var msgLower = mensaje.toLowerCase();
 
-      if (msgUpper === 'CANCELAR') {
+      if (mensaje === '9' || msgUpper === 'CANCELAR') {
         sesiones.eliminarSesion(telefono);
-        return preop.responderTwiml(res, '❌ Preoperacional cancelado.\nEscribe cualquier mensaje para empezar de nuevo.');
+        sesiones.guardarCambios();
+        return responderMenuDesdeModulo(res);
       }
 
       if (msgUpper === 'REINICIAR') {
         sesiones.eliminarSesion(telefono);
-        sesion = await sesiones.obtenerSesion(telefono);
-        sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
-        return preop.responderTwiml(res, mensajes.mensajeInicio());
+        sesiones.guardarCambios();
+        return responderMenuDesdeModulo(res);
       }
 
-      if (msgUpper === 'ATRAS') {
+      if (mensaje === '0' || msgUpper === 'ATRAS') {
         return manejarAtras(res, sesion);
       }
 
-      if (msgUpper === 'MENU') {
-        return volverAMenuPrincipal(res, telefono);
+      if (msgUpper === 'MENU' || msgUpper === 'INICIO') {
+        sesiones.eliminarSesion(telefono);
+        sesiones.guardarCambios();
+        return responderMenuDesdeModulo(res);
       }
 
       switch (sesion.estado) {
@@ -778,7 +783,7 @@ async function manejarPreoperacional(req, res) {
 
         case 'CONFIRMACION': {
           if (msgUpper !== 'SI') {
-            return preop.responderTwiml(res, 'Escriba *SI* para firmar\no *ATRAS* para corregir\no *CANCELAR* para anular.');
+            return preop.responderTwiml(res, 'Escribe *SI* para firmar\no *0* para corregir\no *9* para salir.');
           }
 
           var guardado = await cierre.guardarPreoperacionalCompleto(sesion, telefono, GRUPOS);
@@ -808,7 +813,7 @@ async function manejarPreoperacional(req, res) {
       // FIX: unificar el manejo de errores del handler principal con el mensaje solicitado.
       console.error('Error handler:', err.message);
       // FIX: responder con instruccion explicita para reiniciar el flujo ante un error inesperado.
-      return preop.responderTwiml(res, 'Ocurrió un error. Escribe REINICIAR para comenzar de nuevo.');
+      return preop.responderTwiml(res, 'Ocurrió un error. Escribe *9* para volver al menú.');
     } finally {
       sesiones.desbloquear(telefono);
       sesiones.guardarCambios();
