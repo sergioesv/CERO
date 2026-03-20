@@ -111,7 +111,7 @@ function validarTipoCombustible(texto) {
   if (!normalizado || TIPOS_COMBUSTIBLE.indexOf(normalizado) === -1) {
     return {
       ok: false,
-      mensaje: '❌ Tipo de combustible inválido.\n\nResponde:\n1️⃣ Diesel\n2️⃣ Gasolina\n3️⃣ Gas\n4️⃣ AdBlue\n5️⃣ Otro'
+      mensaje: '❌ Tipo de combustible inválido.\n\nResponde con:\n1️⃣ Diésel\n2️⃣ Gasolina\n3️⃣ Gas\n4️⃣ AdBlue\n5️⃣ Otro\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
     };
   }
 
