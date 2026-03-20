@@ -332,12 +332,13 @@ async function manejarPosoperacional(req, res) {
 
     var msgUpper = mensaje.toUpperCase();
 
-    if (msgUpper === 'CANCELAR') {
+    if (mensaje === '9' || msgUpper === 'CANCELAR' || msgUpper === 'MENU' || msgUpper === 'INICIO') {
       sesiones.eliminarSesion(telefono);
-      return validaciones.responderTwiml(res, '❌ Posoperacional cancelado.\nEscribe MENU para volver al inicio.');
+      sesiones.guardarCambios();
+      return responderMenuDesdeModulo(res);
     }
 
-    if (msgUpper === 'ATRAS') {
+    if (mensaje === '0' || msgUpper === 'ATRAS') {
       return await manejarAtras(res, sesion);
     }
 
@@ -401,7 +402,7 @@ async function manejarPosoperacional(req, res) {
     }
   } catch (error) {
     console.error('Error en flujo posoperacional:', error.message || error);
-    return validaciones.responderTwiml(res, '❌ Ocurrió un error. Escribe MENU para reiniciar.');
+    return validaciones.responderTwiml(res, '❌ Ocurrió un error.\n\nEscribe *9* para volver al menú.');
   } finally {
     sesiones.desbloquear(telefono);
     sesiones.guardarCambios();
