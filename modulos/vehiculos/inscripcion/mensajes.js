@@ -2,7 +2,7 @@
 // Textos de UX para el flujo de inscripción de conductores nuevos.
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto
-//   Navegación → ◀️ *ATRAS*  •  ✖️ *CANCELAR*
+//   Navegación → Escribe ATRAS o CANCELAR (texto, no botones)
 //   Confirmar  → Escribe *SI* para registrarte
 //   Separadores → solo en resúmenes
 //   Tono       → informal, español correcto
@@ -11,7 +11,7 @@
 
 // ── Pie de navegación estándar ────────────────────────────────────────────────
 
-var PIE_NAV = '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
+var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 
 // ============================================================================
 // BIENVENIDA / INICIO
@@ -85,7 +85,7 @@ function mensajeConfirmacion(datos) {
     '🚗 Licencia: *' + datos.licencia + '*\n' +
     '💼 Cargo: *' + datos.cargo + '*\n\n' +
     '✍️ Escribe *SI* para registrarte\n' +
-    '◀️ *ATRAS* para corregir  •  ✖️ *CANCELAR* para anular'
+    '0️⃣ _Atrás_ para corregir  •  9️⃣ _Menú principal_'
   );
 }
 
