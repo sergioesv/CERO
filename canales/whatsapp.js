@@ -1,35 +1,38 @@
 // canales/whatsapp.js
 // Enrutador principal para el canal de WhatsApp con menú de selección
+// v2 — incluye detección automática de conductor no registrado y flujo de inscripción
 
-const { obtenerSesion, eliminarSesion } = require('../servicios/sesiones');
+'use strict';
+
+const { obtenerSesion, eliminarSesion, guardarCambios } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
 const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
-const flujoTanqueo = require('../modulos/vehiculos/tanqueo/flujo');
+const flujoTanqueo        = require('../modulos/vehiculos/tanqueo/flujo');
+const flujoInscripcion    = require('../modulos/vehiculos/inscripcion/flujo');
+const vehiculosData       = require('../data/vehiculos');
 
-const MENU_ESTADOS = {
-  INICIO: 'MENU_INICIO',
-  SELECCION: 'MENU_SELECCION'
-};
+// ============================================================================
+// WEBHOOK PRINCIPAL
+// ============================================================================
 
 async function webhookWhatsApp(req, res) {
   const telefono = req.body.From;
-  const mensaje = req.body.Body?.trim() || '';
+  const mensaje  = (req.body.Body || '').trim();
+  const msgUpper = mensaje.toUpperCase();
 
   try {
     let sesion = await obtenerSesion(telefono);
 
-    if (mensaje.toUpperCase() === 'MENU' || mensaje.toUpperCase() === 'INICIO') {
+    // ── Comando global MENU / INICIO: reinicia cualquier flujo activo ─────
+    if (msgUpper === 'MENU' || msgUpper === 'INICIO') {
       await eliminarSesion(telefono);
-      sesion = {
-        telefono,
-        estado: MENU_ESTADOS.SELECCION,
-        tipo: null
-      };
+      guardarCambios();
       return responderMenu(res);
     }
 
-    if (!sesion.tipo) {
-      return await manejarMenuPrincipal(req, res, sesion, mensaje);
+    // ── Enrutar según el tipo de flujo activo en sesión ───────────────────
+    if (sesion.tipo === 'inscripcion') {
+      return await flujoInscripcion.manejarInscripcion(req, res);
     }
 
     if (sesion.tipo === 'preoperacional') {
@@ -44,49 +47,78 @@ async function webhookWhatsApp(req, res) {
       return await flujoTanqueo.manejarTanqueo(req, res);
     }
 
-    await eliminarSesion(telefono);
-    return responderMenu(res);
+    // ── Sin tipo activo → menú principal con verificación de registro ─────
+    return await manejarMenuPrincipal(req, res, sesion, mensaje);
+
   } catch (error) {
     console.error('❌ Error en webhook WhatsApp:', error);
     return responderError(res);
   }
 }
 
-async function manejarMenuPrincipal(req, res, sesion, mensaje) {
-  const opcion = mensaje.trim();
+// ============================================================================
+// MENÚ PRINCIPAL CON VERIFICACIÓN DE REGISTRO
+// ============================================================================
 
+/**
+ * Antes de procesar cualquier opción verifica que el número esté registrado
+ * como conductor activo. Si no lo está, inicia el flujo de inscripción.
+ */
+async function manejarMenuPrincipal(req, res, sesion, mensaje) {
+  const telefono = req.body.From;
+  const opcion   = mensaje.trim();
+
+  // Verificar si el operario está registrado en el sistema
+  const conductor = await vehiculosData.buscarConductorPorTelefono(telefono);
+
+  if (!conductor) {
+    // Número desconocido — iniciar inscripción automáticamente
+    console.log('[WHATSAPP] Número no registrado, iniciando inscripción:', telefono);
+    sesion.tipo        = 'inscripcion';
+    sesion.inscripcion = null; // flujoInscripcion lo inicializa en el primer mensaje
+    guardarCambios();
+    return await flujoInscripcion.manejarInscripcion(req, res);
+  }
+
+  // Conductor registrado — procesar selección del menú
   if (opcion === '1') {
-    sesion.tipo = 'preoperacional';
+    sesion.tipo   = 'preoperacional';
     sesion.estado = 'INICIO';
+    guardarCambios();
     return await flujoPreoperacional.manejarPreoperacional(req, res);
   }
 
   if (opcion === '2') {
-    sesion.tipo = 'posoperacional';
+    sesion.tipo   = 'posoperacional';
     sesion.estado = 'POSOP_INICIO';
+    guardarCambios();
     return await flujoPosoperacional.manejarPosoperacional(req, res);
   }
 
   if (opcion === '3') {
-    sesion.tipo = 'tanqueo';
+    sesion.tipo   = 'tanqueo';
     sesion.estado = 'TANQUEO_INICIO';
+    guardarCambios();
     return await flujoTanqueo.manejarTanqueo(req, res);
   }
 
+  // Opción no reconocida — mostrar menú
   return responderMenu(res);
 }
 
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 function responderMenu(res) {
-  const menu = `🚗 *SISTEMA CERO*
-cero papel, cero accidentes
-
-Selecciona una opción:
-
-1️⃣ Preoperacional (inicio de jornada)
-2️⃣ Posoperacional (cierre de jornada)
-3️⃣ Combustible / tanqueo
-
-Escribe el número:`;
+  const menu =
+    '🚗 *SISTEMA CERO*\n' +
+    '_cero papel, cero accidentes_\n\n' +
+    'Selecciona una opción:\n\n' +
+    '1️⃣ Preoperacional (inicio de jornada)\n' +
+    '2️⃣ Posoperacional (cierre de jornada)\n' +
+    '3️⃣ Combustible / tanqueo\n\n' +
+    'Escribe el número:';
 
   return responderTwiml(res, menu);
 }
@@ -101,16 +133,14 @@ function responderError(res) {
 
 function responderTwiml(res, mensaje) {
   res.set('Content-Type', 'text/xml');
-  res.send(`
-    <?xml version="1.0" encoding="UTF-8"?>
-    <Response>
-      <Message>${escaparXml(mensaje)}</Message>
-    </Response>
-  `);
+  res.send(
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Response><Message>' + escaparXml(mensaje) + '</Message></Response>'
+  );
 }
 
 function escaparXml(texto) {
-  return texto
+  return String(texto || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -121,7 +151,6 @@ function escaparXml(texto) {
 function registrarCanalWhatsapp(app) {
   app.get('/', responderRaiz);
   app.post('/webhook', webhookWhatsApp);
-
   console.log('✓ Canal WhatsApp registrado con menú principal');
 }
 
