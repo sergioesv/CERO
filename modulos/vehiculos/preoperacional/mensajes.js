@@ -2,7 +2,7 @@
 // Textos de UX del flujo preoperacional.
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto
-//   Navegación → ◀️ *ATRAS*  •  ✖️ *CANCELAR*
+//   Navegación → Escribe ATRAS o CANCELAR (texto, no botones)
 //   Confirmar  → Escribe *SI* para firmar
 //   Separadores → solo en resúmenes/confirmación final
 //   Tono       → informal, español correcto
@@ -15,9 +15,9 @@ var PASOS_INICIALES = preop.PASOS_INICIALES;
 
 // ── Pie de navegación estándar ────────────────────────────────────────────────
 
-var PIE_MENU    = '\n\n9️⃣ *Menú principal*';
-var PIE_NAV     = '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*';
-var PIE_NAV_MAS = '\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*  •  9️⃣ *Menú principal*';
+var PIE_MENU    = '\n\n9️⃣ _Menú principal_';
+var PIE_NAV     = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+var PIE_NAV_MAS = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 
 // ============================================================================
 // INICIO DEL FLUJO
@@ -180,8 +180,7 @@ function mensajeConfirmacionFinal(sesion) {
 
   msg +=
     '\n✍️ Escribe *SI* para firmar\n' +
-    '◀️ *ATRAS* para corregir\n' +
-    '✖️ *CANCELAR* para anular';
+    '0️⃣ _Atrás_ para corregir  •  9️⃣ _Menú principal_';
 
   return msg;
 }
