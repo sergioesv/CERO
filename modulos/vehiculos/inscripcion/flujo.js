@@ -100,15 +100,15 @@ async function manejarInscripcion(req, res) {
 
   // ── CANCELAR: borra inscripción y vuelve al inicio ────────────────────────
   // Nota: MENU e INICIO son interceptados por whatsapp.js antes de llegar aquí.
-  if (msgUpper === 'CANCELAR') {
+  if (mensaje === '9' || msgUpper === 'CANCELAR') {
     estadoMod.limpiarInscripcion(sesion);
     sesion.tipo = null;
     sesiones.guardarCambios();
-    return responder(res, mensajes.mensajeCancelado());
+    return responderMenuDesdeModulo(res);
   }
 
   // ── REINICIAR: reinicia desde el primer paso ──────────────────────────────
-  if (msgUpper === 'REINICIAR') {
+  if (mensaje === '0' || msgUpper === 'REINICIAR') {
     estadoMod.iniciarInscripcion(sesion);
     sesiones.guardarCambios();
     return responder(res, mensajes.mensajeBienvenida());
@@ -203,7 +203,7 @@ async function manejarInscripcion(req, res) {
           return responder(res,
             '⚠️ Ese número de cédula ya está registrado en el sistema.\n\n' +
             'Si crees que es un error, contacta al supervisor.\n\n' +
-            'Escribe *MENU* para continuar.'
+            'Escribe *9* para volver al menú.'
           );
         }
 
