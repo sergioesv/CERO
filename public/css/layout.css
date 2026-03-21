@@ -99,7 +99,7 @@
 .sidebar-item-badge.danger { background: var(--danger-bg); color: var(--danger-text); }
 .sidebar-divider { height: 1px; background: var(--border-secondary); margin: var(--spacing-md) 0; }
 
-.main { grid-area: main; background: var(--bg-primary); overflow-y: auto; }
+.main { grid-area: main; background: var(--bg-primary); overflow: auto; }
 .main-header {
   display: flex;
   align-items: center;
