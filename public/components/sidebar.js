@@ -3,14 +3,6 @@ const Sidebar = {
     vehiculos: {
       sections: [
         {
-          title: 'Vehículos',
-          items: [
-            { id: 'flota', label: 'Flota', route: 'vehiculos/flota' },
-            { id: 'conductores', label: 'Conductores', route: 'vehiculos/conductores' },
-            { id: 'alertas', label: 'Alertas', route: 'vehiculos/alertas', badge: { type: 'danger', count: 0 } }
-          ]
-        },
-        {
           title: 'Operación',
           items: [
             { id: 'preoperacionales', label: 'Preoperacionales', route: 'vehiculos/preoperacionales' },
@@ -20,6 +12,14 @@ const Sidebar = {
         }
       ]
     },
+            {
+          title: 'Vehículos',
+          items: [
+            { id: 'flota', label: 'Flota', route: 'vehiculos/flota' },
+            { id: 'conductores', label: 'Conductores', route: 'vehiculos/conductores' },
+            { id: 'alertas', label: 'Alertas', route: 'vehiculos/alertas', badge: { type: 'danger', count: 0 } }
+          ]
+        },
     seguridad: {
       sections: [
         {
