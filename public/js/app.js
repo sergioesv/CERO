@@ -1,4 +1,3 @@
-```javascript
 const App = {
   async init() {
     console.log('🚀 CERO Panel — Iniciando...');
@@ -65,4 +64,3 @@ const App = {
 
 document.addEventListener('DOMContentLoaded', () => App.init());
 window.App = App;
-```
