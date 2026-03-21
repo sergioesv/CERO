@@ -1,0 +1,55 @@
+```css
+[data-theme="dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #3c3c3c;
+  --bg-active: #4a4a4a;
+  
+  --text-primary: #e4e4e4;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #6e6e6e;
+  --text-disabled: #4a4a4a;
+  
+  --border-primary: #3c3c3c;
+  --border-secondary: #2d2d30;
+  --border-focus: #4fc3f7;
+  
+  --success-bg: #1b3d2f;
+  --success-text: #81c995;
+  --success-border: #34a853;
+  
+  --warning-bg: #3d3015;
+  --warning-text: #fdd663;
+  --warning-border: #f9ab00;
+  
+  --danger-bg: #3d1f1f;
+  --danger-text: #f28b82;
+  --danger-border: #ea4335;
+  
+  --info-bg: #1a3a5c;
+  --info-text: #8ab4f8;
+  --info-border: #4285f4;
+  
+  --header-bg: #252526;
+  --header-border: #3c3c3c;
+  
+  --sidebar-bg: #252526;
+  --sidebar-item-hover: #3c3c3c;
+  --sidebar-item-active: #1a3a5c;
+  --sidebar-item-active-text: #8ab4f8;
+  
+  --table-header-bg: #2d2d30;
+  --table-row-hover: #3c3c3c;
+  
+  --input-bg: #2d2d30;
+  --input-border: #3c3c3c;
+  --input-focus-border: #4fc3f7;
+  
+  --modal-backdrop: rgba(0,0,0,0.7);
+  --modal-bg: #252526;
+  
+  --toast-bg: #e4e4e4;
+  --toast-text: #1e1e1e;
+}
+```
