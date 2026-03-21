@@ -23,6 +23,38 @@ const LAYOUT = {
   }
 };
 
+// ───────────────────────────────────────────────────────────
+// Obtiene la fecha y hora actual en Colombia (UTC-5)
+// Retorna un objeto Date ajustado a zona horaria colombiana
+// ───────────────────────────────────────────────────────────
+function obtenerFechaColombia() {
+  var ahora = new Date();
+  return new Date(ahora.getTime() - (5 * 60 * 60 * 1000));
+}
+
+// ───────────────────────────────────────────────────────────
+// Calcula los días restantes entre hoy (Colombia) y una fecha
+// Positivo = faltan días, Negativo = ya venció, 0 = vence hoy
+// ───────────────────────────────────────────────────────────
+function calcularDiasRestantes(fechaVencimiento) {
+  if (!fechaVencimiento) return null;
+  var hoy = obtenerFechaColombia();
+  hoy.setHours(0, 0, 0, 0);
+  var fecha = new Date(fechaVencimiento + 'T00:00:00');
+  var diferencia = fecha.getTime() - hoy.getTime();
+  return Math.floor(diferencia / (1000 * 60 * 60 * 24));
+}
+
+// ───────────────────────────────────────────────────────────
+// Formatea una fecha ISO a dd/mm/aaaa
+// ───────────────────────────────────────────────────────────
+function formatearFechaCorta(fechaISO) {
+  if (!fechaISO) return 'Sin fecha';
+  var partes = fechaISO.split('-');
+  if (partes.length !== 3) return fechaISO;
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
 function descargarImagen(url) {
   return new Promise(function(resolve, reject) {
     var isTwilio = url.indexOf('twilio.com') >= 0 || url.indexOf('api.twilio.com') >= 0;
@@ -100,7 +132,7 @@ async function generarPDF(sesion) {
   return new Promise(function(resolve, reject) {
     try {
       // ===== CONSTANTES =====
-      var NEGRO      = LAYOUT.colores.negro; // FIX: usar color centralizado desde LAYOUT
+      var NEGRO      = LAYOUT.colores.negro;
       var GRIS_OSC   = '#333333';
       var GRIS       = '#666666';
       var GRIS_CLR   = '#999999';
@@ -110,17 +142,17 @@ async function generarPDF(sesion) {
       var ROJO       = '#C62828';
       var ROJO_CLR   = '#FFEBEE';
       var AMARILLO   = '#F9A825';
+      var NARANJA    = '#E65100';
       var PAGE_W     = 612;
       var PAGE_H     = 792;
-      var MARGIN     = LAYOUT.margin; // FIX: reemplazar margen hardcodeado por referencia a LAYOUT
-      var CONTENT_W  = LAYOUT.anchoUtil; // FIX: reemplazar ancho util hardcodeado por referencia a LAYOUT
-      var FOOTER_Y   = PAGE_H - 30;           // 762 — posición fija del pie
+      var MARGIN     = LAYOUT.margin;
+      var CONTENT_W  = LAYOUT.anchoUtil;
+      var FOOTER_Y   = PAGE_H - 30;
 
-      var ahoraUTC = sesion.fecha ? new Date(sesion.fecha) : new Date();
-      var ahora = new Date(ahoraUTC.getTime() - (5 * 60 * 60 * 1000)); // Colombia UTC-5
+      // FIX: usar fecha Colombia centralizada en todo el PDF
+      var ahora = obtenerFechaColombia();
       var fecha = ahora.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      // autoFirstPage: false — controlamos TODAS las páginas manualmente
       var doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
       var chunks = [];
       doc.on('data', function(c) { chunks.push(c); });
@@ -131,13 +163,10 @@ async function generarPDF(sesion) {
 
       // Dibuja header/footer en la página actual sin mover el cursor de contenido
       function decorarPagina(esPrimera) {
-        // Guardar posición actual del cursor
         var savedX = doc.x;
         var savedY = doc.y;
 
-        // Sin barra superior — causa conflicto con márgenes PDFKit
-
-        // Footer (coordenada absoluta fija, no mueve flujo de texto)
+        // Footer
         doc.fontSize(6).font('Helvetica').fill(GRIS_CLR)
           .text(
             'Pag. ' + numPagina + '  |  CERO  |  Diseñado por Sergio Andres Estrada Velez  |  v1.0',
@@ -150,13 +179,12 @@ async function generarPDF(sesion) {
             doc.image(lb, MARGIN, 8, { width: 24, height: 22 });
           } catch(e) {}
           doc.fill(NEGRO).fontSize(LAYOUT.fuentePie).font('Helvetica-Bold')
-            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false }); // FIX: usar tamaño de fuente desde LAYOUT
+            .text('EDEMSA | CERO SYSTEM  —  Inspeccion Preoperacional', 75, 11, { lineBreak: false });
           doc.fill(GRIS_CLR).fontSize(6).font('Helvetica')
             .text((sesion.placa || '') + '  |  ' + fecha, 75, 21, { lineBreak: false });
           doc.moveTo(MARGIN, 36).lineTo(PAGE_W - MARGIN, 36).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
         }
 
-        // Restaurar posición del cursor
         doc.x = savedX;
         doc.y = savedY;
       }
@@ -191,15 +219,15 @@ async function generarPDF(sesion) {
         doc.image(logoBuffer, MARGIN, 12, { width: 50, height: 45 });
       } catch (e) {}
 
-      doc.fill(NEGRO).fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold').text('EDEMSA | CERO SYSTEM', 105, 18); // FIX: usar tamaño base desde LAYOUT
-      doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica').text('Inspeccion Preoperacional de Vehiculo', 105, 30); // FIX: usar tamaño de pie desde LAYOUT
-      doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica') // FIX: usar tamaño de pie desde LAYOUT
+      doc.fill(NEGRO).fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold').text('EDEMSA | CERO SYSTEM', 105, 18);
+      doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica').text('Inspeccion Preoperacional de Vehiculo', 105, 30);
+      doc.fill(GRIS_CLR).fontSize(LAYOUT.fuentePie).font('Helvetica')
         .text('COD: I-GL-001-F04 V05', 420, 18, { align: 'right', width: 147 });
       doc.text('RES: 40595 DE 2022 (PESV)', 420, 30, { align: 'right', width: 147 });
       doc.moveTo(MARGIN, 62).lineTo(PAGE_W - MARGIN, 62).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
 
       // ===== HERO VEHÍCULO =====
-      y = LAYOUT.headerAlto; // FIX: reemplazar alto de header hardcodeado por referencia a LAYOUT
+      y = LAYOUT.headerAlto;
       var vehiculo = sesion.vehiculo || {};
       var marcaModelo = ((vehiculo.marca || '') + ' ' + (vehiculo.modelo || '')).trim();
 
@@ -210,7 +238,7 @@ async function generarPDF(sesion) {
       doc.fill(NEGRO).fontSize(28).font('Helvetica-Bold')
         .text(sesion.placa || '', MARGIN, y);
 
-      // Año a la derecha (sin tipo)
+      // Año a la derecha
       doc.fill(GRIS).fontSize(8).font('Helvetica')
         .text('Año ' + (vehiculo.anio || 'N/R'), 420, 80, { align: 'right', width: 147 });
 
@@ -238,9 +266,85 @@ async function generarPDF(sesion) {
         var cx = MARGIN + ci * (cardW + 10);
         doc.rect(cx, y, cardW, 35).fill(GRIS_FONDO);
         doc.fill(GRIS_CLR).fontSize(6).font('Helvetica-Bold').text(cards[ci].label, cx + 8, y + 6, { width: cardW - 16 });
-        doc.fill(NEGRO).fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold').text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 }); // FIX: usar tamaño base desde LAYOUT
+        doc.fill(NEGRO).fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold').text(cards[ci].value, cx + 8, y + 18, { width: cardW - 16 });
       }
       y += 48;
+
+      // ═══════════════════════════════════════════════════════
+      // SECCIÓN DOCUMENTOS VIGENTES — Requisito Res. 40595/2022
+      // Muestra estado de SOAT, Tecnomecánica y Licencia
+      // al momento exacto de la inspección (inmutable para auditoría)
+      // ═══════════════════════════════════════════════════════
+      y = checkY(y, 80);
+      doc.rect(MARGIN, y, CONTENT_W, 16).fill(GRIS_FONDO);
+      doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text('DOCUMENTOS DEL VEHICULO Y CONDUCTOR', MARGIN + 10, y + 4);
+      y += 22;
+
+      // Preparar datos de documentos
+      var documentos = [
+        {
+          nombre: 'SOAT',
+          fecha: vehiculo.soat_vencimiento || null,
+          obligatorio: true
+        },
+        {
+          nombre: 'Tecnomecanica',
+          fecha: vehiculo.tecnomecanica_vencimiento || null,
+          obligatorio: true
+        },
+        {
+          nombre: 'Licencia conduccion',
+          fecha: conductor.licencia_vencimiento || null,
+          obligatorio: true
+        }
+      ];
+
+      for (var di = 0; di < documentos.length; di++) {
+        y = checkY(y, 18);
+        var docInfo = documentos[di];
+        var diasRest = calcularDiasRestantes(docInfo.fecha);
+        var estadoDocTexto = '';
+        var estadoDocColor = VERDE;
+
+        if (!docInfo.fecha) {
+          // Sin fecha registrada
+          estadoDocTexto = 'Sin fecha registrada';
+          estadoDocColor = GRIS_CLR;
+        } else if (diasRest <= 0) {
+          // Vencido
+          estadoDocTexto = 'VENCIDO — ' + formatearFechaCorta(docInfo.fecha);
+          estadoDocColor = ROJO;
+        } else if (diasRest <= 7) {
+          // Crítico — 7 días o menos
+          estadoDocTexto = 'Vence en ' + diasRest + ' dia(s) — ' + formatearFechaCorta(docInfo.fecha);
+          estadoDocColor = ROJO;
+        } else if (diasRest <= 15) {
+          // Urgente — 15 días o menos
+          estadoDocTexto = 'Vence en ' + diasRest + ' dia(s) — ' + formatearFechaCorta(docInfo.fecha);
+          estadoDocColor = NARANJA;
+        } else if (diasRest <= 30) {
+          // Próximo — 30 días o menos
+          estadoDocTexto = 'Vence en ' + diasRest + ' dia(s) — ' + formatearFechaCorta(docInfo.fecha);
+          estadoDocColor = AMARILLO;
+        } else {
+          // Vigente
+          estadoDocTexto = 'Vigente — ' + formatearFechaCorta(docInfo.fecha);
+          estadoDocColor = VERDE;
+        }
+
+        // Nombre del documento a la izquierda
+        doc.fill(NEGRO).fontSize(8).font('Helvetica').text(docInfo.nombre, MARGIN + 10, y);
+
+        // Estado a la derecha con color
+        doc.fill(estadoDocColor).fontSize(8).font('Helvetica-Bold')
+          .text(estadoDocTexto, 280, y, { width: 260, align: 'right' });
+
+        y += 12;
+        doc.moveTo(MARGIN + 10, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.3).stroke();
+        y += 8;
+      }
+
+      y += 5;
 
       // ===== NOVEDADES =====
       var novedades = sesion.novedades || [];
@@ -330,7 +434,7 @@ async function generarPDF(sesion) {
         y = checkY(y, 40);
 
         doc.rect(MARGIN, y, CONTENT_W, 18).fill(NEGRO);
-        doc.fill('#ffffff').fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold') // FIX: usar tamaño base desde LAYOUT
+        doc.fill('#ffffff').fontSize(LAYOUT.fuenteBase).font('Helvetica-Bold')
           .text('EVIDENCIA FOTOGRAFICA', MARGIN + 10, y + 4);
         y += 30;
 
@@ -352,7 +456,7 @@ async function generarPDF(sesion) {
           }
 
           doc.rect(MARGIN, y, 86, 14).fill(labelColor);
-          doc.fill('#ffffff').fontSize(LAYOUT.fuentePie).font('Helvetica-Bold').text(fotoLabel, MARGIN + 6, y + 3); // FIX: usar tamaño de pie desde LAYOUT
+          doc.fill('#ffffff').fontSize(LAYOUT.fuentePie).font('Helvetica-Bold').text(fotoLabel, MARGIN + 6, y + 3);
           if (tituloFoto) {
             doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold')
               .text(tituloFoto, MARGIN + 96, y + 2, { width: 300 });
@@ -384,11 +488,11 @@ async function generarPDF(sesion) {
       doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 10;
 
-      doc.fill(NEGRO).fontSize(LAYOUT.fuentePie).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', MARGIN, y); // FIX: usar tamaño de pie desde LAYOUT
+      doc.fill(NEGRO).fontSize(LAYOUT.fuentePie).font('Helvetica-Bold').text('VERIFICACION Y TRAZABILIDAD LEGAL', MARGIN, y);
       y += 14;
 
       var telFirma = sesion.telefono ? sesion.telefono.replace('whatsapp:', '') : (conductor.telefono || 'N/R');
-      doc.fill(GRIS_OSC).fontSize(LAYOUT.fuentePie).font('Helvetica') // FIX: usar tamaño de pie desde LAYOUT
+      doc.fill(GRIS_OSC).fontSize(LAYOUT.fuentePie).font('Helvetica')
         .text('Firma: Firmado digitalmente por ' + nombreConductor + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
       y += 12;
       var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
@@ -400,7 +504,7 @@ async function generarPDF(sesion) {
       doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(GRIS_LIN).lineWidth(0.5).stroke();
       y += 10;
       doc.rect(MARGIN, y, CONTENT_W, 35).fill(NEGRO);
-      doc.fill('#ffffff').fontSize(LAYOUT.fuentePie).font('Helvetica') // FIX: usar tamaño de pie desde LAYOUT
+      doc.fill('#ffffff').fontSize(LAYOUT.fuentePie).font('Helvetica')
         .text('Delega el papeleo al sistema. Asegura el cumplimiento PESV, registra novedades con evidencia fotografica', MARGIN + 10, y + 6, { width: 390 });
       doc.text('y valida cada paso legalmente con firmas digitales.', MARGIN + 10, y + 17, { width: 390 });
       doc.fill('#ffffff').fontSize(12).font('Helvetica-Bold').text('CERO', 490, y + 10);
@@ -420,7 +524,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     var nombreArchivo = 'preop_' + sesion.placa + '_' + Date.now() + '.pdf';
 
     var uploadResult = await config.supabase.storage
-.from(config.STORAGE_BUCKET_PREOPERACIONALES)
+      .from(config.STORAGE_BUCKET_PREOPERACIONALES)
       .upload(nombreArchivo, pdfBuffer, { contentType: 'application/pdf', upsert: false });
 
     if (uploadResult.error) {
@@ -429,7 +533,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     }
 
     var signedUrlResult = await config.supabase.storage
-.from(config.STORAGE_BUCKET_PREOPERACIONALES)
+      .from(config.STORAGE_BUCKET_PREOPERACIONALES)
       .createSignedUrl(nombreArchivo, 60 * 60 * 24 * 7);
 
     if (signedUrlResult.error || !signedUrlResult.data || !signedUrlResult.data.signedUrl) {
@@ -440,7 +544,11 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     var pdfUrl = signedUrlResult.data.signedUrl;
     console.log('PDF subido:', nombreArchivo);
 
-        await config.supabase.from(config.TABLES.preoperacionales).update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
+    await config.supabase.from(config.TABLES.preoperacionales).update({ pdf_url: pdfUrl }).eq('id', preoperacionalId);
+
+    // FIX: usar fecha Colombia para el mensaje de envío
+    var ahoraCo = obtenerFechaColombia();
+    var fechaEnvio = ahoraCo.toLocaleDateString('es-CO');
 
     var ultimoErrorEnvio = null;
     for (var intento = 1; intento <= 2; intento++) {
@@ -448,7 +556,7 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
         await config.twilioClient.messages.create({
           from: config.TWILIO_WHATSAPP_NUMBER,
           to: telefono,
-          body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + ahora_co() + '\n\nDescarga aqui:\n' + pdfUrl
+          body: '📄 *PDF Preoperacional*\n' + (sesion.placa || '') + ' | ' + fechaEnvio + '\n\nDescarga aqui:\n' + pdfUrl
         });
         console.log('PDF enviado a ' + telefono);
         return pdfUrl;
@@ -467,12 +575,6 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
     console.error('Error en subirYEnviarPDF:', error);
     return null;
   }
-}
-
-function ahora_co() {
-  var u = new Date();
-  var c = new Date(u.getTime() - 5 * 60 * 60 * 1000);
-  return c.toLocaleDateString('es-CO');
 }
 
 module.exports = { generarPDF, subirYEnviarPDF };
