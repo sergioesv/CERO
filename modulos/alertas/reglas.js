@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // modulos/alertas/reglas.js
-// Define umbrales de alerta (30/15/7/0 días) y lógica de bloqueo
+// Define umbrales de alerta (30/15/7/0 días), lógica de bloqueo
+// y clasificación de novedades críticas de inspección
 // CERO — Módulo 1.4 Alertas de documentos
 // ═══════════════════════════════════════════════════════════
 
@@ -83,6 +84,22 @@ function debeBloquear(tipoDocumento, diasRestantes) {
 }
 
 // ───────────────────────────────────────────────────────────
+// Filtra novedades críticas de una inspección preoperacional
+// Recibe: array de novedades de sesión
+// Retorna: array con solo las que tienen critico = true
+// Usado por cierre.js para notificar al supervisor
+// ───────────────────────────────────────────────────────────
+function obtenerNovedadesCriticas(novedades) {
+  if (!Array.isArray(novedades) || novedades.length === 0) {
+    return [];
+  }
+
+  return novedades.filter(function(n) {
+    return n && n.critico === true;
+  });
+}
+
+// ───────────────────────────────────────────────────────────
 // Formatea la fecha para mostrar en mensajes
 // ───────────────────────────────────────────────────────────
 function formatearFecha(fechaISO) {
@@ -147,6 +164,7 @@ module.exports = {
   UMBRALES,
   clasificarAlerta,
   debeBloquear,
+  obtenerNovedadesCriticas,
   formatearFecha,
   generarMensajeVehiculo,
   generarMensajeLicencia
