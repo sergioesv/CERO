@@ -1,4 +1,3 @@
-```javascript
 const API = {
   baseURL: '/api',
   
@@ -64,4 +63,3 @@ const API = {
 };
 
 window.API = API;
-```
