@@ -426,6 +426,7 @@ app.get('/api/preoperacionales', async function (req, res) {
         firma_operario: registro.firma_operario,
         firma_timestamp: registro.firma_timestamp,
         estado: registro.estado
+        pdf_url: registro.pdf_url || null
       };
     });
 
