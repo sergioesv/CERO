@@ -9,17 +9,17 @@ const Sidebar = {
             { id: 'posoperacionales', label: 'Posoperacionales', route: 'vehiculos/posoperacionales' },
             { id: 'tanqueos', label: 'Tanqueos', route: 'vehiculos/tanqueos' }
           ]
-        }
-      ]
-    },
-            {
+        },
+        {
           title: 'Vehículos',
           items: [
             { id: 'flota', label: 'Flota', route: 'vehiculos/flota' },
             { id: 'conductores', label: 'Conductores', route: 'vehiculos/conductores' },
             { id: 'alertas', label: 'Alertas', route: 'vehiculos/alertas', badge: { type: 'danger', count: 0 } }
           ]
-        },
+        }
+      ]
+    },
     seguridad: {
       sections: [
         {
@@ -81,4 +81,3 @@ const Sidebar = {
 };
 
 window.Sidebar = Sidebar;
-
