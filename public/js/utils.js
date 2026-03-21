@@ -1,4 +1,3 @@
-```javascript
 const Utils = {
   formatearFecha(fecha) {
     if (!fecha) return '—';
@@ -56,4 +55,4 @@ const Utils = {
 };
 
 window.Utils = Utils;
-```
+
