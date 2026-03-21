@@ -492,8 +492,9 @@ async function generarPDF(sesion) {
       y += 14;
 
       var telFirma = sesion.telefono ? sesion.telefono.replace('whatsapp:', '') : (conductor.telefono || 'N/R');
+      var cedulaFirma = conductor.cedula ? ' — CC ' + conductor.cedula : '';
       doc.fill(GRIS_OSC).fontSize(LAYOUT.fuentePie).font('Helvetica')
-        .text('Firma: Firmado digitalmente por ' + nombreConductor + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
+        .text('Firma: Firmado digitalmente por ' + nombreConductor + cedulaFirma + ' mediante WhatsApp (' + telFirma + ')', MARGIN, y, { width: 520 });
       y += 12;
       var idTx = 'CERO-' + (sesion.placa || '') + '-' + ahora.toISOString().split('T')[0].replace(/-/g, '');
       doc.text('Timestamp: ' + ahora.toLocaleString('es-CO') + ' | ID Transaccion: ' + idTx, MARGIN, y, { width: 520 });
