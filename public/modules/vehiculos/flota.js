@@ -151,7 +151,7 @@ const VehiculosFlota = {
     }
   },
   
-  async eliminar(placa) {
+async eliminar(placa) {
     const confirmado = await Modal.confirm({
       title: '¿Eliminar vehículo?',
       message: `Se eliminará permanentemente el vehículo ${placa}. Esta acción no se puede deshacer.`,
@@ -168,7 +168,7 @@ const VehiculosFlota = {
         this.renderTabla();
         this.renderStats();
       } catch (error) {
-        Toast.error('Error al eliminar');
+        Toast.error(error.message || 'Error al eliminar');
       }
     }
   },
