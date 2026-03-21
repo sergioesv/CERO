@@ -1,4 +1,3 @@
-```javascript
 const Toast = {
   show(message, duration = 3000) {
     const container = document.getElementById('toast-container');
@@ -20,4 +19,3 @@ const Toast = {
 };
 
 window.Toast = Toast;
-```
