@@ -352,11 +352,11 @@ app.get('/api/preoperacionales', async function (req, res) {
     var hasta = req.query.hasta || null;
     var placa = req.query.placa || null;
     var conductor = req.query.conductor || null;
-    var estado = req.query.estado || null; // sin_novedades, con_novedades, critico
+    var estado = req.query.estado || null;
 
     // Consulta base con join a vehiculos y conductores
-    var query = config.supabase
-      .from(config.TABLES.preoperacionales)
+    var query = supabase
+      .from('preoperacionales')
       .select('*, vehiculos:vehiculo_placa(placa, marca, modelo), conductores:conductor_id(id, nombre, cedula)')
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false });
@@ -374,7 +374,7 @@ app.get('/api/preoperacionales', async function (req, res) {
       query = query.eq('vehiculo_placa', placa.toUpperCase());
     }
 
-    // Filtro por conductor (busca por ID)
+    // Filtro por conductor
     if (conductor) {
       query = query.eq('conductor_id', conductor);
     }
@@ -429,7 +429,7 @@ app.get('/api/preoperacionales', async function (req, res) {
       };
     });
 
-    // Filtro por clasificación de novedades (post-query porque es calculado)
+    // Filtro por clasificación de novedades
     if (estado && estado !== 'todos') {
       data = data.filter(function (r) { return r.clasificacion === estado; });
     }
@@ -462,8 +462,8 @@ app.get('/api/preoperacionales/:id', async function (req, res) {
   try {
     var id = req.params.id;
 
-    var resultado = await config.supabase
-      .from(config.TABLES.preoperacionales)
+    var resultado = await supabase
+      .from('preoperacionales')
       .select('*, vehiculos:vehiculo_placa(placa, marca, modelo, soat_vencimiento, tecnomecanica_vencimiento), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
       .eq('id', id)
       .single();
@@ -473,8 +473,8 @@ app.get('/api/preoperacionales/:id', async function (req, res) {
     }
 
     // Buscar fotos asociadas
-    var fotos = await config.supabase
-      .from(config.TABLES.fotosEvidencia)
+    var fotos = await supabase
+      .from('fotos_evidencia')
       .select('*')
       .eq('preoperacional_id', id);
 
