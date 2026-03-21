@@ -8,7 +8,7 @@ const App = {
   },
   
   registerRoutes() {
-    Router.register('vehiculos/index', () => Router.navigate('vehiculos/flota'));
+    Router.register('vehiculos/index', () => Router.navigate('vehiculos/preoperacionales'));
     Router.register('vehiculos/flota', () => VehiculosFlota.render());
     
     Router.register('vehiculos/conductores', () => {
