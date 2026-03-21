@@ -1,4 +1,3 @@
-```javascript
 const Sidebar = {
   menus: {
     vehiculos: {
@@ -82,5 +81,4 @@ const Sidebar = {
 };
 
 window.Sidebar = Sidebar;
-```
 
