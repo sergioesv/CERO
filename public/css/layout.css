@@ -1,4 +1,3 @@
-```css
 .app {
   min-height: 100vh;
   display: grid;
@@ -136,4 +135,3 @@
   .header-modules { display: none; }
   .main-content { padding: var(--spacing-md); }
 }
-```
