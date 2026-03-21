@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // modulos/alertas/notificador.js
 // Cron job diario — revisa vencimientos y envía alertas por WhatsApp
+// Notificación de novedades críticas de inspección al supervisor
 // CERO — Módulo 1.4 Alertas de documentos
 // ═══════════════════════════════════════════════════════════
 
@@ -170,8 +171,51 @@ function registrarCronAlertas() {
   console.log('✓ Cron de alertas registrado — 6:00 AM Colombia');
 }
 
+// ───────────────────────────────────────────────────────────
+// Notifica novedades críticas de inspección al supervisor
+// Se llama desde cierre.js del preoperacional cuando hay
+// ítems críticos en estado malo (frenos, llantas, etc.)
+// Ejecución asíncrona sin bloquear el cierre de inspección
+// ───────────────────────────────────────────────────────────
+async function notificarCriticas(placa, novedadesCriticas) {
+  if (!Array.isArray(novedadesCriticas) || novedadesCriticas.length === 0) {
+    return;
+  }
+
+  try {
+    // Construir mensaje con las novedades críticas
+    var lineas = novedadesCriticas.map(function(n) {
+      var detalle = n.nota || n.estado || 'Reportado';
+      return '⚠️ ' + (n.grupo || '') + ' — ' + (n.item || '') + ' (' + detalle + ')';
+    });
+
+    var mensaje = '🚨 *NOVEDAD CRITICA EN INSPECCIÓN*\n'
+      + '━━━━━━━━━━━━━━━━━━\n'
+      + '🚗 Vehículo: *' + placa + '*\n\n'
+      + lineas.join('\n') + '\n'
+      + '━━━━━━━━━━━━━━━━━━\n'
+      + '_Requiere atención inmediata_\n'
+      + '_CERO — Sistema de gestión de operaciones_';
+
+    // Enviar al Supervisor y Administrador
+    var supervisores = await alertasData.obtenerContactosPorCargo('Supervisor');
+    var administradores = await alertasData.obtenerContactosPorCargo('Administrador');
+    var contactos = supervisores.concat(administradores);
+
+    for (var i = 0; i < contactos.length; i++) {
+      await enviarWhatsApp(contactos[i].telefono, mensaje);
+    }
+
+    console.log('🚨 Novedades críticas notificadas — ' + placa + ' (' + novedadesCriticas.length + ' ítems)');
+  } catch (error) {
+    // No bloquear el cierre de inspección si falla la notificación
+    console.error('❌ Error notificando novedades críticas:', error.message);
+  }
+}
+
 module.exports = {
   registrarCronAlertas,
   ejecutarAlertasDiarias,
-  enviarWhatsApp
+  enviarWhatsApp,
+  notificarCriticas
 };
