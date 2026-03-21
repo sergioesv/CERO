@@ -145,7 +145,8 @@ app.put('/api/vehiculos/:placa', async function (req, res) {
     if (req.body.tecnomecanica_vencimiento !== undefined) campos.tecnomecanica_vencimiento = req.body.tecnomecanica_vencimiento;
     if (req.body.bloqueado !== undefined) campos.bloqueado = req.body.bloqueado;
     if (req.body.motivo_bloqueo !== undefined) campos.motivo_bloqueo = req.body.motivo_bloqueo;
-    
+    if (req.body.estado !== undefined) campos.estado = req.body.estado;
+
     const { data, error } = await supabase
       .from('vehiculos')
       .update(campos)
