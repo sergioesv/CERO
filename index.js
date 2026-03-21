@@ -203,13 +203,43 @@ app.post('/api/vehiculos/:placa/desbloquear', async function (req, res) {
   }
 });
 
-// DELETE /api/vehiculos/:placa — elimina un vehículo
+// DELETE /api/vehiculos/:placa — elimina un vehículo (solo si no tiene historial)
 app.delete('/api/vehiculos/:placa', async function (req, res) {
   try {
+    const placa = req.params.placa.toUpperCase();
+    
+    // Verificar si tiene preoperacionales
+    const { count: preop } = await supabase
+      .from('preoperacionales')
+      .select('*', { count: 'exact', head: true })
+      .eq('vehiculo_placa', placa);
+    
+    // Verificar si tiene posoperacionales
+    const { count: posop } = await supabase
+      .from('posoperacionales')
+      .select('*', { count: 'exact', head: true })
+      .eq('vehiculo_placa', placa);
+    
+    // Verificar si tiene tanqueos
+    const { count: tanq } = await supabase
+      .from('tanqueos')
+      .select('*', { count: 'exact', head: true })
+      .eq('vehiculo_placa', placa);
+    
+    const totalHistorial = (preop || 0) + (posop || 0) + (tanq || 0);
+    
+    if (totalHistorial > 0) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: `No se puede eliminar. El vehículo tiene ${totalHistorial} registro(s) asociado(s). Use desactivar en su lugar.`
+      });
+    }
+    
+    // Sin historial, se puede eliminar
     const { error } = await supabase
       .from('vehiculos')
       .delete()
-      .eq('placa', req.params.placa.toUpperCase());
+      .eq('placa', placa);
     
     if (error) throw error;
     res.json({ ok: true, message: 'Vehículo eliminado' });
