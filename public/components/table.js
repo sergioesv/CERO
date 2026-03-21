@@ -1,4 +1,3 @@
-```javascript
 const Table = {
   render(config) {
     const { columns = [], data = [], emptyMessage = 'No hay datos', rowClass = null } = config;
@@ -37,4 +36,3 @@ const Table = {
 };
 
 window.Table = Table;
-```
