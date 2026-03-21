@@ -1,6 +1,7 @@
 const VehiculosFlota = {
   data: [],
-  filtro: 'todos',
+  filtro: 'operativo',
+  mostrarRetirados: false,
   busqueda: '',
   
   async render() {
@@ -23,9 +24,14 @@ const VehiculosFlota = {
           </div>
           <div class="flex gap-sm">
             <button class="btn btn-sm ${this.filtro === 'todos' ? 'btn-primary' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('todos')">Todos</button>
-            <button class="btn btn-sm ${this.filtro === 'activos' ? 'btn-primary' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('activos')">Activos</button>
-            <button class="btn btn-sm ${this.filtro === 'bloqueados' ? 'btn-danger' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('bloqueados')">Bloqueados</button>
+            <button class="btn btn-sm ${this.filtro === 'operativo' ? 'btn-primary' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('operativo')">Operativos</button>
+            <button class="btn btn-sm ${this.filtro === 'bloqueado' ? 'btn-warning' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('bloqueado')">Bloqueados</button>
+            <button class="btn btn-sm ${this.filtro === 'taller' ? 'btn-info' : 'btn-secondary'}" onclick="VehiculosFlota.filtrar('taller')">En taller</button>
           </div>
+          <label class="flex items-center gap-sm text-sm" style="margin-left: auto;">
+            <input type="checkbox" id="mostrar-retirados" ${this.mostrarRetirados ? 'checked' : ''} onchange="VehiculosFlota.toggleRetirados()">
+            Mostrar retirados
+          </label>
         </div>
         <div id="flota-tabla">Cargando...</div>
       </div>
@@ -51,23 +57,41 @@ const VehiculosFlota = {
   },
   
   renderStats() {
-    const total = this.data.length;
-    const activos = this.data.filter(v => !v.bloqueado).length;
-    const bloqueados = this.data.filter(v => v.bloqueado).length;
+    const operativos = this.data.filter(v => v.estado === 'operativo').length;
+    const bloqueados = this.data.filter(v => v.estado === 'bloqueado').length;
+    const enTaller = this.data.filter(v => v.estado === 'taller').length;
+    const retirados = this.data.filter(v => v.estado === 'retirado').length;
     
     document.getElementById('flota-stats').innerHTML = Card.statsGrid([
-      { label: 'Total vehículos', value: total },
-      { label: 'Activos', value: activos, type: 'success' },
-      { label: 'Bloqueados', value: bloqueados, type: bloqueados > 0 ? 'danger' : null }
+      { label: 'Operativos', value: operativos, type: 'success' },
+      { label: 'Bloqueados', value: bloqueados, type: bloqueados > 0 ? 'danger' : null },
+      { label: 'En taller', value: enTaller, type: enTaller > 0 ? 'warning' : null },
+      { label: 'Retirados', value: retirados }
     ]);
   },
   
   renderTabla() {
     let datos = [...this.data];
     
-    if (this.filtro === 'activos') datos = datos.filter(v => !v.bloqueado);
-    if (this.filtro === 'bloqueados') datos = datos.filter(v => v.bloqueado);
-    if (this.busqueda) datos = datos.filter(v => v.placa.toLowerCase().includes(this.busqueda.toLowerCase()));
+    // Filtrar por estado
+    if (this.filtro !== 'todos') {
+      datos = datos.filter(v => v.estado === this.filtro);
+    } else {
+      // En "todos" no mostrar retirados a menos que esté marcado
+      if (!this.mostrarRetirados) {
+        datos = datos.filter(v => v.estado !== 'retirado');
+      }
+    }
+    
+    // Ocultar retirados si no está marcado el checkbox
+    if (!this.mostrarRetirados && this.filtro !== 'todos') {
+      datos = datos.filter(v => v.estado !== 'retirado');
+    }
+    
+    // Búsqueda por placa
+    if (this.busqueda) {
+      datos = datos.filter(v => v.placa.toLowerCase().includes(this.busqueda.toLowerCase()));
+    }
     
     const html = Table.render({
       columns: [
@@ -75,22 +99,42 @@ const VehiculosFlota = {
         { key: 'vehiculo', label: 'Vehículo', render: (_, row) => `${row.marca || ''} ${row.modelo || ''}`.trim() || '—' },
         { key: 'soat_vencimiento', label: 'SOAT', render: v => Badge.documento(v) },
         { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: v => Badge.documento(v) },
-        { key: 'bloqueado', label: 'Estado', render: v => Badge.estadoVehiculo(v) },
+        { key: 'estado', label: 'Estado', render: v => this.badgeEstado(v) },
         { key: 'acciones', label: '', width: '80px', render: (_, row) => `
           <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>
         ` }
       ],
       data: datos,
-      rowClass: row => row.bloqueado ? 'row-danger' : '',
+      rowClass: row => {
+        if (row.estado === 'bloqueado') return 'row-danger';
+        if (row.estado === 'retirado') return 'row-muted';
+        return '';
+      },
       emptyMessage: 'No hay vehículos'
     });
     
     document.getElementById('flota-tabla').innerHTML = html;
   },
   
+  badgeEstado(estado) {
+    const estados = {
+      'operativo': { texto: 'OK', tipo: 'success' },
+      'bloqueado': { texto: 'BLOQ', tipo: 'danger' },
+      'taller': { texto: 'TALLER', tipo: 'warning' },
+      'retirado': { texto: 'RETIRADO', tipo: 'neutral' }
+    };
+    const e = estados[estado] || { texto: estado, tipo: 'neutral' };
+    return Badge.render(e.texto, e.tipo);
+  },
+  
   filtrar(filtro) {
     this.filtro = filtro;
-    this.render();
+    this.renderTabla();
+  },
+  
+  toggleRetirados() {
+    this.mostrarRetirados = document.getElementById('mostrar-retirados').checked;
+    this.renderTabla();
   },
   
   buscar(texto) {
@@ -102,20 +146,19 @@ const VehiculosFlota = {
     const vehiculo = this.data.find(v => v.placa === placa);
     if (!vehiculo) return;
     
-    const estadoTexto = vehiculo.bloqueado ? 'BLOQUEADO' : 'ACTIVO';
-    const estadoClass = vehiculo.bloqueado ? 'danger' : 'success';
-    const botonEstado = vehiculo.bloqueado 
-      ? `<button class="btn btn-sm btn-success" onclick="VehiculosFlota.desbloquear('${placa}')">Activar</button>`
-      : `<button class="btn btn-sm btn-warning" onclick="VehiculosFlota.bloquear('${placa}')">Desactivar</button>`;
-    
     Modal.open({
       title: `Editar ${placa}`,
       size: 'md',
       content: `
         <div class="flex items-center justify-between mb-md">
-          <span class="badge badge-${estadoClass}">${estadoTexto}</span>
+          ${this.badgeEstado(vehiculo.estado)}
           <div class="flex gap-sm">
-            ${botonEstado}
+            <select class="input input-sm" id="edit-estado" style="width: auto;">
+              <option value="operativo" ${vehiculo.estado === 'operativo' ? 'selected' : ''}>Operativo</option>
+              <option value="bloqueado" ${vehiculo.estado === 'bloqueado' ? 'selected' : ''}>Bloqueado</option>
+              <option value="taller" ${vehiculo.estado === 'taller' ? 'selected' : ''}>En taller</option>
+              <option value="retirado" ${vehiculo.estado === 'retirado' ? 'selected' : ''}>Retirado</option>
+            </select>
             <button class="btn btn-sm btn-danger" onclick="VehiculosFlota.eliminar('${placa}')">Eliminar</button>
           </div>
         </div>
@@ -148,7 +191,8 @@ const VehiculosFlota = {
       marca: document.getElementById('edit-marca').value,
       modelo: document.getElementById('edit-modelo').value,
       soat_vencimiento: document.getElementById('edit-soat').value || null,
-      tecnomecanica_vencimiento: document.getElementById('edit-tecno').value || null
+      tecnomecanica_vencimiento: document.getElementById('edit-tecno').value || null,
+      estado: document.getElementById('edit-estado').value
     };
     
     try {
@@ -163,36 +207,10 @@ const VehiculosFlota = {
     }
   },
   
-  async bloquear(placa) {
-    try {
-      await API.vehiculos.bloquear(placa, 'Desactivado manualmente');
-      Modal.close();
-      Toast.success(`Vehículo ${placa} desactivado`);
-      await this.cargarDatos();
-      this.renderTabla();
-      this.renderStats();
-    } catch (error) {
-      Toast.error(error.message || 'Error al desactivar');
-    }
-  },
-  
-  async desbloquear(placa) {
-    try {
-      await API.vehiculos.desbloquear(placa);
-      Modal.close();
-      Toast.success(`Vehículo ${placa} activado`);
-      await this.cargarDatos();
-      this.renderTabla();
-      this.renderStats();
-    } catch (error) {
-      Toast.error(error.message || 'Error al activar');
-    }
-  },
-  
   async eliminar(placa) {
     const confirmado = await Modal.confirm({
       title: '¿Eliminar vehículo?',
-      message: `Se eliminará permanentemente el vehículo ${placa}. Esta acción no se puede deshacer.`,
+      message: `Se eliminará permanentemente el vehículo ${placa}. Si tiene historial, use "Retirado" en su lugar.`,
       confirmText: 'Eliminar',
       cancelText: 'Cancelar',
       type: 'danger'
