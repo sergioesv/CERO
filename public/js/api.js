@@ -48,6 +48,14 @@ const API = {
     actualizar(id, data) { return API.put(`/conductores/${id}`, data); },
     eliminar(id) { return API.delete(`/conductores/${id}`); }
   },
+
+  preoperacionales: {
+    listar(filtros = {}) {
+      const params = new URLSearchParams(filtros).toString();
+      return API.get(`/preoperacionales${params ? '?' + params : ''}`);
+    },
+    obtener(id) { return API.get(`/preoperacionales/${id}`); }
+  },
   
   alertas: {
     listar(filtros = {}) {
