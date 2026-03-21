@@ -203,6 +203,22 @@ app.post('/api/vehiculos/:placa/desbloquear', async function (req, res) {
   }
 });
 
+// DELETE /api/vehiculos/:placa — elimina un vehículo
+app.delete('/api/vehiculos/:placa', async function (req, res) {
+  try {
+    const { error } = await supabase
+      .from('vehiculos')
+      .delete()
+      .eq('placa', req.params.placa.toUpperCase());
+    
+    if (error) throw error;
+    res.json({ ok: true, message: 'Vehículo eliminado' });
+  } catch (error) {
+    console.error('Error eliminando vehículo:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 // ───────────────────────────────────────────────────────────
 // CONDUCTORES
 // ───────────────────────────────────────────────────────────
