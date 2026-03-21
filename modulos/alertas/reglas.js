@@ -1,79 +1,142 @@
-function obtenerNovedadesCriticas(novedades) {
-  return (novedades || []).filter(function(novedad) {
-    return !!(novedad && novedad.critico);
-  });
-}
+// ═══════════════════════════════════════════════════════════
+// modulos/alertas/reglas.js
+// Define umbrales de alerta (30/15/7/0 días) y lógica de bloqueo
+// CERO — Módulo 1.4 Alertas de documentos
+// ═══════════════════════════════════════════════════════════
 
-function construirAlertasPreoperacional(contexto) {
-  var novedadesCriticas = obtenerNovedadesCriticas(contexto.novedades);
-  return novedadesCriticas.map(function(novedad) {
+// ───────────────────────────────────────────────────────────
+// Umbrales de alerta en días
+// ───────────────────────────────────────────────────────────
+var UMBRALES = [
+  { dias: 0,  tipo: 'BLOQUEO',     emoji: '🔴' },
+  { dias: 7,  tipo: 'CRITICA',     emoji: '🟠' },
+  { dias: 15, tipo: 'URGENTE',     emoji: '🟡' },
+  { dias: 30, tipo: 'INFORMATIVA', emoji: '🔵' }
+];
+
+// ───────────────────────────────────────────────────────────
+// Clasifica una alerta según los días restantes
+// Retorna: { tipo, emoji, destinatarios[] }
+// ───────────────────────────────────────────────────────────
+function clasificarAlerta(diasRestantes) {
+  // Vencido o vence hoy
+  if (diasRestantes <= 0) {
     return {
-      origen: 'preoperacional',
-      placa: contexto.placa,
-      criticidad: 'alta',
-      tipo: 'novedad_critica',
-      titulo: 'Novedad critica detectada',
-      mensaje: contexto.placa + ': ' + novedad.item + ' - ' + (novedad.estado || 'Con novedad'),
-      payload: {
-        grupo: novedad.grupo,
-        item: novedad.item,
-        estado: novedad.estado,
-        nota: novedad.nota || null,
-        preoperacionalId: contexto.preoperacionalId || null
-      }
+      tipo: 'BLOQUEO',
+      emoji: '🔴',
+      destinatarios: ['Administrador', 'Supervisor']
     };
-  });
+  }
+
+  // Crítica — 7 días o menos
+  if (diasRestantes <= 7) {
+    return {
+      tipo: 'CRITICA',
+      emoji: '🟠',
+      destinatarios: ['Administrador', 'Supervisor']
+    };
+  }
+
+  // Urgente — 15 días o menos
+  if (diasRestantes <= 15) {
+    return {
+      tipo: 'URGENTE',
+      emoji: '🟡',
+      destinatarios: ['Administrador']
+    };
+  }
+
+  // Informativa — 30 días o menos
+  if (diasRestantes <= 30) {
+    return {
+      tipo: 'INFORMATIVA',
+      emoji: '🔵',
+      destinatarios: ['Administrador']
+    };
+  }
+
+  // Fuera de rango de alerta
+  return null;
 }
 
-function construirAlertasPosoperacional(contexto) {
-  var alertas = [];
-  var novedadesCriticas = obtenerNovedadesCriticas(contexto.novedades);
+// ───────────────────────────────────────────────────────────
+// Determina si un documento vencido debe bloquear el vehículo
+// SOAT y Tecnomecánica vencidos = bloqueo
+// Licencia vencida = alerta sin bloqueo (decisión del supervisor)
+// ───────────────────────────────────────────────────────────
+function debeBloquear(tipoDocumento, diasRestantes) {
+  if (diasRestantes > 0) return false;
 
-  novedadesCriticas.forEach(function(novedad) {
-    alertas.push({
-      origen: 'posoperacional',
-      placa: contexto.placa,
-      criticidad: novedad.severidad === 'alta' ? 'alta' : 'media',
-      tipo: 'novedad_critica_posop',
-      titulo: 'Novedad crítica al cierre de jornada',
-      mensaje: contexto.placa + ': ' + novedad.item + ' - ' + (novedad.estado || 'Con novedad'),
-      payload: {
-        categoria: novedad.categoria || null,
-        item: novedad.item,
-        estado: novedad.estado || null,
-        textoOriginal: novedad.texto_original || null,
-        posoperacionalId: contexto.posoperacionalId || null
-      }
-    });
-  });
-
-  (contexto.alertasKm || []).forEach(function(alertaKm) {
-    alertas.push({
-      origen: 'posoperacional',
-      placa: contexto.placa,
-      criticidad: 'media',
-      tipo: 'inconsistencia_kilometraje',
-      titulo: 'Inconsistencia de kilometraje en cierre de jornada',
-      mensaje: contexto.placa + ': ' + (alertaKm.mensaje || 'Alerta de kilometraje'),
-      payload: {
-        alerta: alertaKm,
-        posoperacionalId: contexto.posoperacionalId || null
-      }
-    });
-  });
-
-  return alertas;
+  var documentosQueBloquean = ['SOAT', 'Tecnomecánica'];
+  return documentosQueBloquean.indexOf(tipoDocumento) >= 0;
 }
 
-function consolidarAlertas(alertas) {
-  return (alertas || []).filter(function(alerta) {
-    return alerta && alerta.tipo;
-  });
+// ───────────────────────────────────────────────────────────
+// Formatea la fecha para mostrar en mensajes
+// ───────────────────────────────────────────────────────────
+function formatearFecha(fechaISO) {
+  if (!fechaISO) return 'Sin fecha';
+  var partes = fechaISO.split('-');
+  if (partes.length !== 3) return fechaISO;
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+// ───────────────────────────────────────────────────────────
+// Genera el texto del mensaje de alerta para vehículos
+// ───────────────────────────────────────────────────────────
+function generarMensajeVehiculo(alerta, clasificacion) {
+  var estado = '';
+  if (alerta.dias_restantes <= 0) {
+    estado = '⛔ *VENCIDO* hace ' + Math.abs(alerta.dias_restantes) + ' día(s)';
+  } else {
+    estado = 'Vence en *' + alerta.dias_restantes + ' día(s)*';
+  }
+
+  var mensaje = clasificacion.emoji + ' *ALERTA ' + clasificacion.tipo + '*\n'
+    + '━━━━━━━━━━━━━━━━━━\n'
+    + '🚗 Vehículo: *' + alerta.placa + '* — ' + alerta.descripcion_vehiculo + '\n'
+    + '📄 Documento: *' + alerta.tipo_documento + '*\n'
+    + '📅 Vencimiento: ' + formatearFecha(alerta.fecha_vencimiento) + '\n'
+    + '⏳ Estado: ' + estado + '\n'
+    + '━━━━━━━━━━━━━━━━━━\n';
+
+  if (alerta.dias_restantes <= 0 && alerta.bloquea) {
+    mensaje += '🔒 *Vehículo bloqueado automáticamente*\n'
+      + 'No podrá realizar preoperacional hasta renovar el documento.\n';
+  }
+
+  mensaje += '_CERO — Sistema de gestión de operaciones_';
+  return mensaje;
+}
+
+// ───────────────────────────────────────────────────────────
+// Genera el texto del mensaje de alerta para licencias
+// ───────────────────────────────────────────────────────────
+function generarMensajeLicencia(alerta, clasificacion) {
+  var estado = '';
+  if (alerta.dias_restantes <= 0) {
+    estado = '⛔ *VENCIDA* hace ' + Math.abs(alerta.dias_restantes) + ' día(s)';
+  } else {
+    estado = 'Vence en *' + alerta.dias_restantes + ' día(s)*';
+  }
+
+  var mensaje = clasificacion.emoji + ' *ALERTA ' + clasificacion.tipo + ' — LICENCIA*\n'
+    + '━━━━━━━━━━━━━━━━━━\n'
+    + '👤 Conductor: *' + alerta.nombre + '*\n'
+    + '🪪 Categoría: ' + (alerta.licencia_categoria || 'N/A') + '\n'
+    + '📅 Vencimiento: ' + formatearFecha(alerta.fecha_vencimiento) + '\n'
+    + '⏳ Estado: ' + estado + '\n'
+    + '━━━━━━━━━━━━━━━━━━\n'
+    + '_CERO — Sistema de gestión de operaciones_';
+
+  return mensaje;
 }
 
 module.exports = {
-  obtenerNovedadesCriticas,
-  construirAlertasPreoperacional,
-  construirAlertasPosoperacional,
-  consolidarAlertas
+  UMBRALES,
+  clasificarAlerta,
+  debeBloquear,
+  formatearFecha,
+  generarMensajeVehiculo,
+  generarMensajeLicencia
 };
