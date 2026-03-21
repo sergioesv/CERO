@@ -16,16 +16,27 @@ var UMBRALES = [
 
 // ───────────────────────────────────────────────────────────
 // Clasifica una alerta según los días restantes
+// bloquea: true para SOAT/Tecnomecánica, false para Licencia
 // Retorna: { tipo, emoji, destinatarios[] }
 // ───────────────────────────────────────────────────────────
-function clasificarAlerta(diasRestantes) {
+function clasificarAlerta(diasRestantes, bloquea) {
   // Vencido o vence hoy
   if (diasRestantes <= 0) {
-    return {
-      tipo: 'BLOQUEO',
-      emoji: '🔴',
-      destinatarios: ['Administrador', 'Supervisor']
-    };
+    if (bloquea) {
+      // SOAT o Tecnomecánica — bloquea vehículo
+      return {
+        tipo: 'BLOQUEO',
+        emoji: '🔴',
+        destinatarios: ['Administrador', 'Supervisor']
+      };
+    } else {
+      // Licencia — alerta sin bloqueo, decisión del supervisor
+      return {
+        tipo: 'VENCIDA',
+        emoji: '🟠',
+        destinatarios: ['Administrador', 'Supervisor']
+      };
+    }
   }
 
   // Crítica — 7 días o menos
