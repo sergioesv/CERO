@@ -1,4 +1,3 @@
-```javascript
 const Router = {
   routes: {},
   currentModule: null,
@@ -68,5 +67,4 @@ const Router = {
 };
 
 window.Router = Router;
-```
 
