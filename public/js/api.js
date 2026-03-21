@@ -34,7 +34,8 @@ const API = {
     crear(data) { return API.post('/vehiculos', data); },
     actualizar(placa, data) { return API.put(`/vehiculos/${placa}`, data); },
     bloquear(placa, motivo) { return API.post(`/vehiculos/${placa}/bloquear`, { motivo }); },
-    desbloquear(placa) { return API.post(`/vehiculos/${placa}/desbloquear`); }
+    desbloquear(placa) { return API.post(`/vehiculos/${placa}/desbloquear`); },
+    eliminar(placa) { return API.delete(`/vehiculos/${placa}`); }
   },
   
   conductores: {
@@ -44,7 +45,8 @@ const API = {
     },
     obtener(id) { return API.get(`/conductores/${id}`); },
     crear(data) { return API.post('/conductores', data); },
-    actualizar(id, data) { return API.put(`/conductores/${id}`, data); }
+    actualizar(id, data) { return API.put(`/conductores/${id}`, data); },
+    eliminar(id) { return API.delete(`/conductores/${id}`); }
   },
   
   alertas: {
