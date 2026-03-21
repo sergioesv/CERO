@@ -1,4 +1,3 @@
-```javascript
 const VehiculosFlota = {
   data: [],
   filtro: 'todos',
@@ -195,4 +194,3 @@ const VehiculosFlota = {
 };
 
 window.VehiculosFlota = VehiculosFlota;
-```
