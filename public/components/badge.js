@@ -1,4 +1,3 @@
-```javascript
 const Badge = {
   render(text, type = 'neutral') {
     return `<span class="badge badge-${type}">${Utils.escaparHTML(text)}</span>`;
@@ -25,4 +24,4 @@ const Badge = {
 };
 
 window.Badge = Badge;
-```
+
