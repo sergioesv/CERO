@@ -1,4 +1,3 @@
-```javascript
 const Card = {
   stat(config) {
     const { label = '', value = '—', type = null, suffix = '' } = config;
@@ -17,4 +16,3 @@ const Card = {
 };
 
 window.Card = Card;
-```
