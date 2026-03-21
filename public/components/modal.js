@@ -1,4 +1,3 @@
-```javascript
 const Modal = {
   current: null,
   
@@ -57,4 +56,3 @@ const Modal = {
 };
 
 window.Modal = Modal;
-```
