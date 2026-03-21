@@ -12,7 +12,7 @@ const Router = {
   
   navigate(path) { window.location.hash = path; },
   
-  getPath() { return window.location.hash.slice(1) || 'vehiculos/preoperacionales'; }
+  getPath() { return window.location.hash.slice(1) || 'vehiculos/preoperacionales'; },
   
   handleRoute() {
     const path = this.getPath();
