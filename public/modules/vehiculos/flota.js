@@ -75,7 +75,12 @@ const VehiculosFlota = {
         { key: 'soat_vencimiento', label: 'SOAT', render: v => Badge.documento(v) },
         { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: v => Badge.documento(v) },
         { key: 'bloqueado', label: 'Estado', render: v => Badge.estadoVehiculo(v) },
-        { key: 'acciones', label: '', render: (_, row) => `<button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>` }
+        { key: 'acciones', label: '', width: '150px', render: (_, row) => `
+          <div class="flex gap-sm">
+            <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="VehiculosFlota.eliminar('${row.placa}')">Eliminar</button>
+          </div>
+        ` }
       ],
       data: datos,
       rowClass: row => row.bloqueado ? 'row-danger' : '',
@@ -143,6 +148,28 @@ const VehiculosFlota = {
       this.renderStats();
     } catch (error) {
       Toast.error('Error al guardar');
+    }
+  },
+  
+  async eliminar(placa) {
+    const confirmado = await Modal.confirm({
+      title: '¿Eliminar vehículo?',
+      message: `Se eliminará permanentemente el vehículo ${placa}. Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+    
+    if (confirmado) {
+      try {
+        await API.vehiculos.eliminar(placa);
+        Toast.success(`Vehículo ${placa} eliminado`);
+        await this.cargarDatos();
+        this.renderTabla();
+        this.renderStats();
+      } catch (error) {
+        Toast.error('Error al eliminar');
+      }
     }
   },
   
