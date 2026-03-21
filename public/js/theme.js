@@ -1,4 +1,3 @@
-```javascript
 const Theme = {
   STORAGE_KEY: 'cero_theme',
   LIGHT: 'light',
@@ -46,5 +45,5 @@ const Theme = {
 };
 
 window.Theme = Theme;
-```
+
 
