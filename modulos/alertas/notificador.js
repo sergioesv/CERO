@@ -73,7 +73,8 @@ async function procesarAlertasVehiculos() {
 
   for (var i = 0; i < alertas.length; i++) {
     var alerta = alertas[i];
-    var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes);
+    // bloquea = true para documentos de vehículo (SOAT, Tecnomecánica)
+    var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes, true);
     if (!clasificacion) continue;
 
     // Generar y enviar mensaje
@@ -101,7 +102,8 @@ async function procesarAlertasLicencias() {
 
   for (var i = 0; i < alertas.length; i++) {
     var alerta = alertas[i];
-    var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes);
+    // bloquea = false para licencias — no bloquean vehículo
+    var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes, false);
     if (!clasificacion) continue;
 
     // Generar mensaje de licencia
@@ -156,11 +158,10 @@ async function ejecutarAlertasDiarias() {
 
 // ───────────────────────────────────────────────────────────
 // Registra el cron job — se llama desde index.js
-// Horario: 6:00 AM hora Colombia (UTC-5) = 11:00 UTC
+// Horario: 6:00 AM hora Colombia (UTC-5)
 // ───────────────────────────────────────────────────────────
 function registrarCronAlertas() {
-  // Cron: minuto 0, hora 11 UTC = 6:00 AM Colombia
-  cron.schedule('0 11 * * *', async function () {
+  cron.schedule('0 6 * * *', async function () {
     await ejecutarAlertasDiarias();
   }, {
     timezone: 'America/Bogota'
