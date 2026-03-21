@@ -1,6 +1,7 @@
 const VehiculosFlota = {
   data: [],
   filtro: 'todos',
+  busqueda: '',
   
   async render() {
     const main = document.getElementById('main');
@@ -75,15 +76,8 @@ const VehiculosFlota = {
         { key: 'soat_vencimiento', label: 'SOAT', render: v => Badge.documento(v) },
         { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: v => Badge.documento(v) },
         { key: 'bloqueado', label: 'Estado', render: v => Badge.estadoVehiculo(v) },
-        { key: 'acciones', label: '', width: '200px', render: (_, row) => `
-          <div class="flex gap-sm">
-            <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>
-            ${row.bloqueado 
-              ? `<button class="btn btn-sm btn-success" onclick="VehiculosFlota.desbloquear('${row.placa}')">Activar</button>`
-              : `<button class="btn btn-sm btn-warning" onclick="VehiculosFlota.bloquear('${row.placa}')">Desactivar</button>`
-            }
-            <button class="btn btn-sm btn-danger" onclick="VehiculosFlota.eliminar('${row.placa}')">Eliminar</button>
-          </div>
+        { key: 'acciones', label: '', width: '80px', render: (_, row) => `
+          <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>
         ` }
       ],
       data: datos,
@@ -108,9 +102,23 @@ const VehiculosFlota = {
     const vehiculo = this.data.find(v => v.placa === placa);
     if (!vehiculo) return;
     
+    const estadoTexto = vehiculo.bloqueado ? 'BLOQUEADO' : 'ACTIVO';
+    const estadoClass = vehiculo.bloqueado ? 'danger' : 'success';
+    const botonEstado = vehiculo.bloqueado 
+      ? `<button class="btn btn-sm btn-success" onclick="VehiculosFlota.desbloquear('${placa}')">Activar</button>`
+      : `<button class="btn btn-sm btn-warning" onclick="VehiculosFlota.bloquear('${placa}')">Desactivar</button>`;
+    
     Modal.open({
       title: `Editar ${placa}`,
+      size: 'md',
       content: `
+        <div class="flex items-center justify-between mb-md">
+          <span class="badge badge-${estadoClass}">${estadoTexto}</span>
+          <div class="flex gap-sm">
+            ${botonEstado}
+            <button class="btn btn-sm btn-danger" onclick="VehiculosFlota.eliminar('${placa}')">Eliminar</button>
+          </div>
+        </div>
         <div class="mb-md">
           <label class="text-sm text-secondary">Marca</label>
           <input type="text" class="input" id="edit-marca" value="${vehiculo.marca || ''}">
@@ -151,11 +159,37 @@ const VehiculosFlota = {
       this.renderTabla();
       this.renderStats();
     } catch (error) {
-      Toast.error('Error al guardar');
+      Toast.error(error.message || 'Error al guardar');
     }
   },
   
-async eliminar(placa) {
+  async bloquear(placa) {
+    try {
+      await API.vehiculos.bloquear(placa, 'Desactivado manualmente');
+      Modal.close();
+      Toast.success(`Vehículo ${placa} desactivado`);
+      await this.cargarDatos();
+      this.renderTabla();
+      this.renderStats();
+    } catch (error) {
+      Toast.error(error.message || 'Error al desactivar');
+    }
+  },
+  
+  async desbloquear(placa) {
+    try {
+      await API.vehiculos.desbloquear(placa);
+      Modal.close();
+      Toast.success(`Vehículo ${placa} activado`);
+      await this.cargarDatos();
+      this.renderTabla();
+      this.renderStats();
+    } catch (error) {
+      Toast.error(error.message || 'Error al activar');
+    }
+  },
+  
+  async eliminar(placa) {
     const confirmado = await Modal.confirm({
       title: '¿Eliminar vehículo?',
       message: `Se eliminará permanentemente el vehículo ${placa}. Esta acción no se puede deshacer.`,
@@ -167,6 +201,7 @@ async eliminar(placa) {
     if (confirmado) {
       try {
         await API.vehiculos.eliminar(placa);
+        Modal.close();
         Toast.success(`Vehículo ${placa} eliminado`);
         await this.cargarDatos();
         this.renderTabla();
@@ -219,7 +254,7 @@ async eliminar(placa) {
       this.renderTabla();
       this.renderStats();
     } catch (error) {
-      Toast.error('Error al crear vehículo');
+      Toast.error(error.message || 'Error al crear vehículo');
     }
   }
 };
