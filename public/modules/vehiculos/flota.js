@@ -75,9 +75,13 @@ const VehiculosFlota = {
         { key: 'soat_vencimiento', label: 'SOAT', render: v => Badge.documento(v) },
         { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: v => Badge.documento(v) },
         { key: 'bloqueado', label: 'Estado', render: v => Badge.estadoVehiculo(v) },
-        { key: 'acciones', label: '', width: '150px', render: (_, row) => `
+        { key: 'acciones', label: '', width: '200px', render: (_, row) => `
           <div class="flex gap-sm">
             <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.placa}')">Editar</button>
+            ${row.bloqueado 
+              ? `<button class="btn btn-sm btn-success" onclick="VehiculosFlota.desbloquear('${row.placa}')">Activar</button>`
+              : `<button class="btn btn-sm btn-warning" onclick="VehiculosFlota.bloquear('${row.placa}')">Desactivar</button>`
+            }
             <button class="btn btn-sm btn-danger" onclick="VehiculosFlota.eliminar('${row.placa}')">Eliminar</button>
           </div>
         ` }
