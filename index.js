@@ -64,6 +64,7 @@ app.get('/alertas/ejecutar', async function (req, res) {
 // ═══════════════════════════════════════════════════════════
 
 const { supabase } = require('./config/config');
+const autorizacionesData = require('./data/autorizaciones');
 
 // ───────────────────────────────────────────────────────────
 // VEHÍCULOS
@@ -601,6 +602,83 @@ app.get('/api/dashboard/resumen', async function (req, res) {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════
+// ALERTAS — DOCUMENTOS Y AUTORIZACIONES (Panel web)
+// ═══════════════════════════════════════════════════════════
+
+// GET /api/alertas/documentos — estado de documentos por vehículo
+app.get('/api/alertas/documentos', async function(req, res) {
+  try {
+    var datos = await autorizacionesData.obtenerDocumentosVehiculos();
+    res.json({ ok: true, datos: datos });
+  } catch (error) {
+    console.error('Error en /api/alertas/documentos:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// GET /api/autorizaciones/pendientes — autorizaciones sin decisión
+app.get('/api/autorizaciones/pendientes', async function(req, res) {
+  try {
+    var datos = await autorizacionesData.obtenerAutorizacionesPendientes();
+    res.json({ ok: true, datos: datos });
+  } catch (error) {
+    console.error('Error en /api/autorizaciones/pendientes:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// GET /api/autorizaciones/resueltas — autorizaciones con decisión
+app.get('/api/autorizaciones/resueltas', async function(req, res) {
+  try {
+    var datos = await autorizacionesData.obtenerAutorizacionesResueltas();
+    res.json({ ok: true, datos: datos });
+  } catch (error) {
+    console.error('Error en /api/autorizaciones/resueltas:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// PUT /api/autorizaciones/:id/decidir — registrar decisión del supervisor
+app.put('/api/autorizaciones/:id/decidir', async function(req, res) {
+  try {
+    var id = req.params.id;
+    var decision = req.body.decision;
+    var justificacion = (req.body.justificacion || '').trim();
+    var supervisorId = req.body.supervisor_id;
+
+    var decisiones = ['autorizar', 'taller', 'restringir'];
+    if (!decisiones.includes(decision)) {
+      return res.status(400).json({ ok: false, error: 'Decisión inválida. Use: autorizar, taller o restringir' });
+    }
+
+    if (decision === 'autorizar' && justificacion.length < 10) {
+      return res.status(400).json({ ok: false, error: 'Justificación obligatoria (mín 10 caracteres) para autorizar' });
+    }
+
+    var resultado = await autorizacionesData.registrarDecision(id, decision, justificacion, supervisorId);
+    if (!resultado.ok) {
+      return res.status(400).json(resultado);
+    }
+
+    res.json({ ok: true, mensaje: 'Decisión registrada' });
+  } catch (error) {
+    console.error('Error en PUT /api/autorizaciones/:id/decidir:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// GET /api/vehiculos/:placa/historial — timeline completo del vehículo
+app.get('/api/vehiculos/:placa/historial', async function(req, res) {
+  try {
+    var resultado = await autorizacionesData.obtenerHistorialVehiculo(req.params.placa);
+    res.json({ ok: true, vehiculo: resultado.vehiculo, historial: resultado.historial });
+  } catch (error) {
+    console.error('Error en /api/vehiculos/:placa/historial:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 // SERVIDOR
