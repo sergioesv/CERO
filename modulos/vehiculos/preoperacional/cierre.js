@@ -79,7 +79,7 @@ function construirDatosPreoperacional(sesion, ahora, hayBloqueo) {
     alertas_km: alertasKm,
     fecha: ahora.toISOString().split('T')[0],
     hora: ahora.toTimeString().split(' ')[0],
-    estado: hayBloqueo ? 'pendiente_autorizacion' : 'completado',
+    estado: 'completado',
     motor_niveles: sesion.respuestas.motor_niveles || null,
     electrico_luces: sesion.respuestas.electrico_luces || null,
     frenos_direccion_llantas: sesion.respuestas.frenos_direccion_llantas || null,

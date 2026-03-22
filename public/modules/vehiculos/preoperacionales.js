@@ -317,7 +317,7 @@ const Preoperacionales = {
     var autorizacion = registro.autorizacion || null;
     var hayBloqueo = novedades.some(function (n) { return n.severidad === 'bloqueo'; });
 
-    if (hayBloqueo && !autorizacion && registro.estado === 'pendiente_autorizacion') {
+    if (hayBloqueo && autorizacion && !autorizacion.decision) {
       html += '<div class="drawer-section">';
       html += '<div style="background:var(--color-danger-bg,#fff1f0);border:1px solid var(--color-danger,#e03030);border-radius:8px;padding:12px 14px;margin-bottom:8px;">';
       html += '<div class="font-medium" style="color:var(--color-danger,#e03030);">⛔ Pendiente de autorización del supervisor</div>';
