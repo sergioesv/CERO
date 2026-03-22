@@ -147,10 +147,22 @@ async function buscarPlacaSugerida(placaDetectada) {
   return null;
 }
 
+async function buscarConductorPorId(id) {
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .select('id, nombre, telefono, cargo')
+    .eq('id', id)
+    .single();
+
+  if (resultado.error || !resultado.data) return null;
+  return resultado.data;
+}
+
 module.exports = {
   cargarVehiculoYConductor,
   buscarPlacaSugerida,
   buscarConductorPorTelefono,
+  buscarConductorPorId,
   normalizarTelefono,
   posiblesTelefonos,
   distanciaPlaca

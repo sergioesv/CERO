@@ -906,15 +906,25 @@ async function manejarPreoperacional(req, res) {
           }
 
           sesiones.eliminarSesion(telefono);
-          return preop.responderTwiml(
-            res,
-            mensajes.mensajeFinalFirma(
+
+          var fechaTexto = guardado.ahora.toLocaleDateString('es-CO');
+          var msgFinal;
+          if (guardado.hayBloqueo) {
+            msgFinal = mensajes.mensajeFinalBloqueado(
               guardado.datosSesion,
-              guardado.ahora.toLocaleDateString('es-CO'),
+              fechaTexto,
+              guardado.novedadesBloqueo,
+              guardado.pdfUrl
+            );
+          } else {
+            msgFinal = mensajes.mensajeFinalFirma(
+              guardado.datosSesion,
+              fechaTexto,
               guardado.novedadesCriticas,
               guardado.pdfUrl
-            )
-          );
+            );
+          }
+          return preop.responderTwiml(res, msgFinal);
         }
 
         default: {

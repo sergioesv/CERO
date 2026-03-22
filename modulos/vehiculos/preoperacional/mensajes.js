@@ -209,6 +209,32 @@ function mensajeFinalFirma(datosSesion, fechaTexto, novedadesCriticas, pdfUrl) {
   return msg;
 }
 
+// ── Mensaje al operario cuando el vehículo queda bloqueado ────────────────────
+
+function mensajeFinalBloqueado(datosSesion, fechaTexto, novedadesBloqueo, pdfUrl) {
+  var lineas = (novedadesBloqueo || []).map(function(n) {
+    return '⛔ ' + (n.item || n.grupo || '—') + ': ' + (n.estado || 'Mal estado');
+  });
+
+  var msg =
+    '───────────────\n' +
+    '⛔ *VEHÍCULO PENDIENTE DE AUTORIZACIÓN*\n' +
+    '───────────────\n' +
+    '🚗 *' + datosSesion.placa + '* | ' + fechaTexto + '\n' +
+    '👤 ' + (datosSesion.conductor ? datosSesion.conductor.nombre : 'Conductor') + '\n' +
+    '📏 ' + datosSesion.kilometraje + ' km\n\n' +
+    '*Novedades que requieren autorización:*\n' +
+    lineas.join('\n') + '\n\n' +
+    '⏳ El supervisor fue notificado y debe autorizar la salida.\n' +
+    '_Por favor espera la confirmación antes de mover el vehículo._';
+
+  if (pdfUrl) {
+    msg += '\n\n📄 Preoperacional registrado.';
+  }
+
+  return msg;
+}
+
 module.exports = {
   mensajeInicio,
   mensajeInicioPlaca,
@@ -220,5 +246,6 @@ module.exports = {
   mensajeFotoNovedad,
   primerMensajeInspeccion,
   mensajeConfirmacionFinal,
-  mensajeFinalFirma
+  mensajeFinalFirma,
+  mensajeFinalBloqueado
 };

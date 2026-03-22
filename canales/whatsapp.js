@@ -13,6 +13,8 @@ const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo')
 const flujoTanqueo        = require('../modulos/vehiculos/tanqueo/flujo');
 const flujoInscripcion    = require('../modulos/vehiculos/inscripcion/flujo');
 const vehiculosData       = require('../data/vehiculos');
+const autorizacionesData  = require('../data/autorizaciones');
+const alertasNotificador  = require('../modulos/alertas/notificador');
 
 // ============================================================================
 // WEBHOOK PRINCIPAL
@@ -38,6 +40,13 @@ async function webhookWhatsApp(req, res) {
       return responderMenu(res);
     }
 
+    // ── AUTORIZAR/TALLER/RESTRINGIR + PLACA → respuesta del supervisor ────────
+    // Formato: "AUTORIZAR STQ406" | "TALLER STQ406" | "RESTRINGIR STQ406"
+    var decisionMatch = msgUpper.match(/^(AUTORIZAR|TALLER|RESTRINGIR)\s+([A-Z0-9]{5,7})$/);
+    if (decisionMatch) {
+      return await manejarDecisionSupervisor(req, res, telefono, decisionMatch[1], decisionMatch[2]);
+    }
+
     // ── Enrutar según el tipo de flujo activo ─────────────────────────────────
     if (sesion.tipo === 'inscripcion') {
       return await flujoInscripcion.manejarInscripcion(req, res);
@@ -61,6 +70,115 @@ async function webhookWhatsApp(req, res) {
   } catch (error) {
     console.error('❌ Error en webhook WhatsApp:', error);
     return responderError(res);
+  }
+}
+
+// ============================================================================
+// DECISIÓN DEL SUPERVISOR — AUTORIZAR / TALLER / RESTRINGIR
+// ============================================================================
+
+async function manejarDecisionSupervisor(req, res, telefonoSupervisor, accion, placa) {
+  try {
+    // Verificar que quien responde es un supervisor registrado
+    var supervisor = await vehiculosData.buscarConductorPorTelefono(telefonoSupervisor);
+    if (!supervisor) {
+      return responderTwiml(res, '❌ Tu número no está registrado en CERO.\nNo puedes autorizar vehículos.');
+    }
+
+    var esSupervisor = supervisor.cargo === 'Supervisor' || supervisor.cargo === 'Administrador';
+    if (!esSupervisor) {
+      return responderTwiml(res, '❌ Solo supervisores y administradores pueden autorizar vehículos.');
+    }
+
+    // Buscar autorización pendiente para esa placa
+    var autorizacion = await autorizacionesData.obtenerPendientePorPlaca(placa);
+    if (!autorizacion) {
+      return responderTwiml(res,
+        '⚠️ No hay autorización pendiente para el vehículo *' + placa + '*.\n' +
+        'Puede que ya fue procesada o la placa no es correcta.'
+      );
+    }
+
+    // Mapear acción a decisión
+    var decisionMap = {
+      'AUTORIZAR': 'autorizado',
+      'TALLER': 'taller',
+      'RESTRINGIR': 'restringido'
+    };
+    var decision = decisionMap[accion];
+
+    // Registrar la decisión
+    var resultado = await autorizacionesData.registrarDecision(
+      autorizacion.id,
+      autorizacion.preoperacional_id,
+      decision,
+      null,
+      supervisor.id
+    );
+
+    if (resultado.error) {
+      console.error('Error registrando decisión:', resultado.error);
+      return responderTwiml(res, '❌ Error procesando la decisión. Intenta de nuevo.');
+    }
+
+    // Confirmación al supervisor
+    var iconosDecision = { autorizado: '✅', taller: '🔧', restringido: '🚫' };
+    var textosDecision = { autorizado: 'AUTORIZADO', taller: 'ENVIADO A TALLER', restringido: 'RESTRINGIDO' };
+    var ahora = new Date(new Date().getTime() - (5 * 60 * 60 * 1000));
+    var horaTexto = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+    var msgSupervisor =
+      iconosDecision[decision] + ' *DECISIÓN REGISTRADA*\n' +
+      '━━━━━━━━━━━━━━━━\n' +
+      '🚗 Vehículo: *' + placa + '*\n' +
+      '📋 Decisión: *' + textosDecision[decision] + '*\n' +
+      '⏱️ ' + horaTexto + '\n' +
+      'Tu respuesta queda registrada en el sistema CERO.';
+
+    // Notificar al operario (si tiene teléfono)
+    if (autorizacion.conductor_id) {
+      try {
+        var conductorResp = await vehiculosData.buscarConductorPorId(autorizacion.conductor_id);
+        if (conductorResp && conductorResp.telefono) {
+          var msgOperario;
+          if (decision === 'autorizado') {
+            msgOperario =
+              '✅ *VEHÍCULO AUTORIZADO*\n' +
+              '━━━━━━━━━━━━━━━━\n' +
+              '🚗 *' + placa + '*\n' +
+              '👤 Supervisor: ' + supervisor.nombre + '\n' +
+              '⏱️ ' + horaTexto + '\n\n' +
+              'Puedes continuar con la operación.';
+          } else if (decision === 'taller') {
+            msgOperario =
+              '🔧 *VEHÍCULO — ENVIAR A TALLER*\n' +
+              '━━━━━━━━━━━━━━━━\n' +
+              '🚗 *' + placa + '*\n' +
+              '👤 Supervisor: ' + supervisor.nombre + '\n' +
+              '⏱️ ' + horaTexto + '\n\n' +
+              'El vehículo debe ser llevado a mantenimiento antes de operar.';
+          } else {
+            msgOperario =
+              '🚫 *VEHÍCULO RESTRINGIDO*\n' +
+              '━━━━━━━━━━━━━━━━\n' +
+              '🚗 *' + placa + '*\n' +
+              '👤 Supervisor: ' + supervisor.nombre + '\n' +
+              '⏱️ ' + horaTexto + '\n\n' +
+              'El vehículo no puede operar. Comunícate con tu supervisor.';
+          }
+          await alertasNotificador.enviarWhatsApp(conductorResp.telefono, msgOperario);
+        }
+      } catch (errNotif) {
+        console.error('Error notificando al operario:', errNotif.message);
+      }
+    }
+
+    console.log('✅ Decisión registrada — ' + placa + ' → ' + decision + ' (supervisor: ' + supervisor.nombre + ')');
+    return responderTwiml(res, msgSupervisor);
+
+  } catch (error) {
+    console.error('❌ Error en manejarDecisionSupervisor:', error);
+    return responderTwiml(res, '❌ Error procesando la autorización. Intenta de nuevo.');
   }
 }
 

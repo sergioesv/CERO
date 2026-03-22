@@ -479,13 +479,69 @@ app.get('/api/preoperacionales/:id', async function (req, res) {
       .select('*')
       .eq('preoperacional_id', id);
 
+    // Buscar autorización asociada (si existe)
+    var autorizacionResp = await supabase
+      .from('autorizaciones_novedad')
+      .select('id, decision, justificacion, timestamp_alerta, timestamp_decision, novedades_bloqueo, supervisores:supervisor_id(nombre)')
+      .eq('preoperacional_id', id)
+      .order('timestamp_alerta', { ascending: false })
+      .limit(1)
+      .single();
+
     var registro = resultado.data;
     registro.fotos = fotos.data || [];
+    if (!autorizacionResp.error && autorizacionResp.data) {
+      var auth = autorizacionResp.data;
+      registro.autorizacion = {
+        id: auth.id,
+        decision: auth.decision || null,
+        justificacion: auth.justificacion || null,
+        timestamp_alerta: auth.timestamp_alerta,
+        timestamp_decision: auth.timestamp_decision || null,
+        novedades_bloqueo: auth.novedades_bloqueo || [],
+        supervisor_nombre: auth.supervisores ? auth.supervisores.nombre : null
+      };
+    } else {
+      registro.autorizacion = null;
+    }
 
     res.json(registro);
   } catch (error) {
     console.error('Error en GET /api/preoperacionales/:id:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// ───────────────────────────────────────────────────────────
+// AUTORIZACIONES DE NOVEDAD
+// ───────────────────────────────────────────────────────────
+
+const autorizacionesData = require('./data/autorizaciones');
+
+// GET /api/autorizaciones/pendientes — lista autorizaciones sin decisión
+app.get('/api/autorizaciones/pendientes', async function (req, res) {
+  try {
+    var data = await autorizacionesData.listarPendientes();
+    res.json({ ok: true, data: data, total: data.length });
+  } catch (error) {
+    console.error('Error listando autorizaciones pendientes:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// GET /api/autorizaciones — lista autorizaciones con filtros opcionales
+app.get('/api/autorizaciones', async function (req, res) {
+  try {
+    var filtros = {};
+    if (req.query.placa) filtros.placa = req.query.placa;
+    if (req.query.pendientes === 'true') filtros.soloSinDecision = true;
+    if (req.query.limite) filtros.limite = parseInt(req.query.limite, 10) || 100;
+
+    var data = await autorizacionesData.listarTodas(filtros);
+    res.json({ ok: true, data: data, total: data.length });
+  } catch (error) {
+    console.error('Error listando autorizaciones:', error);
+    res.status(500).json({ ok: false, error: error.message });
   }
 });
 

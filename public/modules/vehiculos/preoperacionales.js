@@ -314,6 +314,36 @@ const Preoperacionales = {
 
     // ── Novedades destacadas ──
     var novedades = registro.novedades || [];
+    var autorizacion = registro.autorizacion || null;
+    var hayBloqueo = novedades.some(function (n) { return n.severidad === 'bloqueo'; });
+
+    if (hayBloqueo && !autorizacion && registro.estado === 'pendiente_autorizacion') {
+      html += '<div class="drawer-section">';
+      html += '<div style="background:var(--color-danger-bg,#fff1f0);border:1px solid var(--color-danger,#e03030);border-radius:8px;padding:12px 14px;margin-bottom:8px;">';
+      html += '<div class="font-medium" style="color:var(--color-danger,#e03030);">⛔ Pendiente de autorización del supervisor</div>';
+      html += '<div class="text-xs text-secondary mt-sm">El supervisor fue notificado por WhatsApp. Debe responder antes de que el vehículo pueda operar.</div>';
+      html += '</div></div>';
+    }
+
+    if (autorizacion && autorizacion.decision) {
+      var iconosDecision = { autorizado: '✅', taller: '🔧', restringido: '🚫' };
+      var textosDecision = { autorizado: 'Autorizado', taller: 'Enviado a taller', restringido: 'Restringido' };
+      var colorDecision = autorizacion.decision === 'autorizado' ? 'success' : 'danger';
+      html += '<div class="drawer-section">';
+      html += '<div class="drawer-section-title"><span class="section-title-bar ' + colorDecision + '"></span>Decisión del supervisor</div>';
+      html += '<div class="flex items-center gap-sm">';
+      html += '<span style="font-size:1.3em">' + (iconosDecision[autorizacion.decision] || '📋') + '</span>';
+      html += '<div>';
+      html += '<div class="font-medium">' + (textosDecision[autorizacion.decision] || autorizacion.decision) + '</div>';
+      if (autorizacion.supervisor_nombre) {
+        html += '<div class="text-xs text-secondary">Por: ' + Utils.escaparHTML(autorizacion.supervisor_nombre) + '</div>';
+      }
+      if (autorizacion.timestamp_decision) {
+        html += '<div class="text-xs text-secondary">' + Utils.formatearFecha(autorizacion.timestamp_decision) + '</div>';
+      }
+      html += '</div></div></div>';
+    }
+
     if (novedades.length > 0) {
       html += '<div class="drawer-section">';
       html += '<div class="drawer-section-title">';
@@ -321,11 +351,17 @@ const Preoperacionales = {
       html += 'Novedades (' + novedades.length + ')';
       html += '</div>';
       novedades.forEach(function (n) {
+        var esBloqueo = n.severidad === 'bloqueo';
         var esCritico = n.critico === true;
-        var badgeHtml = esCritico
-          ? '<span class="badge badge-danger">CRÍTICO</span>'
-          : '<span class="badge badge-warning">ATENCIÓN</span>';
-        html += '<div class="drawer-novedad ' + (esCritico ? 'critica' : '') + '">';
+        var badgeHtml;
+        if (esBloqueo) {
+          badgeHtml = '<span class="badge badge-danger">BLOQUEO</span>';
+        } else if (esCritico) {
+          badgeHtml = '<span class="badge badge-warning">CRÍTICO</span>';
+        } else {
+          badgeHtml = '<span class="badge badge-neutral">ATENCIÓN</span>';
+        }
+        html += '<div class="drawer-novedad ' + (esBloqueo ? 'critica' : '') + '">';
         html += '<div class="flex items-center justify-between">';
         html += '<span class="font-medium">' + Utils.escaparHTML(n.item || n.grupo || '—') + '</span>';
         html += badgeHtml;

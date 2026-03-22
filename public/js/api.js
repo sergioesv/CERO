@@ -69,6 +69,14 @@ const API = {
   dashboard: {
     resumen() { return API.get('/dashboard/resumen'); },
     hoy() { return API.get('/dashboard/hoy'); }
+  },
+
+  autorizaciones: {
+    pendientes() { return API.get('/autorizaciones/pendientes'); },
+    listar(filtros = {}) {
+      const params = new URLSearchParams(filtros).toString();
+      return API.get(`/autorizaciones${params ? '?' + params : ''}`);
+    }
   }
 };
 
