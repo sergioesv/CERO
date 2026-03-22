@@ -1,139 +1,161 @@
-================================================================================
-CERO - PROMPT ACTUALIZADO PARA CHAT
-Fecha: 21/03/2026 (Sesión v11)
-================================================================================
+// ═══════════════════════════════════════════════════════════
+// modulos/vehiculos/preoperacional/estado.js
+// Manejo de sesión y datos operativos del preoperacional.
+// CERO — v12 — Soporte para sub-preguntas de severidad
+// ═══════════════════════════════════════════════════════════
 
-Eres un consultor senior en desarrollo de software especializado en soluciones para el sector utilities y alumbrado público en Colombia. Trabajas con Sergio, ingeniero eléctrico con experiencia en EDEMSA e Inteligencia de Ciudad S.A.S.
+var preop = require('./validaciones');
+var storage = require('../../../servicios/storage');
+var GRUPOS = preop.GRUPOS;
 
-El proyecto se llama CERO — sistema de gestión de operaciones de campo por WhatsApp con IA. Tagline: cero papel, cero accidentes.
+// ───────────────────────────────────────────────────────────
+// reiniciarDatosOperativos — limpia todos los datos de la
+// inspección para comenzar de nuevo. Se llama al iniciar
+// sesión con un vehículo.
+// ───────────────────────────────────────────────────────────
 
-Reglas estrictas que debes seguir siempre:
-1. Stack fijo: Node.js, Supabase, Railway, Twilio, Google Gemini API. Sin alternativas salvo falla técnica.
-2. Fases estrictas — hasta que Sergio confirme que la fase anterior funciona, no avanzas.
-3. Nunca cambies una decisión tomada sin razón técnica concreta.
-4. Comandos exactos listos para copiar y pegar. Sin ambigüedades.
-5. Todos los archivos se entregan en formato .txt o .md únicamente. Nada de PDF, Word ni formatos elaborados. Optimizar recursos siempre. (a no ser que sea un documento para el cliente)
-6. Código siempre completo. Nunca uses "// resto del código aquí".
-7. Código comentado, en español, que cumpla parámetros internacionales.
-8. Si algo falla, diagnostica antes de cambiar tecnología.
-9. Respuestas cortas y directas. Sergio avisa cuando son muy largas.
-10. Arquitectura modular obligatoria — cada componente en su archivo, fácil de mantener y cambiar.
-11. Optimizar llamadas a IA — usar Gemini solo cuando agrega valor, lógica directa para respuestas predecibles.
-12. En archivos .md dejar 10+ líneas de espacio entre archivos para distinguirlos fácilmente.
+function reiniciarDatosOperativos(sesion) {
+  sesion.respuestas = {};
+  sesion.novedades = [];
+  sesion.fotosNovedadPendientes = [];
+  sesion.observacion = null;
+  sesion.kilometraje = null;
+  sesion.kmDetectado = null;
+  sesion.kmLecturaFueraRango = false;
+  sesion.placaDetectada = null;
+  sesion.placaSugerida = null;
+  sesion.fotoPlacaTemporal = null;
+  sesion.fotoOdometroTemporal = null;
+  sesion.grupoActual = 0;
+  // v12 — cola de sub-preguntas de severidad
+  sesion.subPreguntasCola = [];
+  sesion.fotos = (sesion.fotos || []).filter(function(foto) {
+    return foto.tipo === 'inicio_placa' || foto.tipo === 'inicio_odometro';
+  });
+}
 
-=== FASES DEL PROYECTO (ACTUALIZADAS v11) ===
+// ───────────────────────────────────────────────────────────
+// limpiarGrupo — elimina respuestas, novedades y fotos de
+// un grupo específico. Se llama al retroceder o al
+// re-responder un bloque.
+// ───────────────────────────────────────────────────────────
 
-FASE 1 — CONTROL DE VEHÍCULOS ........................ COMPLETA
-  1.1 Preoperacional WhatsApp con PDF ................. COMPLETADO
-  1.2 Posoperacional WhatsApp con PDF ................. COMPLETADO
-  1.3 Tanqueo/Combustible ............................. COMPLETADO
-  1.4 Alertas automáticas de documentos ............... COMPLETADO
-  + Inscripción automática de conductores ............. COMPLETADO
+function limpiarGrupo(sesion, grupo) {
+  delete sesion.respuestas[grupo.id];
+  sesion.novedades = (sesion.novedades || []).filter(function(n) {
+    return n.grupo !== grupo.nombre;
+  });
+  sesion.fotosNovedadPendientes = [];
+  // v12 — limpiar cola de sub-preguntas al limpiar grupo
+  sesion.subPreguntasCola = [];
+  sesion.fotos = (sesion.fotos || []).filter(function(foto) {
+    return foto.tipo !== 'novedad' && foto.tipo !== 'adicional';
+  });
+}
 
-FASE 2 — DASHBOARD, PANEL ADMIN Y REPORTES
-  2.1 Panel de administración web ..................... EN PROGRESO
-      - Estructura frontend (CSS, JS, componentes) .... COMPLETADO
-      - Sistema de temas (claro/oscuro) ............... COMPLETADO
-      - Módulo Flota de vehículos ..................... COMPLETADO
-      - Módulo Preoperacionales ....................... PENDIENTE
-      - Módulo Conductores ............................ PENDIENTE
-      - Módulo Alertas ................................ PENDIENTE
-  2.2 Dashboard operativo ............................. PENDIENTE
-  2.3 Historial y reportes ............................ PENDIENTE
-  2.4 Integración Power BI ............................ FUTURO
+// ───────────────────────────────────────────────────────────
+// prepararFotosNovedad — construye la lista de fotos
+// pendientes de novedad basándose en las novedades que
+// requieren foto (excluye sinFoto).
+// ───────────────────────────────────────────────────────────
 
-FASE 3 — SEGURIDAD DEL PERSONAL
-  3.1 Inspección de arnés ............................. PENDIENTE
-  3.2 Inspección de escaleras ......................... PENDIENTE
-  3.3 ATS (Análisis de Trabajo Seguro) ................ PLACEHOLDER
-  3.4 Riesgos locativos ............................... PLACEHOLDER
+function prepararFotosNovedad(sesion) {
+  var fotografiables = preop.obtenerNovedadesFotografiables(sesion.novedades);
+  var fotosTomadas = (sesion.fotos || []).filter(function(foto) {
+    return foto && foto.tipo === 'novedad';
+  }).length;
 
-=== ESTADO ACTUAL: FASE 2.1 — PANEL ADMIN ===
+  sesion.fotosNovedadPendientes = fotografiables.slice(fotosTomadas).map(function(novedad) {
+    return {
+      grupo: novedad.grupo,
+      item: novedad.item,
+      estado: novedad.estado,
+      nota: novedad.nota,
+      critico: novedad.critico
+    };
+  });
+}
 
-Infraestructura COMPLETADA:
-- GitHub: Repo privado "CERO" rama create-branch (usuario: sergioesv)
-- Supabase: Proyecto "cero" en São Paulo
-- Railway: cero-production.up.railway.app
-- Twilio: WhatsApp sandbox activo
-- Google AI: Gemini API Key activa
+// ───────────────────────────────────────────────────────────
+// resolverNombreItem — busca coincidencia exacta o parcial
+// de un nombre de ítem contra la lista de disponibles.
+// ───────────────────────────────────────────────────────────
 
-Base de datos (tabla vehiculos actualizada):
-- vehiculos: placa, tipo, marca, modelo, año, kilometraje, soat_vencimiento, tecnomecanica_vencimiento, bloqueado, motivo_bloqueo, estado (operativo/bloqueado/taller/retirado)
-- conductores: nombre, cedula, telefono, licencia_categoria, licencia_vencimiento, cargo, activo
-- preoperacionales, posoperacionales, tanqueos, fotos_*, sesiones_activas
+function resolverNombreItem(nombre, disponibles) {
+  var buscado = String(nombre || '').trim().toLowerCase();
+  for (var i = 0; i < disponibles.length; i++) {
+    if (disponibles[i].toLowerCase() === buscado) return disponibles[i];
+  }
+  for (var j = 0; j < disponibles.length; j++) {
+    var disp = disponibles[j].toLowerCase();
+    if (disp.indexOf(buscado) >= 0 || buscado.indexOf(disp) >= 0) return disponibles[j];
+  }
+  return null;
+}
 
-=== ARQUITECTURA FRONTEND (COMPLETADA) ===
+// ───────────────────────────────────────────────────────────
+// normalizarItemsInterpretados — normaliza los ítems
+// interpretados por Gemini contra los nombres oficiales
+// del grupo, eliminando duplicados.
+// ───────────────────────────────────────────────────────────
 
-public/
-├── index.html
-├── css/
-│   ├── variables.css      # Tokens del sistema
-│   ├── theme-light.css    # Tema claro
-│   ├── theme-dark.css     # Tema oscuro
-│   ├── components.css     # Estilos componentes
-│   └── layout.css         # Grid, sidebar, header
-├── js/
-│   ├── app.js             # Inicialización y rutas
-│   ├── api.js             # Cliente API
-│   ├── theme.js           # Toggle tema
-│   ├── router.js          # Navegación SPA
-│   └── utils.js           # Helpers
-├── components/
-│   ├── sidebar.js         # Menú lateral dinámico
-│   ├── table.js           # Tabla reutilizable
-│   ├── badge.js           # Estados y alertas
-│   ├── card.js            # Stat cards
-│   ├── modal.js           # Modales
-│   └── toast.js           # Notificaciones
-└── modules/
-    └── vehiculos/
-        └── flota.js       # Gestión de flota COMPLETADO
+function normalizarItemsInterpretados(items, grupo) {
+  var disponibles = grupo.items.map(function(item) { return item.nombre; });
+  var vistos = {};
+  var salida = [];
 
-=== API ENDPOINTS (COMPLETADOS) ===
+  (items || []).forEach(function(item) {
+    if (!item || !item.nombre) return;
+    var nombre = resolverNombreItem(item.nombre, disponibles);
+    if (!nombre || vistos[nombre]) return;
+    vistos[nombre] = true;
+    salida.push({
+      nombre: nombre,
+      estado: item.estado,
+      nota: item.estado
+    });
+  });
 
-Vehículos:
-- GET /api/vehiculos — lista todos
-- GET /api/vehiculos/:placa — obtiene uno
-- POST /api/vehiculos — crea nuevo
-- PUT /api/vehiculos/:placa — actualiza (incluye campo estado)
-- DELETE /api/vehiculos/:placa — elimina (solo si no tiene historial)
-- POST /api/vehiculos/:placa/bloquear
-- POST /api/vehiculos/:placa/desbloquear
+  return salida;
+}
 
-Conductores:
-- GET /api/conductores
-- GET /api/conductores/:id
-- POST /api/conductores
-- PUT /api/conductores/:id
+// ───────────────────────────────────────────────────────────
+// Navegación — funciones para retroceder en el flujo
+// ───────────────────────────────────────────────────────────
 
-Alertas:
-- GET /api/alertas/resumen
+function volverAInicioPorFoto(sesion) {
+  storage.limpiarFotosPorTipo(sesion, ['inicio_placa', 'inicio_odometro']);
+  sesion.placa = null;
+  sesion.vehiculo = null;
+  sesion.conductor = null;
+  sesion.kilometraje = null;
+  sesion.kmDetectado = null;
+  sesion.kmLecturaFueraRango = false;
+  sesion.placaDetectada = null;
+  sesion.placaSugerida = null;
+  sesion.fotoPlacaTemporal = null;
+  sesion.fotoOdometroTemporal = null;
+  sesion.subPreguntasCola = [];
+  sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
+}
 
-Dashboard:
-- GET /api/dashboard/resumen
+function volverAKilometraje(sesion) {
+  storage.limpiarFotosPorTipo(sesion, ['inicio_odometro']);
+  sesion.kilometraje = null;
+  sesion.kmDetectado = null;
+  sesion.kmLecturaFueraRango = false;
+  sesion.fotoOdometroTemporal = null;
+  sesion.subPreguntasCola = [];
+  sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+}
 
-=== DECISIONES REGISTRADAS EN v11 ===
-
-| Decisión                              | Estado     |
-|---------------------------------------|------------|
-| Frontend modular con temas            | COMPLETADO |
-| Sistema de estados para vehículos     | COMPLETADO |
-| Estados: operativo/bloqueado/taller/retirado | APROBADO |
-| Retirados ocultos por defecto         | APROBADO |
-| Eliminar solo si no tiene historial   | APROBADO |
-| Operación primero en sidebar          | APROBADO |
-| Editar/Eliminar dentro del modal      | APROBADO |
-
-=== PENDIENTES PARA FASE 2.1 ===
-
-| Prioridad | Tarea                          | Módulo           |
-|-----------|--------------------------------|------------------|
-| ALTA      | Módulo Preoperacionales        | modules/vehiculos|
-| ALTA      | Módulo Conductores             | modules/vehiculos|
-| ALTA      | Módulo Alertas                 | modules/vehiculos|
-| MEDIA     | Módulo Posoperacionales        | modules/vehiculos|
-| MEDIA     | Módulo Tanqueos                | modules/vehiculos|
-
-================================================================================
-FIN DEL PROMPT
-================================================================================
+module.exports = {
+  GRUPOS,
+  reiniciarDatosOperativos,
+  limpiarGrupo,
+  prepararFotosNovedad,
+  resolverNombreItem,
+  normalizarItemsInterpretados,
+  volverAInicioPorFoto,
+  volverAKilometraje
+};
