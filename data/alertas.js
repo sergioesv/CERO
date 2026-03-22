@@ -134,7 +134,7 @@ async function obtenerContactosPorCargo(cargo) {
   var resultado = await config.supabase
     .from(config.TABLES.conductores)
     .select('nombre, telefono, cargo')
-    .eq('cargo', cargo)
+    .ilike('cargo', cargo + '%')
     .neq('activo', false);
 
   if (resultado.error || !Array.isArray(resultado.data)) {
