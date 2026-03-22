@@ -363,6 +363,14 @@ function manejarAtras(res, sesion) {
     return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
   }
 
+  // v12 — Atrás desde sub-pregunta: limpiar grupo y volver a opciones
+  if (sesion.estado === 'SUB_PREGUNTA') {
+    sesion.subPreguntasCola = [];
+    estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
+    sesion.estado = 'GRUPO';
+    return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+  }
+
   if (sesion.estado === 'FOTO_NOVEDAD') {
     storage.limpiarFotosPorTipo(sesion, ['novedad', 'adicional']);
     sesion.fotosNovedadPendientes = [];
@@ -692,10 +700,39 @@ async function manejarPreoperacional(req, res) {
             };
           });
 
+          // v12 — Separar novedades con y sin sub-pregunta de severidad
+          var novedadesSinSub = [];
+          var novedadesConSub = [];
+
           for (var i = 0; i < novedadesGrupo.length; i++) {
-            sesion.novedades.push(novedadesGrupo[i]);
+            var nov = novedadesGrupo[i];
+            if (preop.tieneSubPregunta(nov.item)) {
+              novedadesConSub.push(nov);
+            } else {
+              // Ítems sin sub-pregunta: evaluar severidad inmediatamente
+              nov.severidad = preop.evaluarSeveridadNovedad(nov.item, nov.estado, null);
+              novedadesSinSub.push(nov);
+            }
           }
 
+          // Agregar novedades sin sub-pregunta directamente
+          for (var j = 0; j < novedadesSinSub.length; j++) {
+            sesion.novedades.push(novedadesSinSub[j]);
+          }
+
+          // Si hay novedades que necesitan sub-pregunta, entrar al estado SUB_PREGUNTA
+          if (novedadesConSub.length > 0) {
+            sesion.subPreguntasCola = novedadesConSub;
+            sesion.estado = 'SUB_PREGUNTA';
+            var primeraSub = novedadesConSub[0];
+            var subPregunta = preop.obtenerSubPregunta(primeraSub.item);
+            var prefijoSub = novedadesSinSub.length > 0
+              ? '⚠️ Anotado: ' + novedadesSinSub.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
+              : '📋 Necesito precisar la novedad:';
+            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subPregunta, prefijoSub));
+          }
+
+          // Sin sub-preguntas pendientes — avanzar normalmente
           var confirmacion = novedadesGrupo.length > 0
             ? '⚠️ Anotado: ' + novedadesGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
             : '✅ Registrado';
@@ -706,6 +743,82 @@ async function manejarPreoperacional(req, res) {
             return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacion));
           }
           return avanzarDespuesDeInspeccion(res, sesion, confirmacion);
+        }
+
+        // ────────────────────────────────────────────────────
+        // SUB_PREGUNTA — v12 — precisar severidad de novedad
+        // Se activa cuando un ítem crítico tiene opciones de
+        // nivel (aceite, refrigerante, etc.) o tipo (fugas, pito)
+        // ────────────────────────────────────────────────────
+        case 'SUB_PREGUNTA': {
+          // No se aceptan fotos en este paso
+          if (numMedia > 0) {
+            var subActualFoto = preop.obtenerSubPregunta(sesion.subPreguntasCola[0].item);
+            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subActualFoto, '⌨️ En este paso necesito un número, no foto.'));
+          }
+
+          // Validar que hay cola activa
+          if (!sesion.subPreguntasCola || sesion.subPreguntasCola.length === 0) {
+            sesion.estado = 'GRUPO';
+            return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '↩️ Continuamos'));
+          }
+
+          var novedadSubActual = sesion.subPreguntasCola[0];
+          var subPreguntaActual = preop.obtenerSubPregunta(novedadSubActual.item);
+
+          // Procesar la respuesta numérica del operario
+          var opcionElegida = preop.procesarRespuestaSubPregunta(subPreguntaActual, mensaje);
+
+          if (!opcionElegida) {
+            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subPreguntaActual, '❌ Responde con el número de la opción'));
+          }
+
+          // Actualizar la novedad con la severidad y estado preciso
+          novedadSubActual.severidad = opcionElegida.severidad;
+          novedadSubActual.estado = opcionElegida.estado;
+          novedadSubActual.nota = opcionElegida.estado;
+          novedadSubActual.subRespuesta = {
+            num: opcionElegida.num,
+            texto: opcionElegida.texto,
+            severidad: opcionElegida.severidad
+          };
+
+          // Agregar la novedad procesada a la sesión
+          sesion.novedades.push(novedadSubActual);
+
+          // Quitar de la cola
+          sesion.subPreguntasCola.shift();
+
+          // Si hay más sub-preguntas en la cola, preguntar la siguiente
+          if (sesion.subPreguntasCola.length > 0) {
+            var siguienteSub = sesion.subPreguntasCola[0];
+            var subSiguiente = preop.obtenerSubPregunta(siguienteSub.item);
+            var prefijoSiguiente = '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*';
+            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subSiguiente, prefijoSiguiente));
+          }
+
+          // Cola vacía — todas las sub-preguntas respondidas
+          sesion.subPreguntasCola = [];
+
+          // Generar confirmación con todas las novedades del grupo actual
+          var grupoActualNombre = GRUPOS[sesion.grupoActual].nombre;
+          var novedadesDelGrupo = sesion.novedades.filter(function(n) {
+            return n.grupo === grupoActualNombre;
+          });
+          var confirmacionSub = '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*';
+          if (novedadesDelGrupo.length > 1) {
+            confirmacionSub = '⚠️ Anotado: ' + novedadesDelGrupo.map(function(n) {
+              return n.item + ' (' + n.estado + ')';
+            }).join(', ');
+          }
+
+          // Avanzar al siguiente grupo
+          sesion.grupoActual++;
+          sesion.estado = 'GRUPO';
+          if (sesion.grupoActual < GRUPOS.length) {
+            return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacionSub));
+          }
+          return avanzarDespuesDeInspeccion(res, sesion, confirmacionSub);
         }
 
         case 'FOTO_NOVEDAD': {
