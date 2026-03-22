@@ -211,11 +211,14 @@ const AlertasModule = {
       { id: 'documentos', label: 'Docs por vencer', value: docsPorVencer, type: docsPorVencer > 0 ? 'warning' : null },
       { id: 'bloqueados', label: 'Bloqueados', value: bloqueados, type: bloqueados > 0 ? 'danger' : null },
       { id: 'pendientes', label: 'Auth. pendientes', value: pendientes, type: pendientes > 0 ? 'danger' : null },
-      { id: 'hoy', label: 'Alertas hoy', value: alertasHoy, type: alertasHoy > 0 ? 'warning' : null }
+      { id: 'todas', label: 'Alertas hoy', value: alertasHoy, type: alertasHoy > 0 ? 'warning' : null }
     ];
 
+    var container = document.getElementById('alertas-stats');
+    if (!container) return;
+
     var filtroActivo = this.filtroActivo;
-    var html = '<div class="alertas-stats">';
+    var html = '';
     categorias.forEach(function(c) {
       var activo = filtroActivo === c.id ? ' activo' : '';
       var colorClass = c.type ? ' alertas-stat-' + c.type : '';
@@ -226,9 +229,8 @@ const AlertasModule = {
         </div>
       `;
     });
-    html += '</div>';
 
-    document.getElementById('alertas-stats').outerHTML = html;
+    container.innerHTML = html;
   },
 
   // ─────────────────────────────────────────────────────────

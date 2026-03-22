@@ -483,6 +483,17 @@ app.get('/api/preoperacionales/:id', async function (req, res) {
     var registro = resultado.data;
     registro.fotos = fotos.data || [];
 
+    // Buscar autorización asociada a este preoperacional
+    var resAut = await supabase
+      .from('autorizaciones_novedad')
+      .select('id, decision, justificacion, novedades_bloqueo, timestamp_alerta, timestamp_decision, supervisor_id')
+      .eq('preoperacional_id', id)
+      .limit(1);
+
+    registro.autorizacion = (!resAut.error && resAut.data && resAut.data.length > 0)
+      ? resAut.data[0]
+      : null;
+
     res.json(registro);
   } catch (error) {
     console.error('Error en GET /api/preoperacionales/:id:', error);
