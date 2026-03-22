@@ -1,0 +1,299 @@
+================================================================================
+CERO — INSTRUCCIONES DEL PROYECTO
+Metodología de trabajo y estado actual
+Actualizado: 22/03/2026
+================================================================================
+
+AUTOR       Sergio — Ing. Eléctrico
+PROYECTO    CERO — Gestión de Operaciones de Campo
+EMPRESA     Inteligencia de Ciudad S.A.S.
+CLIENTE     EDEMSA (Popayán)
+TAGLINE     cero papel, cero accidentes
+
+================================================================================
+1. METODOLOGÍA DE TRABAJO
+================================================================================
+
+El proyecto CERO se desarrolla con dos herramientas de IA coordinadas:
+
+CLAUDE (chat) — Consultor senior de diseño y arquitectura
+  - Diseña la solución completa antes de escribir código
+  - Mantiene el contexto total del proyecto (12 sesiones de diseño)
+  - Toma decisiones de arquitectura, flujo, UX y legales
+  - Genera documentos de sesión de diseño (propiedad intelectual)
+  - Genera instrucciones precisas para Claude Code
+  - Revisa código implementado, diagnostica errores
+  - Si necesita ver un archivo del repo, lo pide a Sergio
+
+CLAUDE CODE — Ejecutor de código conectado a GitHub
+  - Recibe instrucciones específicas de Claude (chat)
+  - Implementa los cambios en el código
+  - Ejecuta directamente en el repo (rama activa)
+  - Despliega automáticamente vía Railway
+  - NO toma decisiones de diseño por su cuenta
+  - NO cambia arquitectura sin instrucciones explícitas
+
+FLUJO DE TRABAJO:
+  1. Sergio plantea el problema/necesidad en Claude (chat)
+  2. Claude diseña la solución, la cuestiona, la refina
+  3. Claude genera instrucciones detalladas (BUSCAR/REEMPLAZAR,
+     archivos nuevos, SQL, etc.)
+  4. Sergio copia las instrucciones y las pega en Claude Code
+  5. Claude Code implementa y despliega
+  6. Sergio prueba (WhatsApp, panel web, logs Railway)
+  7. Si hay errores, Sergio reporta en Claude (chat)
+  8. Claude diagnostica y genera instrucciones de corrección
+  9. Se repite hasta que funcione
+
+REGLA CLAVE: Claude Code no debe inventar diseño. Si algo no está
+claro en las instrucciones, debe preguntar — no adivinar.
+
+
+================================================================================
+2. STACK TECNOLÓGICO (FIJO — NO CAMBIAR)
+================================================================================
+
+  Servidor ............. Node.js + Express
+  Base de datos ........ Supabase (PostgreSQL, São Paulo)
+  Hosting .............. Railway (auto-deploy desde GitHub)
+  Mensajería ........... Twilio WhatsApp
+  IA ................... Google Gemini API (gemini-2.0-flash)
+  PDF .................. PDFKit
+  Repositorio .......... GitHub privado (sergioesv/CERO)
+  Rama principal ....... create-branch
+  Rama actual .......... claude-add-authorizations-table
+
+
+================================================================================
+3. REGLAS DE DESARROLLO (OBLIGATORIAS)
+================================================================================
+
+  1. Código siempre COMPLETO — nunca "// resto del código aquí"
+  2. Código comentado en ESPAÑOL
+  3. Archivos con nombres BARE (flujo.js, no preoperacional_flujo.js)
+  4. Arquitectura MODULAR — cada módulo tiene:
+     flujo.js, estado.js, mensajes.js, validaciones.js, cierre.js
+  5. Gemini solo cuando agrega valor — lógica directa para
+     respuestas predecibles (modelo híbrido)
+  6. Documentos de entrega en .txt — no PDF, no Word
+  7. Respuestas cortas y directas
+  8. Si algo falla, diagnosticar ANTES de cambiar tecnología
+  9. Las variables de Railway NUNCA llevan comillas
+  10. Las URLs de Twilio requieren Basic Auth para descargar fotos
+
+
+================================================================================
+4. ESTADO ACTUAL DEL PROYECTO — 22/03/2026
+================================================================================
+
+FASE 1 — CONTROL DE VEHÍCULOS ........................ COMPLETA
+  1.1 Preoperacional WhatsApp con PDF ................. COMPLETADO
+  1.2 Posoperacional WhatsApp con PDF ................. COMPLETADO
+  1.3 Tanqueo/Combustible ............................. COMPLETADO
+  1.4 Alertas automáticas de documentos ............... COMPLETADO
+  + Inscripción automática de conductores ............. COMPLETADO
+  + Sistema de autorización de novedades v12 .......... COMPLETADO
+
+FASE 2 — DASHBOARD, PANEL ADMIN Y REPORTES
+  2.1 Panel de administración web
+      - Estructura frontend (CSS, JS, componentes) .... COMPLETADO
+      - Sistema de temas (claro/oscuro) ............... COMPLETADO
+      - Módulo Flota de vehículos ..................... COMPLETADO
+      - Módulo Preoperacionales ....................... COMPLETADO
+      - Módulo Conductores ............................ PENDIENTE
+      - Módulo Alertas ................................ PENDIENTE
+      - Módulo Posoperacionales ....................... PENDIENTE
+      - Módulo Tanqueos ............................... PENDIENTE
+  2.2 Dashboard operativo ............................. PENDIENTE
+  2.3 Historial y reportes ............................ PENDIENTE
+  2.4 Integración Power BI ............................ FUTURO
+
+FASE 3 — SEGURIDAD DEL PERSONAL ...................... FUTURO
+
+
+================================================================================
+5. ARQUITECTURA DEL SISTEMA
+================================================================================
+
+/
+├── index.js                          # Express + endpoints API + cron
+├── package.json
+├── config/
+│   └── config.js                     # Supabase, Twilio, Gemini, TABLES
+├── canales/
+│   ├── whatsapp.js                   # Router WhatsApp + autorización supervisor
+│   └── dashboard.js                  # Health check del panel
+├── data/
+│   ├── vehiculos.js                  # CRUD vehículos + conductores
+│   ├── inspecciones.js               # CRUD preoperacionales + fotos
+│   ├── posoperacionales.js           # CRUD posoperacionales
+│   ├── tanqueos.js                   # CRUD tanqueos
+│   ├── alertas.js                    # Consultas vencimientos
+│   └── autorizaciones.js             # CRUD autorizaciones (v12)
+├── modulos/
+│   ├── vehiculos/
+│   │   ├── preoperacional/
+│   │   │   ├── flujo.js              # Orquestador + estado SUB_PREGUNTA
+│   │   │   ├── estado.js             # Manejo sesión + subPreguntasCola
+│   │   │   ├── mensajes.js           # Textos UX + mensajeFinalBloqueado
+│   │   │   ├── validaciones.js       # 20 ítems, 7 sub-preguntas, severidad
+│   │   │   └── cierre.js             # Guardado + evaluación bloqueos
+│   │   ├── posoperacional/
+│   │   │   ├── flujo.js, estado.js, mensajes.js,
+│   │   │   ├── validaciones.js, cierre.js
+│   │   ├── tanqueo/
+│   │   │   ├── flujo.js, estado.js, mensajes.js,
+│   │   │   └── validaciones.js
+│   │   └── inscripcion/
+│   │       ├── flujo.js, estado.js, mensajes.js,
+│   │       └── validaciones.js
+│   ├── alertas/
+│   │   ├── notificador.js            # Cron 6AM + envío WhatsApp
+│   │   └── reglas.js                 # Umbrales 30/15/7/0 días
+│   └── seguridad-campo/              # FASE 3 — futuro
+├── servicios/
+│   ├── pdf.js                        # Generación PDF preoperacional
+│   ├── pdfPosoperacional.js          # Generación PDF posoperacional
+│   ├── ocr.js                        # Gemini Vision + interpretación
+│   ├── sesiones.js                   # Sesiones en memoria + file store
+│   ├── storage.js                    # Manejo de fotos
+│   └── logo.js                       # Logo EDEMSA en Base64
+└── public/
+    ├── index.html
+    ├── css/                          # variables, temas, componentes, layout
+    ├── js/                           # app, api, router, theme, utils
+    ├── components/                   # sidebar, table, badge, card, modal, toast
+    └── modules/vehiculos/
+        ├── flota.js                  # Gestión de vehículos
+        └── preoperacionales.js       # Historial + drawer + autorizaciones
+
+
+================================================================================
+6. BASE DE DATOS — TABLAS PRINCIPALES
+================================================================================
+
+  vehiculos ............... placa, tipo, marca, modelo, año, km,
+                            soat, tecno, bloqueado, motivo, estado
+  conductores ............. nombre, cedula, telefono, licencia,
+                            cargo, activo
+  preoperacionales ........ vehiculo_placa, conductor_id, km,
+                            fecha, hora, estado, novedades (jsonb),
+                            motor_niveles, electrico_luces,
+                            frenos_direccion_llantas, cabina_equipo,
+                            observaciones, firma, pdf_url
+  fotos_evidencia ......... preoperacional_id, tipo, foto_url,
+                            descripcion, validada
+  posoperacionales ........ vehiculo_placa, conductor_id, datos
+  tanqueos ................ vehiculo_placa, tipo_combustible,
+                            cantidad, valor, estacion
+  sesiones_activas ........ telefono, tipo, estado, datos
+  autorizaciones_novedad .. preoperacional_id, vehiculo_placa,
+                            conductor_id, novedades_bloqueo (jsonb),
+                            decision, justificacion, supervisor_id,
+                            timestamp_alerta, timestamp_decision
+
+
+================================================================================
+7. ENDPOINTS API EXISTENTES
+================================================================================
+
+  Vehículos:
+    GET    /api/vehiculos
+    GET    /api/vehiculos/:placa
+    POST   /api/vehiculos
+    PUT    /api/vehiculos/:placa
+    DELETE /api/vehiculos/:placa
+    POST   /api/vehiculos/:placa/bloquear
+    POST   /api/vehiculos/:placa/desbloquear
+
+  Conductores:
+    GET    /api/conductores
+    GET    /api/conductores/:id
+    POST   /api/conductores
+    PUT    /api/conductores/:id
+
+  Preoperacionales:
+    GET    /api/preoperacionales
+    GET    /api/preoperacionales/:id
+
+  Autorizaciones:
+    GET    /api/autorizaciones
+    GET    /api/autorizaciones/pendientes
+
+  Alertas:
+    GET    /api/alertas/resumen
+    GET    /alertas/ejecutar
+
+  Dashboard:
+    GET    /api/dashboard/resumen
+
+
+================================================================================
+8. SISTEMA DE AUTORIZACIÓN DE NOVEDADES (v12)
+================================================================================
+
+Flujo:
+  1. Operario reporta novedad en ítem crítico
+  2. Si el ítem tiene sub-pregunta → bot pregunta precisión
+  3. Sistema clasifica: INFORMATIVO / ALERTA / BLOQUEO
+  4. Si hay BLOQUEO → supervisor notificado por WhatsApp
+  5. Supervisor responde: AUTORIZAR PLACA / TALLER PLACA / RESTRINGIR PLACA
+  6. Si AUTORIZAR → pide justificación (mín 10 caracteres)
+  7. Decisión registrada con timestamp y justificación
+  8. Operario notificado de la decisión
+
+Ítems con sub-pregunta (7):
+  Aceite motor, Refrigerante, Líquido frenos, Fugas visibles,
+  Pito y alarma reversa, Estado llantas, Pernos de ruedas
+
+Ítems binarios que bloquean (6):
+  Luces, Stops/direccionales, Freno parqueo,
+  Cinturones, Retrovisores, Pedales (freno)
+
+Ítem que nunca bloquea: Equipo carretera (solo alerta)
+
+
+================================================================================
+9. NAVEGACIÓN WHATSAPP — ESTÁNDARES
+================================================================================
+
+  0️⃣ ......... Atrás (paso anterior)
+  9️⃣ ......... Menú principal (cancela sesión)
+  ATRAS ....... Alias de 0
+  CANCELAR .... Alias de 9
+  MENU ........ Alias de 9
+  SI .......... Firmar / confirmar
+  1️⃣ ......... Todo OK / primera opción
+  2️⃣ ......... Novedad / segunda opción
+
+  Comandos del supervisor (sin sesión activa):
+  AUTORIZAR [PLACA] ... Autorizar salida (pide justificación)
+  TALLER [PLACA] ...... Enviar a taller (directo)
+  RESTRINGIR [PLACA] .. Restringir operación (directo)
+
+
+================================================================================
+10. DOCUMENTOS DE REFERENCIA
+================================================================================
+
+  Sesión v1 .... 03/03/2026 — Diseño inicial, pruebas chatbot
+  Sesión v2 .... 06/03/2026 — Rediseño 20 ítems en 4 bloques
+  Sesión v3 .... 07/03/2026 — Modelo híbrido, UX WhatsApp, PDF
+  Sesión v4 .... 08/03/2026 — Estabilidad, vehículos reales
+  Sesión v6 .... 11/03/2026 — Lectura tolerante placa/odómetro
+  Sesión v8 .... 15/03/2026 — Migración a Gemini, modular
+  Sesión v9 .... 20/03/2026 — Inscripción, navegación numérica
+  Sesión v10 ... 20/03/2026 — Cierre Fase 1, alertas documentos
+  Sesión v11 ... 21/03/2026 — Panel admin, módulo flota
+  Sesión v12 ... 22/03/2026 — Sub-preguntas, autorizaciones
+
+
+================================================================================
+
+_______________________
+Sergio
+Autor y desarrollador
+
+CERO — Instrucciones del proyecto — 22/03/2026
+Propiedad intelectual de Sergio — Inteligencia de Ciudad S.A.S.
+Todos los derechos reservados
