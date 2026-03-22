@@ -402,31 +402,14 @@ const Preoperacionales = {
       html += '<div class="drawer-observacion">' + Utils.escaparHTML(registro.observaciones) + '</div>';
       html += '</div>';
     }
-
-    // ── Fotos ──
-    var fotos = registro.fotos || [];
-    if (fotos.length > 0) {
+    
+    // ── Botón PDF ──
+    if (registro.pdf_url) {
       html += '<div class="drawer-section">';
-      html += '<div class="drawer-section-title">Fotos (' + fotos.length + ')</div>';
-      html += '<div class="drawer-fotos-grid">';
-      fotos.forEach(function (foto) {
-        var tipoClass = foto.tipo === 'verificacion' ? 'badge-success' : 'badge-warning';
-        var tipoTexto = foto.tipo === 'verificacion' ? 'VERIFICACIÓN' : 'NOVEDAD';
-        html += '<div class="drawer-foto">';
-        if (foto.foto_url) {
-          html += '<img src="' + foto.foto_url + '" alt="' + Utils.escaparHTML(foto.descripcion || '') + '" class="drawer-foto-img" onclick="window.open(\'' + foto.foto_url + '\', \'_blank\')">';
-        }
-        html += '<div class="flex items-center justify-between mt-sm">';
-        html += '<span class="badge ' + tipoClass + '">' + tipoTexto + '</span>';
-        html += '</div>';
-        if (foto.descripcion) {
-          html += '<div class="text-xs text-secondary mt-sm">' + Utils.escaparHTML(foto.descripcion) + '</div>';
-        }
-        html += '</div>';
-      });
-      html += '</div></div>';
+      html += '<a href="' + registro.pdf_url + '" target="_blank" class="btn btn-primary" style="width:100%;text-align:center;">📄 Ver PDF del preoperacional</a>';
+      html += '</div>';
     }
-
+    
     // ── Firma ──
     if (registro.firma_operario) {
       html += '<div class="drawer-section">';
