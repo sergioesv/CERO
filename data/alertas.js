@@ -135,14 +135,16 @@ async function obtenerContactosPorCargo(cargo) {
     .from(config.TABLES.conductores)
     .select('nombre, telefono, cargo')
     .eq('cargo', cargo)
-    .eq('activo', true);
+    .neq('activo', false);
 
   if (resultado.error || !Array.isArray(resultado.data)) {
     console.error('❌ Error obteniendo contactos con cargo ' + cargo + ':', resultado.error?.message);
     return [];
   }
 
-  return resultado.data;
+  var contactos = resultado.data.filter(function(c) { return c.telefono; });
+  console.log('👥 Contactos con cargo ' + cargo + ': ' + contactos.length);
+  return contactos;
 }
 
 // ───────────────────────────────────────────────────────────
