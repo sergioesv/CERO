@@ -380,7 +380,7 @@ async function generarPDF(sesion) {
         doc.fill(NEGRO).fontSize(8).font('Helvetica-Bold').text(grupo.nombre, MARGIN + 10, y + 4);
         y += 22;
 
-        // Mapa de estados reportados
+        // Mapa de estados reportados (estado genérico de Gemini)
         var respuesta = (sesion.respuestas && sesion.respuestas[grupo.id]) ? sesion.respuestas[grupo.id] : null;
         var itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
         var mapaEstados = {};
@@ -388,10 +388,24 @@ async function generarPDF(sesion) {
           mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
         }
 
+        // Mapa de estados precisos desde novedades (sub-preguntas del operario)
+        // Sobreescribe el estado genérico cuando el operario eligió una opción precisa
+        var mapaNovedades = {};
+        var novedadesSesion = sesion.novedades || sesion.items || [];
+        for (var ni2 = 0; ni2 < novedadesSesion.length; ni2++) {
+          var nov2 = novedadesSesion[ni2];
+          if (nov2.grupo === grupo.nombre && nov2.item && nov2.estado) {
+            mapaNovedades[nov2.item] = nov2.estado;
+          }
+        }
+
         for (var j = 0; j < grupo.items.length; j++) {
           y = checkY(y, 22);
           var itemDef = grupo.items[j];
-          var estadoVal = mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK';
+          // Preferir estado preciso de sub-pregunta sobre el estado genérico
+          var estadoVal = mapaNovedades.hasOwnProperty(itemDef.nombre)
+            ? mapaNovedades[itemDef.nombre]
+            : (mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK');
           var estadoTexto, estadoColor;
 
           var clasificacion = utils.clasificarEstado(estadoVal);

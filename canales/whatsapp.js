@@ -28,6 +28,12 @@ async function webhookWhatsApp(req, res) {
   try {
     let sesion = await obtenerSesion(telefono);
 
+    // ── Justificación pendiente (supervisor acaba de escribir AUTORIZAR y debe explicar por qué) ──
+    // Este bloque tiene prioridad sobre MENU/CANCELAR para dar mensaje de cancelación específico
+    if (sesion.autorizacionPendiente) {
+      return await manejarJustificacionSupervisor(req, res, telefono, sesion, mensaje, msgUpper);
+    }
+
     // ── 9 / MENU / INICIO / CANCELAR → menú directo, sin mensaje intermedio ──
     if (
       mensaje === '9'       ||
@@ -107,7 +113,31 @@ async function manejarDecisionSupervisor(req, res, telefonoSupervisor, accion, p
     };
     var decision = decisionMap[accion];
 
-    // Registrar la decisión
+    // ── AUTORIZAR requiere justificación legal antes de registrar la decisión ──
+    // Para TALLER y RESTRINGIR la acción es suficiente; se registran de inmediato.
+    if (accion === 'AUTORIZAR') {
+      var sesionSup = await obtenerSesion(telefonoSupervisor);
+      sesionSup.autorizacionPendiente = {
+        placa: placa,
+        autorizacionId: autorizacion.id,
+        preoperacionalId: autorizacion.preoperacional_id,
+        conductorId: autorizacion.conductor_id,
+        supervisorId: supervisor.id,
+        supervisorNombre: supervisor.nombre
+      };
+      guardarCambios();
+
+      return responderTwiml(res,
+        '✍️ *JUSTIFICACIÓN REQUERIDA*\n' +
+        '━━━━━━━━━━━━━━━━\n' +
+        '🚗 Vehículo: *' + placa + '*\n\n' +
+        'Para autorizar la salida, escribe la razón:\n' +
+        '_Ej: "Freno revisado, funciona al segundo intento, se programa mantenimiento"_\n\n' +
+        'Escribe *CANCELAR* para anular.'
+      );
+    }
+
+    // TALLER / RESTRINGIR — registrar inmediatamente (sin justificación)
     var resultado = await autorizacionesData.registrarDecision(
       autorizacion.id,
       autorizacion.preoperacional_id,
@@ -141,15 +171,7 @@ async function manejarDecisionSupervisor(req, res, telefonoSupervisor, accion, p
         var conductorResp = await vehiculosData.buscarConductorPorId(autorizacion.conductor_id);
         if (conductorResp && conductorResp.telefono) {
           var msgOperario;
-          if (decision === 'autorizado') {
-            msgOperario =
-              '✅ *VEHÍCULO AUTORIZADO*\n' +
-              '━━━━━━━━━━━━━━━━\n' +
-              '🚗 *' + placa + '*\n' +
-              '👤 Supervisor: ' + supervisor.nombre + '\n' +
-              '⏱️ ' + horaTexto + '\n\n' +
-              'Puedes continuar con la operación.';
-          } else if (decision === 'taller') {
+          if (decision === 'taller') {
             msgOperario =
               '🔧 *VEHÍCULO — ENVIAR A TALLER*\n' +
               '━━━━━━━━━━━━━━━━\n' +
@@ -180,6 +202,83 @@ async function manejarDecisionSupervisor(req, res, telefonoSupervisor, accion, p
     console.error('❌ Error en manejarDecisionSupervisor:', error);
     return responderTwiml(res, '❌ Error procesando la autorización. Intenta de nuevo.');
   }
+}
+
+// ============================================================================
+// PASO 2 DE AUTORIZACIÓN — recibe la justificación del supervisor
+// Se activa cuando sesion.autorizacionPendiente está presente
+// ============================================================================
+
+async function manejarJustificacionSupervisor(req, res, telefonoSupervisor, sesion, mensaje, msgUpper) {
+  var pendiente = sesion.autorizacionPendiente;
+  var placa = pendiente.placa;
+
+  // El supervisor cancela la autorización
+  if (msgUpper === 'CANCELAR' || msgUpper === 'MENU' || msgUpper === 'INICIO' || mensaje === '9') {
+    delete sesion.autorizacionPendiente;
+    guardarCambios();
+    return responderTwiml(res, '❌ Autorización cancelada para *' + placa + '*.');
+  }
+
+  // Validar que la justificación tenga al menos 10 caracteres
+  if (mensaje.length < 10) {
+    return responderTwiml(res,
+      '✍️ La justificación debe tener al menos 10 caracteres.\n' +
+      'Describe por qué autorizas la salida del vehículo *' + placa + '*.'
+    );
+  }
+
+  // Registrar la decisión con la justificación
+  var resultado = await autorizacionesData.registrarDecision(
+    pendiente.autorizacionId,
+    pendiente.preoperacionalId,
+    'autorizado',
+    mensaje,
+    pendiente.supervisorId
+  );
+
+  if (resultado.error) {
+    console.error('Error registrando autorización con justificación:', resultado.error);
+    return responderTwiml(res, '❌ Error procesando la autorización. Intenta de nuevo.');
+  }
+
+  // Limpiar el estado pendiente
+  delete sesion.autorizacionPendiente;
+  guardarCambios();
+
+  var ahora = new Date(new Date().getTime() - (5 * 60 * 60 * 1000));
+  var horaTexto = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+  // Notificar al operario
+  if (pendiente.conductorId) {
+    try {
+      var conductorResp = await vehiculosData.buscarConductorPorId(pendiente.conductorId);
+      if (conductorResp && conductorResp.telefono) {
+        var msgOperario =
+          '✅ *VEHÍCULO AUTORIZADO*\n' +
+          '━━━━━━━━━━━━━━━━\n' +
+          '🚗 *' + placa + '*\n' +
+          '👤 Supervisor: ' + pendiente.supervisorNombre + '\n' +
+          '⏱️ ' + horaTexto + '\n\n' +
+          'Puedes continuar con la operación.';
+        await alertasNotificador.enviarWhatsApp(conductorResp.telefono, msgOperario);
+      }
+    } catch (errNotif) {
+      console.error('Error notificando al operario:', errNotif.message);
+    }
+  }
+
+  console.log('✅ Autorización con justificación registrada — ' + placa + ' (supervisor: ' + pendiente.supervisorNombre + ')');
+
+  return responderTwiml(res,
+    '✅ *AUTORIZACIÓN REGISTRADA*\n' +
+    '━━━━━━━━━━━━━━━━\n' +
+    '🚗 Vehículo: *' + placa + '*\n' +
+    '📋 Decisión: *AUTORIZADO*\n' +
+    '📝 Justificación guardada\n' +
+    '⏱️ ' + horaTexto + '\n' +
+    'Tu respuesta queda registrada en el sistema CERO.'
+  );
 }
 
 // ============================================================================

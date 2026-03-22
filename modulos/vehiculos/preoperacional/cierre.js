@@ -109,10 +109,15 @@ function construirDatosSesionPdf(sesion, grupos, telefono, ahora) {
       nombre: grupo.nombre,
       items: grupo.items.map(function(itemDef) {
         var encontrado = itemsRespuesta.find(function(r) { return r.nombre === itemDef.nombre; });
+        // Si hay novedad con estado preciso de sub-pregunta, usarlo en vez del genérico de Gemini
+        var novedadPrecisa = (datosSesion.novedades || []).find(function(n) {
+          return n.item === itemDef.nombre && n.grupo === grupo.nombre;
+        });
+        var estadoFinal = novedadPrecisa ? novedadPrecisa.estado : (encontrado ? encontrado.estado : 'OK');
         return {
           nombre: itemDef.nombre,
           critico: itemDef.critico,
-          estado: encontrado ? encontrado.estado : 'OK'
+          estado: estadoFinal
         };
       })
     };
