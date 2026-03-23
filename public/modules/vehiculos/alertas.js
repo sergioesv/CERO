@@ -112,8 +112,10 @@ const AlertasModule = {
       });
     });
 
-    // 2. Vehículos bloqueados
-    this.datos.documentos.filter(function(v) { return v.bloqueado; }).forEach(function(v) {
+    // 2. Vehículos bloqueados (excluir los que tienen autorización pendiente — esos van en "pendientes")
+    var placasConPendiente = {};
+    this.datos.pendientes.forEach(function(a) { placasConPendiente[a.vehiculo_placa] = true; });
+    this.datos.documentos.filter(function(v) { return v.bloqueado && !placasConPendiente[v.placa]; }).forEach(function(v) {
       items.push({
         _id: 'bloq_' + v.placa,
         _tipo: 'bloqueado',
@@ -553,6 +555,7 @@ const AlertasModule = {
 
   renderMiniDocs(raw) {
     if (!raw) return '';
+    var self = this;
     var docs = [
       { nombre: 'SOAT', doc: raw.soat },
       { nombre: 'Tecnomecánica', doc: raw.tecnomecanica },
@@ -562,15 +565,25 @@ const AlertasModule = {
     return `<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">` +
       docs.map(function(d) {
         var doc = d.doc;
-        if (!doc) return `<div class="drawer-info-card"><div class="stat-label">${d.nombre}</div><div class="text-xs text-secondary">—</div></div>`;
-        var colorMap = { vigente: 'var(--success-text)', proximo: 'var(--warning-text)', urgente: 'var(--warning-text)', critico: 'var(--danger-text)', vencido: 'var(--danger-text)', sin_dato: 'var(--text-tertiary)' };
+        if (!doc || doc.estado === 'sin_dato' || doc.dias_restantes === null) {
+          return `<div class="drawer-info-card"><div class="stat-label">${d.nombre}</div><div class="text-xs" style="color:var(--text-tertiary);">Sin registro</div></div>`;
+        }
+        var colorMap = { vigente: 'var(--success-text)', proximo: 'var(--warning-text)', urgente: 'var(--warning-text)', critico: 'var(--danger-text)', vencido: 'var(--danger-text)' };
         var color = colorMap[doc.estado] || 'inherit';
-        var dias = doc.dias_restantes !== null ? doc.dias_restantes + 'd' : '—';
+        var fecha = doc.vencimiento ? self.formatearFecha(doc.vencimiento) : '';
+        var texto;
+        if (doc.dias_restantes <= 0) {
+          texto = 'VENCIDO' + (fecha ? ' — ' + fecha : '');
+        } else if (doc.estado === 'vigente') {
+          texto = 'Vigente' + (fecha ? ' — ' + fecha : '');
+        } else {
+          texto = 'Vence en ' + doc.dias_restantes + 'd' + (fecha ? ' — ' + fecha : '');
+        }
         var conductor = (d.nombre === 'Licencia' && doc.conductor) ? `<div class="text-xs text-secondary" style="margin-top:2px;">${Utils.escaparHTML(doc.conductor)}</div>` : '';
         return `
           <div class="drawer-info-card">
             <div class="stat-label">${d.nombre}</div>
-            <div class="text-sm font-medium" style="color:${color};">${dias}</div>
+            <div class="text-xs font-medium" style="color:${color};">${Utils.escaparHTML(texto)}</div>
             ${conductor}
           </div>
         `;

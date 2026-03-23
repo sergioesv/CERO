@@ -555,7 +555,36 @@ async function manejarPreoperacional(req, res) {
           if (esOpcion(msgLower, ['4', '4️⃣'])) return manejarAtras(res, sesion);
           if (esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
 
-          if (!sesion.kmLecturaFueraRango && sesion.kmDetectado != null && (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar')) {
+          // Caso A: lectura fuera de rango — mensaje muestra 2 opciones: 1→manual, 2→nueva foto
+          if (sesion.kmLecturaFueraRango) {
+            if (msgLower === '1' || msgLower === '1️⃣') {
+              sesion.estado = 'ODOMETRO_MANUAL';
+              return preop.responderTwiml(res, '⌨️ Escribe el kilometraje correcto usando solo numeros.');
+            }
+            if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
+              sesion.kmDetectado = null;
+              sesion.kmLecturaFueraRango = false;
+              sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+              return preop.responderTwiml(res, mensajes.mensajeInicioOdometro(sesion.vehiculo));
+            }
+            return preop.responderTwiml(res, mensajes.mensajeKilometrajeFueraRango(sesion, evaluarKilometrajeContraHistorico(sesion, sesion.kmDetectado || 0), config.MAX_KM_SALTO));
+          }
+
+          // Caso B: no se pudo leer el km — mensaje muestra 2 opciones: 1→manual, 2→nueva foto
+          if (sesion.kmDetectado == null) {
+            if (msgLower === '1' || msgLower === '1️⃣') {
+              sesion.estado = 'ODOMETRO_MANUAL';
+              return preop.responderTwiml(res, '⌨️ Escribe el kilometraje correcto usando solo numeros.');
+            }
+            if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
+              sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+              return preop.responderTwiml(res, mensajes.mensajeInicioOdometro(sesion.vehiculo));
+            }
+            return preop.responderTwiml(res, mensajes.mensajeConfirmacionOdometro(sesion));
+          }
+
+          // Caso C: km detectado y en rango — mensaje muestra 3 opciones: 1→confirmar, 2→manual, 3→nueva foto
+          if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') {
             registrarKilometrajeConfirmado(sesion, sesion.kmDetectado, 'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km');
             return preop.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion));
           }
@@ -567,13 +596,8 @@ async function manejarPreoperacional(req, res) {
 
           if (msgLower === '3' || msgLower === '3️⃣' || msgLower === 'foto') {
             sesion.kmDetectado = null;
-            sesion.kmLecturaFueraRango = false;
             sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
             return preop.responderTwiml(res, mensajes.mensajeInicioOdometro(sesion.vehiculo));
-          }
-
-          if (sesion.kmLecturaFueraRango) {
-            return preop.responderTwiml(res, mensajes.mensajeKilometrajeFueraRango(sesion, evaluarKilometrajeContraHistorico(sesion, sesion.kmDetectado || 0), config.MAX_KM_SALTO));
           }
 
           return preop.responderTwiml(res, mensajes.mensajeConfirmacionOdometro(sesion));
