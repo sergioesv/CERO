@@ -1,0 +1,428 @@
+================================================================================
+CERO — SESIÓN DE DISEÑO v13
+Módulo Alertas, botones de autorización en panel y limpieza de BD
+Fecha: 22-23/03/2026
+================================================================================
+
+AUTOR       Sergio — Ing. Eléctrico
+PROYECTO    CERO — Gestión de Operaciones de Campo
+VERSIÓN     v13.0 — Módulo Alertas + autorización desde panel web
+ESTADO      Fase 2.1 — En desarrollo
+
+DOCUMENTOS DE REFERENCIA: Sesión de Diseño v12.1 (22/03/2026).
+
+AVISO LEGAL: Este documento y el sistema descrito son propiedad intelectual
+exclusiva de su autor. Desarrollado de forma independiente en tiempo y
+recursos propios. Inteligencia de Ciudad S.A.S.
+
+
+================================================================================
+1. CONTEXTO Y JUSTIFICACIÓN DE v13
+================================================================================
+
+La sesión v13 cubre dos días de trabajo (22-23/03/2026) enfocados en:
+
+1. Diseño e implementación del módulo Alertas del panel web con patrón
+   inbox (lista + detalle split) — aprobado después de evaluar mockups
+   de dos patrones diferentes
+2. Autorización de novedades desde el panel web (antes solo por WhatsApp)
+3. Corrección de 5 bugs (filtros, sidebar móvil, km invertido)
+4. Limpieza completa de la base de datos de prueba
+5. Reorganización de ramas en GitHub — rama principal renombrada a
+   "desarrollo"
+
+
+================================================================================
+2. METODOLOGÍA DE DESARROLLO — CLAUDE CHAT + CLAUDE CODE
+================================================================================
+
+A partir de v13 se formaliza la metodología dual de desarrollo:
+
+CLAUDE CHAT (este chat):
+- Diseño de funcionalidades y mockups interactivos
+- Toma de decisiones de arquitectura con Sergio
+- Diagnóstico de problemas a partir de logs y capturas
+- Generación de documentos de instrucciones (.txt) para Claude Code
+- Documentación (sesiones de diseño, estado del proyecto)
+- NO escribe código directamente al repositorio
+
+CLAUDE CODE (terminal local de Sergio):
+- Ejecuta las instrucciones generadas en el chat
+- Escribe, modifica y pushea código al repo GitHub
+- Corre comandos, instala dependencias, prueba endpoints
+- Trabaja siempre en la rama "desarrollo" (commit directo)
+- Solo crea rama nueva cuando se empiece un módulo completamente nuevo
+
+FLUJO DE TRABAJO:
+1. Sergio plantea la necesidad en Claude Chat
+2. Chat diseña, discute opciones con Sergio, genera instrucciones
+3. Sergio copia las instrucciones a Claude Code
+4. Claude Code implementa y pushea a "desarrollo"
+5. Railway auto-despliega
+6. Sergio prueba y reporta resultados en Chat
+7. Si hay bugs → Chat diagnostica → genera nuevas instrucciones → paso 3
+
+REGLAS PARA CLAUDE CODE (incluir siempre al inicio de instrucciones):
+- Rama: desarrollo — commit directo, NO crear ramas nuevas
+- Código completo, comentado en español
+- Solo modificar los archivos necesarios
+- Verificar que no rompa funcionalidad existente
+
+
+================================================================================
+3. MÓDULO ALERTAS — PATRÓN INBOX (COMPLETADO)
+================================================================================
+
+2.1 Decisión de diseño
+
+Se evaluaron dos patrones con mockups interactivos:
+- Opción A: Patrón inbox (lista izquierda + panel detalle derecho)
+- Opción B: Patrón cards + tabla + drawer (como Preoperacionales)
+
+Se aprobó el patrón inbox para Alertas por las siguientes razones:
+- Con 150 vehículos y 50 novedades, el supervisor necesita triaje rápido
+- La lista y el detalle son visibles simultáneamente (sin abrir/cerrar)
+- Agrupa diferentes tipos de alerta (documentos, bloqueos, autorizaciones)
+  en una sola vista priorizada
+
+Decisión de consistencia: Cada módulo usa el patrón que mejor se adapta
+a su complejidad. Alertas usa inbox. Los demás (Conductores,
+Posoperacionales, Tanqueos) usan cards + tabla + drawer.
+
+2.2 Estructura del módulo
+
+Archivo: public/modules/vehiculos/alertas.js
+
+Componentes:
+- 4 stat cards clicables como filtro (docs por vencer, bloqueados,
+  auth pendientes, alertas hoy)
+- Lista priorizada con borde de color por severidad
+- Panel de detalle según tipo de alerta
+- Modal de justificación para autorizar (mín 10 chars)
+- Modal de confirmación para taller/restringir
+- Historial reciente del vehículo (timeline, carga lazy)
+- Búsqueda por placa en tiempo real
+
+Orden de prioridad en la lista:
+1. Autorizaciones pendientes (más antigua primero)
+2. Vehículos bloqueados
+3. Documentos críticos (≤7 días)
+4. Documentos urgentes (≤15 días)
+5. Documentos próximos (≤30 días)
+6. Autorizaciones resueltas (más reciente primero)
+
+2.3 Categorización corregida
+
+Un vehículo con autorización pendiente aparece SOLO en "pendientes",
+NO en "bloqueados" — aunque el operario no pueda salir. La razón
+del bloqueo es diferente (novedad en inspección vs documento vencido).
+
+2.4 Documentos del vehículo en detalle
+
+En vez de mostrar "—" cuando no hay fecha:
+- Sin dato → "Sin registro" (gris)
+- Vigente → "Vigente — dd/mm/aaaa" (verde)
+- Por vencer → "Vence en Xd — dd/mm/aaaa" (naranja)
+- Vencido → "VENCIDO — dd/mm/aaaa" (rojo)
+
+
+================================================================================
+4. ENDPOINTS API NUEVOS
+================================================================================
+
+-----------------------------------------------------------
+Endpoint                            | Descripción
+-----------------------------------------------------------
+GET /api/alertas/documentos         | Estado SOAT, tecno y
+                                    | licencia por vehículo
+                                    | con días restantes y
+                                    | clasificación
+-----------------------------------------------------------
+GET /api/autorizaciones/pendientes  | Registros sin decisión
+                                    | ordenados por antigüedad
+-----------------------------------------------------------
+GET /api/autorizaciones/resueltas   | Registros con decisión
+                                    | más reciente primero
+-----------------------------------------------------------
+PUT /api/autorizaciones/:id/decidir | Valida, registra
+                                    | decisión y notifica al
+                                    | conductor por WhatsApp
+-----------------------------------------------------------
+GET /api/vehiculos/:placa/historial | Timeline unificado
+                                    | (preop + posop +
+                                    | tanqueos + auth)
+                                    | límite 50 eventos
+-----------------------------------------------------------
+
+
+================================================================================
+5. AUTORIZACIÓN DESDE EL PANEL WEB
+================================================================================
+
+4.1 Dos canales para la misma acción
+
+El supervisor puede tomar decisiones de autorización desde:
+- WhatsApp: AUTORIZAR/TALLER/RESTRINGIR + PLACA (ya existía)
+- Panel web: botones en el módulo Alertas Y en el drawer de
+  Preoperacionales (nuevo en v13)
+
+Ambos canales usan la misma función registrarDecision() en
+data/autorizaciones.js — sin duplicación de código.
+
+4.2 Botones en el drawer de Preoperacionales
+
+Se agregó sección "Decisión del supervisor" al drawer lateral del
+módulo Preoperacionales. Aparece SOLO cuando la inspección tiene
+novedades de bloqueo:
+
+- Si decision IS NULL → botones Autorizar / Taller / Restringir
+- Si ya tiene decisión → badge con resultado + justificación,
+  sin botones
+
+Botón "Ver PDF del preoperacional" abre el documento en pestaña
+nueva para revisión completa antes de decidir.
+
+4.3 Protección contra doble decisión
+
+El endpoint PUT verifica que decision IS NULL antes de actualizar.
+Si el supervisor ya decidió por WhatsApp y alguien intenta desde
+el panel (o viceversa), retorna error:
+"Esta autorización ya fue resuelta"
+
+
+================================================================================
+6. CORRECCIONES DE BUGS
+================================================================================
+
+-----------------------------------------------------------
+Bug                          | Causa              | Fix
+-----------------------------------------------------------
+Stat cards no filtraban      | renderStats() usaba| Cambio a innerHTML
+la lista al hacer clic       | outerHTML que       | preservando el
+                             | destruía el div     | elemento con su id
+                             | contenedor y sus    |
+                             | event listeners     |
+-----------------------------------------------------------
+Dropdown no filtraba         | Mismo problema del  | Mismo fix
+                             | outerHTML           |
+-----------------------------------------------------------
+Sidebar no visible en móvil  | Sin media query     | Menú hamburguesa
+                             | responsive          | con overlay,
+                             |                     | auto-cierre al
+                             |                     | navegar
+-----------------------------------------------------------
+Opciones km invertidas en    | Handlers cruzados   | Reestructuración
+WhatsApp (manual→foto,       | en estado           | de 3 casos en
+foto→manual)                 | ODOMETRO_           | ODOMETRO_
+                             | CONFIRMACION        | CONFIRMACION
+-----------------------------------------------------------
+WDS340 en "Bloqueados"       | Categorización no   | Excluir placas con
+siendo autorización          | distinguía tipo     | auth pendiente del
+                             | de bloqueo          | grupo bloqueados
+-----------------------------------------------------------
+
+
+================================================================================
+7. REORGANIZACIÓN DE GIT Y RAMAS
+================================================================================
+
+6.1 Problema detectado
+
+Claude Code creaba ramas nuevas para cada tarea menor, acumulando
+ramas y PRs sin mergear. Esto generaba:
+- Confusión sobre dónde estaban los cambios
+- Merges pendientes que bloqueaban deploys
+- Ramas huérfanas
+
+6.2 Nueva regla (permanente)
+
+- Fixes y ajustes menores → commit directo en la rama activa
+- Rama nueva SOLO para módulos completamente nuevos
+
+6.3 Reorganización ejecutada
+
+- Rama principal renombrada de create-branch a "desarrollo"
+- Ramas claude/* mergeadas y eliminadas
+- PRs huérfanos cerrados
+- Railway apunta a "desarrollo" para auto-deploy
+
+Estado final: Una sola rama "desarrollo" como rama principal y
+por defecto del repositorio.
+
+
+================================================================================
+8. LIMPIEZA DE BASE DE DATOS
+================================================================================
+
+7.1 Datos de prueba eliminados
+
+Se eliminaron todos los registros de prueba:
+- preoperacionales, posoperacionales, tanqueos
+- fotos_evidencia, fotos_posoperacional, fotos_tanqueo
+- autorizaciones_novedad
+- sesiones_activas
+- Archivos en Supabase Storage (buckets vaciados)
+
+7.2 Vehículos de prueba eliminados
+
+Placas eliminadas: ABC123, DEF456, GHI789, JKL012, MNO345, PQR678
+
+7.3 Flota real de EDEMSA (11 vehículos)
+
+-----------------------------------------------------------
+Placa   | Tipo                        | Marca   | Estado
+-----------------------------------------------------------
+IDL354  | Camioneta estacas 4x2       | Toyota  | Operativo
+IDL363  | Camioneta estacas 4x2       | Toyota  | Operativo
+MSO120  | Camioneta doble cabina      | Toyota  | Operativo
+MTX900  | Camioneta doble cabina      | Toyota  | Taller
+SHT057  | Camioneta doble cabina      | Toyota  | Operativo
+STQ406  | Camioneta estacas 4x2       | Toyota  | Operativo
+TSS351  | Camioneta doble cabina      | Toyota  | Taller
+WDH689  | Camión canasta              | Toyota  | Operativo
+WDS340  | Camioneta panel (Kangoo)    | Renault | Operativo
+WDS346  | Camioneta panel (Kangoo)    | Renault | Taller
+WLQ37D  | Motocicleta                 | Yamaha  | Taller
+-----------------------------------------------------------
+
+Todos con kilometraje reseteado a 0, desbloqueados.
+
+7.4 Conductores reales (4)
+
+-----------------------------------------------------------
+Nombre                | Cédula     | Cargo       | Activo
+-----------------------------------------------------------
+Administrador Jesus   | 0000000001 | Supervisor  | Sí
+Diego Estrada         | 624664675  | Conductor   | Sí
+Samuel Estrada        | 32552605   | Conductor   | Sí
+Sergio Estrada        | 1020418854 | Conductor   | Sí
+-----------------------------------------------------------
+
+
+================================================================================
+9. ARCHIVOS CREADOS Y MODIFICADOS EN v13
+================================================================================
+
+-----------------------------------------------------------
+Archivo                                | Cambio
+-----------------------------------------------------------
+public/modules/vehiculos/alertas.js    | NUEVO — módulo
+                                       | completo con patrón
+                                       | inbox
+-----------------------------------------------------------
+data/autorizaciones.js                 | NUEVO — función
+                                       | registrarDecision()
+                                       | reutilizable + queries
+-----------------------------------------------------------
+public/modules/vehiculos/              |
+  preoperacionales.js                  | Botones autorización
+                                       | en drawer + Ver PDF
+-----------------------------------------------------------
+public/css/components.css              | Estilos inbox +
+                                       | btn-success/warning +
+                                       | responsive 900px
+-----------------------------------------------------------
+public/css/layout.css                  | Media query móvil
+                                       | sidebar hamburguesa
+-----------------------------------------------------------
+public/components/sidebar.js           | Item Alertas +
+                                       | toggleSidebar() +
+                                       | auto-cierre móvil
+-----------------------------------------------------------
+public/index.html                      | Botón ☰ + overlay
+                                       | + script alertas.js
+-----------------------------------------------------------
+canales/dashboard.js (o index.js)      | 5 endpoints nuevos
+-----------------------------------------------------------
+modulos/vehiculos/preoperacional/      |
+  flujo.js                             | Fix km invertido en
+                                       | ODOMETRO_CONFIRMACION
+-----------------------------------------------------------
+
+
+================================================================================
+10. DECISIONES REGISTRADAS EN v13
+================================================================================
+
+-----------------------------------------------------------
+Decisión                                    | Estado
+-----------------------------------------------------------
+Patrón inbox para módulo Alertas            | APROBADO
+Patrón cards+tabla+drawer para otros módulos| APROBADO
+Supervisor decide desde panel web           | IMPLEMENTADO
+Botones auth en drawer Preoperacionales     | IMPLEMENTADO
+Ver PDF en pestaña nueva                    | IMPLEMENTADO
+Función registrarDecision() reutilizable    | IMPLEMENTADO
+Rama principal = "desarrollo"               | HECHO
+No crear ramas para fixes menores           | REGLA PERMANENTE
+Auth pendiente ≠ Bloqueado en categorización| CORREGIDO
+Documentos sin fecha = "Sin registro"       | CORREGIDO
+Menú hamburguesa en móvil                   | IMPLEMENTADO
+Limpieza total BD de prueba                 | HECHO
+Flota real EDEMSA: 11 vehículos             | ACTUALIZADO
+Conductores reales: 4 personas              | ACTUALIZADO
+-----------------------------------------------------------
+
+
+================================================================================
+11. ESTADO ACTUALIZADO DEL PROYECTO
+================================================================================
+
+FASE 1 — CONTROL DE VEHÍCULOS ........................ COMPLETA
+  1.1 Preoperacional WhatsApp con PDF ................. COMPLETADO
+  1.2 Posoperacional WhatsApp con PDF ................. COMPLETADO
+  1.3 Tanqueo/Combustible ............................. COMPLETADO
+  1.4 Alertas automáticas de documentos ............... COMPLETADO
+  + Inscripción automática de conductores ............. COMPLETADO
+  + Sistema de autorización de novedades v12 .......... COMPLETADO
+
+FASE 2 — DASHBOARD, PANEL ADMIN Y REPORTES
+  2.1 Panel de administración web
+      - Estructura frontend (CSS, JS, componentes) .... COMPLETADO
+      - Sistema de temas (claro/oscuro) ............... COMPLETADO
+      - Módulo Flota de vehículos ..................... COMPLETADO
+      - Módulo Preoperacionales ....................... COMPLETADO
+      - Módulo Alertas (patrón inbox) ................. COMPLETADO ← v13
+      - Módulo Conductores ............................ PENDIENTE
+      - Módulo Posoperacionales ....................... PENDIENTE
+      - Módulo Tanqueos ............................... PENDIENTE
+  2.2 Dashboard operativo ............................. PENDIENTE
+  2.3 Historial y reportes ............................ PENDIENTE
+  2.4 Integración Power BI ............................ FUTURO
+
+FASE 3 — SEGURIDAD DEL PERSONAL ...................... FUTURO
+
+
+================================================================================
+12. PENDIENTES PARA CONTINUAR
+================================================================================
+
+-----------------------------------------------------------
+Prioridad    | Tarea                           | Módulo
+-----------------------------------------------------------
+ALTA         | Módulo Conductores en panel      | Fase 2.1
+MEDIA        | Módulo Posoperacionales en panel | Fase 2.1
+MEDIA        | Módulo Tanqueos en panel         | Fase 2.1
+MEDIA        | Guardar texto original del       | WhatsApp +
+             | operario (no solo interpretación | BD
+             | de IA) en novedades              |
+PRE-CLIENTE  | RLS Supabase + auth panel        | Seguridad
+PRE-CLIENTE  | Validación webhook Twilio        | Seguridad
+PRE-CLIENTE  | Comprar dominio                  | Infra
+-----------------------------------------------------------
+
+Mejoras identificadas pero no priorizadas:
+- Texto original del operario junto a interpretación IA en novedades
+- Escalamiento automático de autorizaciones a 15 min
+- Validación fotos EXIF
+
+
+================================================================================
+
+_______________________
+Sergio
+Autor y desarrollador
+
+CERO — Sesión de Diseño v13 — 23/03/2026
+Propiedad intelectual de Sergio — Inteligencia de Ciudad S.A.S.
+Todos los derechos reservados
