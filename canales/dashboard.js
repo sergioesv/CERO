@@ -2,7 +2,7 @@ const alertasData = require('../data/alertas');
 const preop = require('../modulos/vehiculos/preoperacional/validaciones');
 const bcrypt = require('bcryptjs');
 const { supabase } = require('../config/config');
-const { verificarToken } = require('../middlewares/auth');
+const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 
 function responderHealth(req, res) {
   res.json({
@@ -293,15 +293,15 @@ function registrarDashboard(app) {
   app.get('/dashboard/resumen', responderResumen);
 
   // Sedes
-  app.get('/api/sedes',              verificarToken, listarSedes);
-  app.post('/api/sedes',             verificarToken, crearSede);
-  app.put('/api/sedes/:id',          verificarToken, actualizarSede);
+  app.get('/api/sedes',              verificarToken, verificarPermiso('sedes', 'ver'), listarSedes);
+  app.post('/api/sedes',             verificarToken, verificarPermiso('sedes', 'ver'), crearSede);
+  app.put('/api/sedes/:id',          verificarToken, verificarPermiso('sedes', 'ver'), actualizarSede);
   app.patch('/api/sedes/:id/estado', verificarToken, cambiarEstadoSede);
 
   // Usuarios
-  app.get('/api/usuarios',                    verificarToken, listarUsuarios);
-  app.post('/api/usuarios',                   verificarToken, crearUsuario);
-  app.put('/api/usuarios/:id',                verificarToken, actualizarUsuario);
+  app.get('/api/usuarios',                    verificarToken, verificarPermiso('usuarios', 'ver'), listarUsuarios);
+  app.post('/api/usuarios',                   verificarToken, verificarPermiso('usuarios', 'ver'), crearUsuario);
+  app.put('/api/usuarios/:id',                verificarToken, verificarPermiso('usuarios', 'ver'), actualizarUsuario);
   app.patch('/api/usuarios/:id/estado',       verificarToken, cambiarEstadoUsuario);
   app.patch('/api/usuarios/:id/password',     verificarToken, cambiarPasswordUsuario);
 

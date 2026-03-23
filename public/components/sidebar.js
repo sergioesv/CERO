@@ -62,9 +62,12 @@ const Sidebar = {
     
     let html = '';
     menu.sections.forEach((section, i) => {
+      const visibleItems = section.items.filter(item => !window.App || window.App.canAccessItem(item.id));
+      if (visibleItems.length === 0) return;
+
       if (i > 0) html += '<div class="sidebar-divider"></div>';
       html += `<div class="sidebar-section"><div class="sidebar-section-title">${section.title}</div>`;
-      section.items.forEach(item => {
+      visibleItems.forEach(item => {
         const badge = this.badges[item.id] || (item.badge && item.badge.count > 0 ? item.badge : null);
         const badgeHtml = badge ? `<span class="sidebar-item-badge ${badge.type}">${badge.count}</span>` : '';
         html += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}" onclick="if(window.innerWidth<=768)toggleSidebar()"><span>${item.label}</span>${badgeHtml}</a>`;

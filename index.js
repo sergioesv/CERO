@@ -8,6 +8,8 @@ const express = require('express');
 const { registrarCanalWhatsapp } = require('./canales/whatsapp');
 const { registrarDashboard } = require('./canales/dashboard');
 const { registrarCronAlertas, ejecutarAlertasDiarias } = require('./modulos/alertas/notificador');
+const { verificarToken, verificarPermiso } = require('./middlewares/auth');
+const { seedPermisosBase } = require('./data/permisos');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -97,7 +99,7 @@ const autorizacionesData = require('./data/autorizaciones');
 // ───────────────────────────────────────────────────────────
 
 // GET /api/vehiculos — lista todos los vehículos
-app.get('/api/vehiculos', async function (req, res) {
+app.get('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('vehiculos')
@@ -130,7 +132,7 @@ app.get('/api/vehiculos/:placa', async function (req, res) {
 });
 
 // POST /api/vehiculos — crea un vehículo
-app.post('/api/vehiculos', async function (req, res) {
+app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
   try {
     const vehiculo = {
       placa: req.body.placa.toUpperCase(),
@@ -160,7 +162,7 @@ app.post('/api/vehiculos', async function (req, res) {
 });
 
 // PUT /api/vehiculos/:placa — actualiza un vehículo
-app.put('/api/vehiculos/:placa', async function (req, res) {
+app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
   try {
     const campos = {};
     if (req.body.tipo !== undefined) campos.tipo = req.body.tipo;
@@ -282,7 +284,7 @@ app.delete('/api/vehiculos/:placa', async function (req, res) {
 // ───────────────────────────────────────────────────────────
 
 // GET /api/conductores — lista todos los conductores
-app.get('/api/conductores', async function (req, res) {
+app.get('/api/conductores', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('conductores')
@@ -315,7 +317,7 @@ app.get('/api/conductores/:id', async function (req, res) {
 });
 
 // POST /api/conductores — crea un conductor
-app.post('/api/conductores', async function (req, res) {
+app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
     const conductor = {
       nombre: req.body.nombre,
@@ -342,7 +344,7 @@ app.post('/api/conductores', async function (req, res) {
 });
 
 // PUT /api/conductores/:id — actualiza un conductor
-app.put('/api/conductores/:id', async function (req, res) {
+app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
     const campos = {};
     if (req.body.nombre !== undefined) campos.nombre = req.body.nombre;
@@ -720,6 +722,10 @@ app.get('/api/vehiculos/:placa/historial', async function(req, res) {
 // ═══════════════════════════════════════════════════════════
 // SERVIDOR
 // ═══════════════════════════════════════════════════════════
+seedPermisosBase().catch((error) => {
+  console.error('Error sembrando permisos base:', error);
+});
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✓ CERO en puerto ${PORT}`);
   console.log(`✓ ${new Date().toISOString()}`);

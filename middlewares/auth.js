@@ -1,20 +1,13 @@
 // middlewares/auth.js
-// Middlewares de autenticación y autorización para el panel web CERO
+// Middlewares de autenticacion y autorizacion para el panel web CERO
 // Usa JWT para verificar identidad y Supabase para validar permisos por rol
 
 const jwt = require('jsonwebtoken');
 const { supabase, jwtSecret } = require('../config/config');
 
-// ═══════════════════════════════════════════════════════════
-// verificarToken
-// Valida el JWT enviado en el header Authorization: Bearer <token>
-// Si el token es válido, adjunta el payload decodificado a req.usuario
-// y llama a next(). Si no, responde 401.
-// ═══════════════════════════════════════════════════════════
 const verificarToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  // El header debe existir y tener formato "Bearer <token>"
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token requerido' });
   }
@@ -22,48 +15,59 @@ const verificarToken = async (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    // jwt.verify lanza excepción si el token es inválido o expiró
     const payload = jwt.verify(token, jwtSecret);
-    req.usuario = payload; // { id, email, roles, ... }
+    req.usuario = payload;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    return res.status(401).json({ error: 'Token invalido o expirado' });
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// verificarPermiso
-// Factory que retorna un middleware para validar un permiso específico.
-// Uso: router.get('/ruta', verificarToken, verificarPermiso('vehiculos', 'leer'), handler)
-//
-// Parámetros:
-//   modulo  — nombre del módulo (ej: 'vehiculos', 'conductores')
-//   accion  — acción requerida (ej: 'leer', 'editar', 'autorizar')
-//
-// El rol 'superadmin_plataforma' tiene acceso irrestricto a todo.
-// Para los demás roles, consulta la tabla usuarios_roles → permisos_rol
-// para verificar que exista un permiso explícito permitido=true.
-// ═══════════════════════════════════════════════════════════
 const verificarPermiso = (modulo, accion) => {
   return async (req, res, next) => {
-    // superadmin_plataforma pasa siempre, sin consultar la BD
-    if (req.usuario.roles?.includes('superadmin_plataforma')) return next();
+    const rolesUsuario = Array.isArray(req.usuario?.roles) ? req.usuario.roles : [];
 
-    // Consulta permisos del usuario para el módulo y acción dados
-    const { data, error } = await supabase
-      .from('usuarios_roles')
-      .select('roles(nombre), permisos_rol!inner(modulo, accion, permitido)')
-      .eq('usuario_id', req.usuario.id)
-      .eq('activo', true)
-      .eq('permisos_rol.modulo', modulo)
-      .eq('permisos_rol.accion', accion)
-      .eq('permisos_rol.permitido', true);
-
-    if (error || !data || data.length === 0) {
-      return res.status(403).json({ error: 'Sin permiso para esta acción' });
+    if (rolesUsuario.includes('superadmin_plataforma')) {
+      return next();
     }
 
-    next();
+    if (rolesUsuario.length === 0) {
+      return res.status(403).json({ error: 'Sin permiso para esta accion' });
+    }
+
+    try {
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, nombre')
+        .in('nombre', rolesUsuario);
+
+      if (rolesError) throw rolesError;
+
+      const rolesIds = (rolesData || []).map((rol) => rol.id);
+      if (rolesIds.length === 0) {
+        return res.status(403).json({ error: 'Sin permiso para esta accion' });
+      }
+
+      const { data: permisosData, error: permisosError } = await supabase
+        .from('permisos_rol')
+        .select('rol_id')
+        .in('rol_id', rolesIds)
+        .eq('modulo', modulo)
+        .eq('accion', accion)
+        .eq('permitido', true)
+        .limit(1);
+
+      if (permisosError) throw permisosError;
+
+      if (!permisosData || permisosData.length === 0) {
+        return res.status(403).json({ error: 'Sin permiso para esta accion' });
+      }
+
+      next();
+    } catch (error) {
+      console.error(`Error verificando permiso ${modulo}:${accion}:`, error);
+      return res.status(500).json({ error: 'Error validando permisos' });
+    }
   };
 };
 
