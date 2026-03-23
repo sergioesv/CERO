@@ -17,6 +17,12 @@ const Sidebar = {
             { id: 'conductores', label: 'Conductores', route: 'vehiculos/conductores' },
             { id: 'alertas', label: 'Alertas', route: 'vehiculos/alertas', badge: { type: 'danger', count: 0 } }
           ]
+        },
+        {
+          title: 'Empresa',
+          items: [
+            { id: 'sedes', label: 'Sedes', route: 'vehiculos/sedes' }
+          ]
         }
       ]
     },
