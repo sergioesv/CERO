@@ -16,8 +16,7 @@ const REQUIRED_VARS = [
   'SUPABASE_URL',
   'SUPABASE_KEY',
   'TWILIO_ACCOUNT_SID',
-  'TWILIO_AUTH_TOKEN',
-  'JWT_SECRET'
+  'TWILIO_AUTH_TOKEN'
 ];
 
 const missing = REQUIRED_VARS.filter(varName => !process.env[varName]);
@@ -42,7 +41,7 @@ const TWILIO_WEBHOOK_URL = clean(process.env.TWILIO_WEBHOOK_URL || process.env.P
 const TWILIO_WHATSAPP_NUMBER = clean(process.env.TWILIO_WHATSAPP_NUMBER || '') || 'whatsapp:+14155238886';
 const SESSION_STORE_FILE = clean(process.env.SESSION_STORE_FILE || '');
 const MAX_KM_SALTO = parseInt(clean(process.env.MAX_KM_SALTO || '200'), 10) || 200;
-const JWT_SECRET = clean(process.env.JWT_SECRET);
+const jwtSecret = process.env.JWT_SECRET || 'cero_secret_dev';
 const STORAGE_BUCKET_PREOPERACIONALES = clean(
   process.env.STORAGE_BUCKET_PREOPERACIONALES ||
   process.env.SUPABASE_BUCKET_PREOPERACIONALES ||
@@ -113,5 +112,5 @@ module.exports = {
   MAX_KM_SALTO,
   STORAGE_BUCKET_PREOPERACIONALES,
   TABLES,
-  JWT_SECRET
+  jwtSecret
 };
