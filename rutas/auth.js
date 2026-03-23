@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { supabase, JWT_SECRET } = require('../config/config');
+const { supabase, jwtSecret } = require('../config/config');
 const { verificarToken } = require('../middlewares/auth');
 
 // ═══════════════════════════════════════════════════════════
@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
       roles,
       sedes
     },
-    JWT_SECRET,
+    jwtSecret,
     { expiresIn: '8h' }
   );
 

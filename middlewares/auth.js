@@ -3,7 +3,7 @@
 // Usa JWT para verificar identidad y Supabase para validar permisos por rol
 
 const jwt = require('jsonwebtoken');
-const { supabase, JWT_SECRET } = require('../config/config');
+const { supabase, jwtSecret } = require('../config/config');
 
 // ═══════════════════════════════════════════════════════════
 // verificarToken
@@ -23,7 +23,7 @@ const verificarToken = async (req, res, next) => {
 
   try {
     // jwt.verify lanza excepción si el token es inválido o expiró
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, jwtSecret);
     req.usuario = payload; // { id, email, roles, ... }
     next();
   } catch (err) {
