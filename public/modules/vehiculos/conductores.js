@@ -86,7 +86,7 @@ window.ConductoresModule = (() => {
     try {
       const res = await fetch('/api/conductores');
       const data = await res.json();
-      conductores = data || [];
+      conductores = data.data || data || [];
       renderStats();
       renderTabla(conductores);
     } catch (err) {
