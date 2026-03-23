@@ -21,7 +21,8 @@ const Sidebar = {
         {
           title: 'Empresa',
           items: [
-            { id: 'sedes', label: 'Sedes', route: 'vehiculos/sedes' }
+            { id: 'sedes',    label: 'Sedes',    route: 'vehiculos/sedes' },
+            { id: 'usuarios', label: 'Usuarios', route: 'vehiculos/usuarios' }
           ]
         }
       ]
