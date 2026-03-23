@@ -59,7 +59,7 @@ async function crearSede(req, res) {
 
     const { data, error } = await supabase
       .from('sedes')
-      .insert([{ nombre, ciudad: ciudad || null, direccion: direccion || null, empresa_id: empresa_id || null, activo: true }])
+      .insert([{ nombre, ciudad: ciudad || null, direccion: direccion || null, empresa_id: empresa_id || null, activa: true }])
       .select()
       .single();
     if (error) throw error;
@@ -96,12 +96,12 @@ async function actualizarSede(req, res) {
 // PATCH /api/sedes/:id/estado — activa o desactiva una sede
 async function cambiarEstadoSede(req, res) {
   try {
-    const activo = req.body.activo;
-    if (activo === undefined) return res.status(400).json({ ok: false, error: 'Campo activo requerido' });
+    const activa = req.body.activa;
+    if (activa === undefined) return res.status(400).json({ ok: false, error: 'Campo activa requerido' });
 
     const { data, error } = await supabase
       .from('sedes')
-      .update({ activo: activo })
+      .update({ activa: activa })
       .eq('id', req.params.id)
       .select()
       .single();
