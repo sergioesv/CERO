@@ -15,6 +15,26 @@ const PORT = process.env.PORT || 8080;
 app.set('trust proxy', true);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+
+// ═══════════════════════════════════════════════════════════
+// RUTAS DE PÁGINAS
+// ═══════════════════════════════════════════════════════════
+
+// GET / → redirige a /login
+app.get('/', function (req, res) {
+  res.redirect('/login');
+});
+
+// GET /login → sirve la página de login
+app.get('/login', function (req, res) {
+  res.sendFile(__dirname + '/public/login.html');
+});
+
+// GET /panel → sirve el panel (la verificación de token ocurre client-side)
+app.get('/panel', function (req, res) {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
 app.use(express.static('public'));
 
 // Middleware global de errores
