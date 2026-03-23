@@ -215,21 +215,34 @@ body {
 .drawer {
   position: fixed;
   top: 0;
-  right: 0;
-  width: 480px;
-  max-width: 90vw;
-  height: 100vh;
-  background: var(--bg-primary);
+  right: -400px;
+  width: 400px;
+  height: 100%;
+  background: var(--bg-secondary);
+  z-index: 999;
+  transition: right 0.3s ease;
+  overflow-y: auto;
   border-left: var(--border-width) solid var(--border-secondary);
   box-shadow: var(--shadow-lg);
-  z-index: var(--z-modal);
-  transform: translateX(100%);
-  transition: transform var(--transition-normal);
   display: flex;
   flex-direction: column;
 }
-.drawer.active {
-  transform: translateX(0);
+.drawer.active,
+.drawer.open {
+  right: 0;
+}
+.drawer-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  z-index: 998;
+}
+.drawer-overlay.open {
+  display: block;
 }
 
 .drawer-header {
