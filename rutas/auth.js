@@ -30,6 +30,15 @@ router.post('/login', async (req, res) => {
     .eq('activo', true)
     .single();
 
+  // LOG TEMPORAL — diagnóstico
+  console.log('Usuario encontrado:', usuario ? 'SI' : 'NO');
+  console.log('Error Supabase:', error);
+  if (usuario) {
+    const valido = await bcrypt.compare(password, usuario.password_hash);
+    console.log('Password válido:', valido);
+    console.log('Hash en BD:', usuario.password_hash);
+  }
+
   // No distinguir entre "usuario no existe" y "password incorrecto"
   // para evitar enumeración de usuarios
   if (error || !usuario) {
