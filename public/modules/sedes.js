@@ -90,6 +90,19 @@ window.SedesModule = (() => {
   async function cargarDatos() {
     try {
       const res = await fetch('/api/sedes', { headers: authHeaders() });
+      if (res.status === 403) {
+        sedes = [];
+        renderStats();
+        const tbody = document.getElementById('sedes-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Sin acceso</td></tr>';
+        mostrarToast('Sin acceso', 'error');
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error('Error HTTP ' + res.status);
+      }
+
       const data = await res.json();
       sedes = data.data || data || [];
       renderStats();

@@ -97,6 +97,21 @@ window.UsuariosModule = (() => {
         fetch('/api/usuarios', { headers: authHeaders() }),
         fetch('/api/roles',    { headers: authHeaders() })
       ]);
+
+      if (resUsuarios.status === 403) {
+        usuarios = [];
+        rolesCatalogo = [];
+        renderStats();
+        const tbody = document.getElementById('usuarios-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Sin acceso</td></tr>';
+        mostrarToast('Sin acceso', 'error');
+        return;
+      }
+
+      if (!resUsuarios.ok || !resRoles.ok) {
+        throw new Error(`Error HTTP ${resUsuarios.status}/${resRoles.status}`);
+      }
+
       const dataU = await resUsuarios.json();
       const dataR = await resRoles.json();
       usuarios      = dataU.data || dataU || [];
