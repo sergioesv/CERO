@@ -144,7 +144,7 @@ window.SedesModule = (() => {
         <td>${s.nombre}</td>
         <td>${s.ciudad || '—'}</td>
         <td>${s.direccion || '—'}</td>
-        <td>${s.empresa_id || '—'}</td>
+        <td>${s.empresas?.nombre || s.empresa_id || '—'}</td>
         <td>${s.activo
           ? '<span class="badge badge-success">Activa</span>'
           : '<span class="badge badge-danger">Inactiva</span>'
@@ -216,8 +216,8 @@ window.SedesModule = (() => {
             <span class="detail-value">${s.direccion || 'Sin registro'}</span>
           </div>
           <div class="detail-item">
-            <span class="detail-label">Empresa ID</span>
-            <span class="detail-value">${s.empresa_id || 'Sin registro'}</span>
+            <span class="detail-label">Empresa</span>
+            <span class="detail-value">${s.empresas?.nombre || s.empresa_id || 'Sin registro'}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Estado</span>
