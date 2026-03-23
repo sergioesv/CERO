@@ -76,6 +76,35 @@ const App = {
   }
 };
 
+function normalizeRoleName(role) {
+  return String(role || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function classifyRole(role) {
+  const normalized = normalizeRoleName(role);
+
+  if (!normalized) return null;
+  if (normalized === 'superadmin_plataforma') return 'superadmin_plataforma';
+  if (normalized === 'superadmin_emp' || normalized === 'superadmin_empresa') return 'superadmin_emp';
+  if (normalized === 'administrador') return 'administrador';
+  if (normalized === 'supervisor') return 'supervisor';
+
+  if (normalized.includes('superadmin')) {
+    return normalized.includes('emp') || normalized.includes('empresa')
+      ? 'superadmin_emp'
+      : 'superadmin_plataforma';
+  }
+
+  if (normalized.includes('administrador')) return 'administrador';
+  if (normalized.includes('supervisor')) return 'supervisor';
+  return null;
+}
+
 function getRolesFromToken() {
   const token = sessionStorage.getItem('cero_token');
   if (!token) return [];
@@ -95,11 +124,18 @@ function getRolesFromToken() {
 }
 
 App.getRolesFromToken = getRolesFromToken;
+App.normalizeRoleName = normalizeRoleName;
+App.classifyRole = classifyRole;
+App.getCanonicalRoles = function getCanonicalRoles() {
+  const roles = this.getRolesFromToken();
+  return [...new Set(roles.map((role) => this.classifyRole(role)).filter(Boolean))];
+};
+
 App.canAccessItem = function canAccessItem(itemId) {
   const allowedRoles = this.itemPermissions[itemId];
   if (!allowedRoles) return true;
 
-  const roles = this.getRolesFromToken();
+  const roles = this.getCanonicalRoles();
   return roles.some((role) => allowedRoles.includes(role));
 };
 
