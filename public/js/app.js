@@ -12,6 +12,7 @@ const App = {
     Router.register('vehiculos/flota', () => VehiculosFlota.render());
     
     Router.register('vehiculos/conductores', () => ConductoresModule.render());
+    Router.register('vehiculos/sedes', () => SedesModule.render());
     
     Router.register('vehiculos/alertas', () => AlertasModule.render());
     
