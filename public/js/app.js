@@ -11,12 +11,7 @@ const App = {
     Router.register('vehiculos/index', () => Router.navigate('vehiculos/preoperacionales'));
     Router.register('vehiculos/flota', () => VehiculosFlota.render());
     
-    Router.register('vehiculos/conductores', () => {
-      document.getElementById('main').innerHTML = `
-        <div class="main-header"><div><h1 class="main-title">Conductores</h1></div></div>
-        <div class="main-content"><p class="text-secondary">Módulo pendiente</p></div>
-      `;
-    });
+    Router.register('vehiculos/conductores', () => ConductoresModule.render());
     
     Router.register('vehiculos/alertas', () => AlertasModule.render());
     
