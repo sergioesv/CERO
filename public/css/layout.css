@@ -129,9 +129,47 @@
 .filters-row { display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); flex-wrap: wrap; }
 .search-box { flex: 1; min-width: 200px; max-width: 300px; }
 
+.btn-hamburguesa {
+  display: none;
+  font-size: 24px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+}
+.sidebar-overlay.visible { display: block; }
+
 @media (max-width: 768px) {
   .app { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
-  .sidebar { display: none; }
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 1000;
+    background: var(--sidebar-bg);
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+    overflow-y: auto;
+    padding: var(--spacing-md);
+  }
+  .sidebar.abierto { left: 0; }
   .header-modules { display: none; }
   .main-content { padding: var(--spacing-md); }
+  .btn-hamburguesa { display: block; }
 }
+

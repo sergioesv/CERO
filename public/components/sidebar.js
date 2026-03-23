@@ -60,7 +60,7 @@ const Sidebar = {
       section.items.forEach(item => {
         const badge = this.badges[item.id] || (item.badge && item.badge.count > 0 ? item.badge : null);
         const badgeHtml = badge ? `<span class="sidebar-item-badge ${badge.type}">${badge.count}</span>` : '';
-        html += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}"><span>${item.label}</span>${badgeHtml}</a>`;
+        html += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}" onclick="if(window.innerWidth<=768)toggleSidebar()"><span>${item.label}</span>${badgeHtml}</a>`;
       });
       html += '</div>';
     });
@@ -81,3 +81,11 @@ const Sidebar = {
 };
 
 window.Sidebar = Sidebar;
+
+function toggleSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.toggle('abierto');
+  if (overlay) overlay.classList.toggle('visible');
+}
+window.toggleSidebar = toggleSidebar;

@@ -13,6 +13,7 @@
 <body data-theme="light">
   <div class="app">
     <header class="header">
+      <button class="btn-hamburguesa" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <a href="/" class="header-logo">CERO</a>
       <nav class="header-modules" id="header-modules"></nav>
       <div class="header-spacer"></div>
@@ -22,6 +23,7 @@
     <aside class="sidebar" id="sidebar"></aside>
     <main class="main" id="main"></main>
   </div>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="toast-container" id="toast-container"></div>
   <div id="modal-container"></div>
   
