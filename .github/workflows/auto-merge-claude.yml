@@ -1,0 +1,24 @@
+name: Auto-merge ramas Claude
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge a desarrollo y eliminar rama
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout desarrollo
+          git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} → desarrollo"
+          git push origin desarrollo
+          git push origin --delete ${{ github.ref_name }}
