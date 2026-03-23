@@ -41,7 +41,7 @@ async function listarSedes(req, res) {
   try {
     const { data, error } = await supabase
       .from('sedes')
-      .select('*')
+      .select('*, empresas(nombre)')
       .order('nombre');
     if (error) throw error;
     res.json({ ok: true, data: data });
