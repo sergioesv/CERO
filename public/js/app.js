@@ -18,12 +18,7 @@ const App = {
       `;
     });
     
-    Router.register('vehiculos/alertas', () => {
-      document.getElementById('main').innerHTML = `
-        <div class="main-header"><div><h1 class="main-title">Alertas</h1></div></div>
-        <div class="main-content"><p class="text-secondary">Módulo pendiente</p></div>
-      `;
-    });
+    Router.register('vehiculos/alertas', () => AlertasModule.render());
     
     Router.register('vehiculos/preoperacionales', () => {
       document.getElementById('main').innerHTML = `

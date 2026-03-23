@@ -345,6 +345,55 @@ const Preoperacionales = {
       html += '</div>';
     }
 
+    // ── Sección de autorización ──
+    var autorizacion = registro.autorizacion || null;
+    var novedadesBloqueo = (novedades || []).filter(function(n) { return n.critico === true; });
+
+    if (novedadesBloqueo.length > 0 && autorizacion) {
+      html += '<div class="drawer-section">';
+      html += '<div class="drawer-section-title">';
+      html += '<span class="section-title-bar danger"></span>';
+      html += 'Decisión del supervisor';
+      html += '</div>';
+
+      // Detalle de novedades de bloqueo
+      html += '<div style="margin-bottom:var(--spacing-md);">';
+      novedadesBloqueo.forEach(function(n) {
+        var texto = [n.grupo, n.item, n.nota || n.estado].filter(Boolean).join(' — ');
+        html += '<div class="drawer-novedad critica" style="margin-bottom:6px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;">';
+        html += '<span class="badge badge-danger">BLOQUEO</span>';
+        html += '<span class="text-sm font-medium">' + Utils.escaparHTML(texto || 'Novedad de bloqueo') + '</span>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+
+      if (autorizacion.decision === null || autorizacion.decision === undefined) {
+        // Pendiente: mostrar botones de acción
+        var autId = Utils.escaparHTML(String(autorizacion.id));
+        var placa = Utils.escaparHTML(registro.vehiculo_placa || '');
+        html += '<div style="display:flex;gap:var(--spacing-sm);">';
+        html += '<button class="btn btn-success btn-sm" onclick="Preoperacionales.abrirModalAutorizar(\'' + autId + '\', \'' + placa + '\')">Autorizar</button>';
+        html += '<button class="btn btn-warning btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'taller\', \'' + placa + '\')">Taller</button>';
+        html += '<button class="btn btn-danger btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'restringir\', \'' + placa + '\')">Restringir</button>';
+        html += '</div>';
+      } else {
+        // Ya resuelta: mostrar badge con la decisión
+        var decisionTextos = { autorizar: 'Autorizado', taller: 'En taller', restringir: 'Restringido' };
+        var decisionBadges = { autorizar: 'badge-success', taller: 'badge-warning', restringir: 'badge-danger' };
+        var textoDecision = decisionTextos[autorizacion.decision] || autorizacion.decision;
+        var badgeDecision = decisionBadges[autorizacion.decision] || 'badge-neutral';
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span class="badge ' + badgeDecision + '">' + Utils.escaparHTML(textoDecision) + '</span>';
+        html += '</div>';
+        if (autorizacion.justificacion) {
+          html += '<div class="drawer-observacion" style="margin-top:var(--spacing-sm);">"' + Utils.escaparHTML(autorizacion.justificacion) + '"</div>';
+        }
+      }
+
+      html += '</div>';
+    }
+
     // ── Bloques de inspección ──
     var bloques = [
       { id: 'motor_niveles', nombre: 'Motor y Niveles' },
@@ -451,6 +500,89 @@ const Preoperacionales = {
     if (panel) panel.classList.remove('active');
     this.drawerAbierto = false;
     this.detalleActual = null;
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // ACCIONES DE AUTORIZACIÓN EN DRAWER
+  // ─────────────────────────────────────────────────────────
+
+  abrirModalAutorizar: function (autorizacionId, placa) {
+    Modal.open({
+      title: 'Autorizar salida — ' + placa,
+      size: 'md',
+      content: `
+        <p class="text-sm text-secondary" style="margin-bottom:var(--spacing-md);">
+          Escriba la justificación para autorizar la salida del vehículo con esta novedad.
+        </p>
+        <textarea class="input" id="preop-modal-justificacion" rows="4"
+          placeholder="Escriba la justificación (mínimo 10 caracteres)..."
+          oninput="Preoperacionales.actualizarBtnAutorizar()" style="resize:vertical;"></textarea>
+        <div id="preop-modal-chars" class="text-xs text-secondary" style="margin-top:4px;">0 / mín 10 caracteres</div>
+      `,
+      footer: `
+        <button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+        <button class="btn btn-success" id="preop-btn-confirmar-autorizar"
+          onclick="Preoperacionales.confirmarAutorizar('${Utils.escaparHTML(autorizacionId)}')" disabled>
+          Confirmar autorización
+        </button>
+      `
+    });
+  },
+
+  actualizarBtnAutorizar: function () {
+    var textarea = document.getElementById('preop-modal-justificacion');
+    var btn = document.getElementById('preop-btn-confirmar-autorizar');
+    var chars = document.getElementById('preop-modal-chars');
+    if (!textarea || !btn) return;
+    var len = textarea.value.trim().length;
+    if (chars) chars.textContent = len + ' / mín 10 caracteres';
+    btn.disabled = len < 10;
+  },
+
+  confirmarAutorizar: async function (autorizacionId) {
+    var textarea = document.getElementById('preop-modal-justificacion');
+    if (!textarea) return;
+    var justificacion = textarea.value.trim();
+    if (justificacion.length < 10) {
+      Toast.error('Justificación debe tener al menos 10 caracteres');
+      return;
+    }
+    Modal.close();
+    await this._ejecutarDecisionPreop(autorizacionId, 'autorizar', justificacion);
+  },
+
+  decidirPreop: async function (autorizacionId, decision, placa) {
+    var textos = {
+      taller: { title: '¿Enviar ' + placa + ' a taller?', msg: 'El vehículo pasará a estado "En taller".' },
+      restringir: { title: '¿Restringir operación de ' + placa + '?', msg: 'El vehículo quedará restringido de operar.' }
+    };
+    var t = textos[decision] || { title: 'Confirmar decisión', msg: '' };
+    var confirmado = await Modal.confirm({
+      title: t.title,
+      message: t.msg,
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      type: decision === 'restringir' ? 'danger' : null
+    });
+    if (!confirmado) return;
+    await this._ejecutarDecisionPreop(autorizacionId, decision, '');
+  },
+
+  _ejecutarDecisionPreop: async function (autorizacionId, decision, justificacion) {
+    try {
+      await API.put('/autorizaciones/' + autorizacionId + '/decidir', {
+        decision: decision,
+        justificacion: justificacion,
+        supervisor_id: null
+      });
+      Toast.success('Decisión registrada correctamente');
+      // Recargar drawer con datos actualizados
+      if (this.detalleActual && this.detalleActual.id) {
+        await this.abrirDetalle(this.detalleActual.id);
+      }
+    } catch (error) {
+      Toast.error(error.message || 'Error al registrar decisión');
+    }
   }
 };
 
