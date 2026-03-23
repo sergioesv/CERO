@@ -105,8 +105,8 @@ window.SedesModule = (() => {
   // Render de stat cards
   // --------------------------------------------------------------------------
   function renderStats() {
-    const activas   = sedes.filter(s => s.activo);
-    const inactivas = sedes.filter(s => !s.activo);
+    const activas   = sedes.filter(s => s.activa);
+    const inactivas = sedes.filter(s => !s.activa);
 
     const statsEl = document.getElementById('sedes-stats');
     if (!statsEl) return;
@@ -145,7 +145,7 @@ window.SedesModule = (() => {
         <td>${s.ciudad || '—'}</td>
         <td>${s.direccion || '—'}</td>
         <td>${s.empresas?.nombre || s.empresa_id || '—'}</td>
-        <td>${s.activo
+        <td>${s.activa
           ? '<span class="badge badge-success">Activa</span>'
           : '<span class="badge badge-danger">Inactiva</span>'
         }</td>
@@ -166,8 +166,8 @@ window.SedesModule = (() => {
         (s.ciudad || '').toLowerCase().includes(texto);
 
       let matchFiltro = true;
-      if      (filtro === 'activas')   matchFiltro = s.activo;
-      else if (filtro === 'inactivas') matchFiltro = !s.activo;
+      if      (filtro === 'activas')   matchFiltro = s.activa;
+      else if (filtro === 'inactivas') matchFiltro = !s.activa;
 
       return matchTexto && matchFiltro;
     });
@@ -222,7 +222,7 @@ window.SedesModule = (() => {
           <div class="detail-item">
             <span class="detail-label">Estado</span>
             <span class="detail-value">
-              ${s.activo
+              ${s.activa
                 ? '<span class="badge badge-success">Activa</span>'
                 : '<span class="badge badge-danger">Inactiva</span>'
               }
@@ -235,9 +235,9 @@ window.SedesModule = (() => {
         <button class="btn btn-primary" onclick="SedesModule.abrirEditar('${s.id}')">
           Editar
         </button>
-        <button class="btn ${s.activo ? 'btn-danger' : 'btn-success'}"
-          onclick="SedesModule.toggleEstado('${s.id}', ${!s.activo})">
-          ${s.activo ? 'Desactivar' : 'Activar'}
+        <button class="btn ${s.activa ? 'btn-danger' : 'btn-success'}"
+          onclick="SedesModule.toggleEstado('${s.id}', ${!s.activa})">
+          ${s.activa ? 'Desactivar' : 'Activar'}
         </button>
       </div>
     `;
@@ -359,7 +359,7 @@ window.SedesModule = (() => {
       const res = await fetch(`/api/sedes/${id}/estado`, {
         method: 'PATCH',
         headers: authHeaders(),
-        body: JSON.stringify({ activo: nuevoEstado })
+        body: JSON.stringify({ activa: nuevoEstado })
       });
 
       if (!res.ok) return mostrarToast('Error al actualizar estado', 'error');
