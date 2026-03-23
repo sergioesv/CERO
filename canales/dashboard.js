@@ -123,7 +123,7 @@ async function listarUsuarios(req, res) {
   try {
     const { data, error } = await supabase
       .from('usuarios_panel')
-      .select('id, nombre, email, empresa_id, activo, ultimo_acceso, empresas(nombre), usuarios_roles(id, rol_id, sede_id, roles(nombre))')
+      .select('id, nombre, email, empresa_id, activo, ultimo_acceso, empresas(nombre), usuarios_roles!usuarios_roles_usuario_id_fkey(id, rol_id, sede_id, roles(nombre))')
       .order('nombre');
     if (error) throw error;
     res.json({ ok: true, data });
@@ -243,7 +243,8 @@ async function listarRolesUsuario(req, res) {
     const { data, error } = await supabase
       .from('usuarios_roles')
       .select('id, rol_id, sede_id, roles(nombre), sedes(nombre)')
-      .eq('usuario_id', req.params.id);
+      .eq('usuario_id', req.params.id)
+      .order('id');
     if (error) throw error;
     res.json({ ok: true, data });
   } catch (err) {
