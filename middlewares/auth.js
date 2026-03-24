@@ -26,6 +26,8 @@ const verificarToken = async (req, res, next) => {
 const verificarPermiso = (modulo, accion) => {
   return async (req, res, next) => {
     try {
+      if (req.usuario.roles?.includes('superadmin_plataforma')) return next();
+
       console.log('verificarPermiso - usuario:', req.usuario?.id, 'roles:', req.usuario?.roles);
       console.log('verificarPermiso - modulo:', modulo, 'accion:', accion);
 
