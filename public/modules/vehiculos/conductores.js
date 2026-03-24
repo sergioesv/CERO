@@ -84,9 +84,9 @@ window.ConductoresModule = (() => {
   // --------------------------------------------------------------------------
   async function cargarDatos() {
     try {
-      const res = await fetch('/api/conductores');
-      const data = await res.json();
-      conductores = data.data || data || [];
+      const respuesta = await API.conductores.listar();
+      const conductoresData = respuesta.data || respuesta || [];
+      conductores = conductoresData;
       renderStats();
       renderTabla(conductores);
     } catch (err) {
@@ -386,19 +386,8 @@ window.ConductoresModule = (() => {
 
     try {
       const esEdicion = !!id;
-      const url    = esEdicion ? `/api/conductores/${id}` : '/api/conductores';
-      const method = esEdicion ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        return mostrarToast(err.error || 'Error al guardar', 'error');
-      }
+      if (esEdicion) await API.conductores.actualizar(id, body);
+      else await API.conductores.crear(body);
 
       document.getElementById('modal-conductor')?.remove();
       cerrarDrawer();
@@ -415,13 +404,7 @@ window.ConductoresModule = (() => {
   // --------------------------------------------------------------------------
   async function toggleActivo(id, nuevoEstado) {
     try {
-      const res = await fetch(`/api/conductores/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activo: nuevoEstado })
-      });
-
-      if (!res.ok) return mostrarToast('Error al actualizar estado', 'error');
+      await API.conductores.actualizar(id, { activo: nuevoEstado });
 
       mostrarToast(nuevoEstado ? 'Conductor activado' : 'Conductor desactivado', 'success');
       cerrarDrawer();
