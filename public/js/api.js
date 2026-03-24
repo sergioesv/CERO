@@ -6,6 +6,10 @@ const API = {
       headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options
     };
+    const token = sessionStorage.getItem('cero_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
     if (config.body && typeof config.body === 'object') {
       config.body = JSON.stringify(config.body);
     }
