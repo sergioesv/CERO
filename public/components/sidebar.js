@@ -60,9 +60,20 @@ const Sidebar = {
     const menu = this.menus[module];
     if (!menu) { container.innerHTML = ''; return; }
     
+    const canonicalRoles = window.App && typeof window.App.getCanonicalRoles === 'function'
+      ? window.App.getCanonicalRoles()
+      : [];
+
     let html = '';
     menu.sections.forEach((section, i) => {
-      const visibleItems = section.items.filter(item => !window.App || window.App.canAccessItem(item.id));
+      const visibleItems = section.items.filter(item => {
+        if (canonicalRoles.includes('supervisor') && (item.id === 'sedes' || item.id === 'usuarios')) {
+          return false;
+        }
+
+        return !window.App || window.App.canAccessItem(item.id);
+      });
+
       if (visibleItems.length === 0) return;
 
       if (i > 0) html += '<div class="sidebar-divider"></div>';

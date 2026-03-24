@@ -26,6 +26,7 @@ const verificarToken = async (req, res, next) => {
 const verificarPermiso = (modulo, accion) => {
   return async (req, res, next) => {
     try {
+      console.log('Rol usuario:', req.usuario?.roles);
       const rolesCanonicos = await getCanonicalRolesForUser(req.usuario?.id, req.usuario?.roles);
       const permitidos = getAllowedCanonicalRolesForItem(modulo, accion);
 
