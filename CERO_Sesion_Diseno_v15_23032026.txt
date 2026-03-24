@@ -1,0 +1,277 @@
+================================================================================
+CERO — SESIÓN DE DISEÑO v15
+Autenticación, roles, multi-empresa y módulos faltantes del panel
+Fecha: 23/03/2026
+================================================================================
+
+AUTOR       Sergio — Ing. Eléctrico
+PROYECTO    CERO — Gestión de Operaciones de Campo
+VERSIÓN     v15.0 — Auth completa + panel 2.1 casi completo
+ESTADO      Fase 2.1 — En desarrollo
+
+DOCUMENTOS DE REFERENCIA: Sesión de Diseño v14 (23/03/2026).
+
+AVISO LEGAL: Este documento y el sistema descrito son propiedad intelectual
+exclusiva de su autor. Desarrollado de forma independiente en tiempo y
+recursos propios. Inteligencia de Ciudad S.A.S.
+
+
+================================================================================
+1. REGLAS PERMANENTES DE GIT
+================================================================================
+
+1. Nunca hacer commit directo en desarrollo
+2. Siempre crear rama claude/<descripcion-corta> para cada tarea
+3. Al terminar, hacer push de la rama — el workflow la mergea a desarrollo automáticamente
+4. Confirmar siempre con: git status y git log --oneline -3 antes de terminar
+5. Código completo, comentado en español, sin placeholders
+
+
+================================================================================
+2. CONTEXTO Y JUSTIFICACIÓN DE v15
+================================================================================
+
+La sesión v15 implementa la arquitectura de autenticación y multi-empresa
+definida en v14, completa los módulos faltantes del panel (Conductores,
+Posoperacionales, Tanqueos), y establece control de acceso por roles
+tanto en frontend como en backend.
+
+
+================================================================================
+3. BASE DE DATOS — TABLAS NUEVAS CREADAS
+================================================================================
+
+Tablas creadas en Supabase:
+- empresas
+- sedes
+- usuarios_panel
+- roles
+- permisos_rol (con constraint UNIQUE en rol_id + modulo + accion)
+- usuarios_roles
+- turnos
+- configuracion_sede
+- accesos_auditoria
+
+Columna sede_id agregada a: vehiculos, conductores, preoperacionales,
+posoperacionales, tanqueos, autorizaciones_novedad.
+
+Datos base insertados:
+- Empresa: EDEMSA (NIT 800099999-1, Popayán, plan pro)
+- Sede: Sede Principal (Medellin, Antioquia)
+- 10 roles base del sistema (es_base = true)
+- Usuario superadmin: sergio@cero.com / Cero2026* → rol superadmin_plataforma
+- Usuario prueba: supervisor@cero.com / Cero2026* → rol supervisor
+
+Todos los vehículos y conductores existentes migrados a Sede Principal.
+
+
+================================================================================
+4. AUTENTICACIÓN — BACKEND
+================================================================================
+
+Archivos creados:
+- middlewares/auth.js — verificarToken, verificarPermiso
+- rutas/auth.js — POST /auth/login, GET /auth/me
+
+Dependencias instaladas: jsonwebtoken, bcryptjs
+
+JWT payload incluye: id, nombre, email, empresa_id, roles[], sedes[]
+Expiración: 8 horas (1 turno)
+Token almacenado en: sessionStorage como 'cero_token'
+
+Endpoints:
+- POST /auth/login → valida credenciales, retorna token + datos usuario
+- GET /auth/me → retorna payload del token actual
+
+Regla clave en verificarPermiso:
+- superadmin_plataforma → bypass directo, sin consultar BD
+- Otros roles → consulta permisos_rol en Supabase
+
+
+================================================================================
+5. LOGIN FRONTEND
+================================================================================
+
+Archivo creado: public/login.html
+
+Comportamiento:
+- Si ya hay token en sessionStorage → redirige directo a /panel
+- Submit → POST /auth/login → guarda token → redirige a /panel
+- Error → muestra "Credenciales inválidas"
+- Diseño oscuro consistente con el panel
+
+Rutas en index.js:
+- GET / → redirect a /login
+- GET /login → sirve login.html
+- GET /panel → sirve index.html (protección real en JS cliente)
+
+
+================================================================================
+6. CONTROL DE ACCESO POR ROLES
+================================================================================
+
+Frontend (sidebar + router):
+- getRolesFromToken() decodifica JWT en base64 sin verificar firma
+- Sidebar oculta items según rol del usuario
+- Router bloquea navegación a rutas no permitidas → muestra "Sin acceso"
+
+Matriz de visibilidad:
+
+Módulo            | superadmin_plat | superadmin_emp | administrador | supervisor
+------------------|----------------|----------------|---------------|----------
+Preoperacionales  | ✓              | ✓              | ✓             | ✓
+Posoperacionales  | ✓              | ✓              | ✓             | ✓
+Tanqueos          | ✓              | ✓              | ✓             | ✓
+Flota             | ✓              | ✓              | ✓             | ✓
+Conductores       | ✓              | ✓              | ✓             |
+Alertas           | ✓              | ✓              | ✓             | ✓
+Sedes             | ✓              | ✓              |               |
+Usuarios          | ✓              | ✓              |               |
+
+Backend: verificarPermiso() aplicado a todos los endpoints del panel.
+Permisos base sembrados en tabla permisos_rol al iniciar el servidor.
+
+Archivo creado: data/permisos.js — classifyRoleName(), getAllowedCanonicalRolesForItem()
+
+
+================================================================================
+7. MÓDULOS NUEVOS DEL PANEL
+================================================================================
+
+7.1 Módulo Conductores (completado antes de v15, documentado aquí)
+- Stat cards: Total, Activos, Inactivos, Licencia vencida
+- Tabla: Nombre, Cédula, Cargo, Categoría, Licencia vence, Estado
+- Drawer: detalle completo + Editar + Activar/Desactivar
+- Fix FK Supabase: usuarios_roles!usuarios_roles_usuario_id_fkey
+
+7.2 Módulo Sedes
+- Stat cards: Total, Activas, Inactivas
+- Tabla: Nombre, Ciudad, Dirección, Empresa, Estado
+- Drawer: detalle + Editar + Activar/Desactivar
+- Join con empresas para mostrar nombre en vez de UUID
+- Fix: campo activa (no activo) en Supabase
+
+Endpoints: GET/POST /api/sedes, PUT /api/sedes/:id, PATCH /api/sedes/:id/estado
+
+7.3 Módulo Usuarios y Roles
+- Stat cards: Total, Activos, Inactivos
+- Tabla: Nombre, Email, Empresa, Roles, Último acceso, Estado
+- Drawer: detalle + Editar + Activar/Desactivar + Cambiar password + gestión roles
+- Modal crear: nombre, email, password, empresa_id
+- Sección roles en drawer: lista roles con ×, select + sede + Asignar
+- Password nunca expuesto en respuestas (select explícito)
+
+Endpoints: GET/POST /api/usuarios, PUT /api/usuarios/:id,
+PATCH /api/usuarios/:id/estado, PATCH /api/usuarios/:id/password,
+GET/POST /api/roles, GET /api/usuarios/:id/roles,
+POST /api/usuarios/:id/roles, DELETE /api/usuarios_roles/:id
+
+7.4 Módulo Posoperacionales
+- Stat cards: Inspecciones hoy, Con novedades, Mostrando
+- Tabla: Fecha/Hora, Placa, Vehículo, Conductor, KM inicial, KM final, Estado
+- Drawer: detalle completo + Ver PDF
+- Filtros: rango fechas (default hoy), placa, estado
+- Nota: usa conductor_nombre del registro (no join) — posoperacionales no tiene conductor_id
+
+Endpoint: GET /api/posoperacionales con filtros fecha_inicio, fecha_fin, placa
+
+7.5 Módulo Tanqueos
+- Stat cards: Tanqueos hoy, Total litros hoy, Mostrando
+- Tabla: Fecha/Hora, Placa, Vehículo, Conductor, Litros, KM, Valor
+- Drawer: detalle completo + foto si existe
+- Filtros: rango fechas (default hoy), placa
+
+Endpoint: GET /api/tanqueos con filtros fecha_inicio, fecha_fin, placa
+
+
+================================================================================
+8. CORRECCIONES Y FIXES
+================================================================================
+
+- api.js: agregado header Authorization: Bearer <token> en todos los requests
+- permisos_rol: agregado UNIQUE constraint (rol_id, modulo, accion)
+- Seed de permisos: corregido ON CONFLICT tras agregar constraint
+- roles en JWT: faltaban en payload — corregido en rutas/auth.js
+- Logs temporales de diagnóstico eliminados de rutas/auth.js y middlewares/auth.js
+- Fecha inicial módulo Preoperacionales: corregida con new Date().toISOString().split('T')[0]
+
+
+================================================================================
+9. ARCHIVOS CREADOS Y MODIFICADOS EN v15
+================================================================================
+
+Nuevos:
+- middlewares/auth.js
+- rutas/auth.js
+- data/permisos.js
+- public/login.html
+- public/modules/sedes.js
+- public/modules/usuarios.js
+- public/modules/posoperacionales.js
+- public/modules/tanqueos.js
+
+Modificados:
+- index.js — rutas auth, seed permisos al iniciar
+- config/config.js — jwtSecret
+- canales/dashboard.js — endpoints nuevos + verificarToken en todos
+- public/js/api.js — Authorization header en todos los requests
+- public/js/app.js — getRolesFromToken(), rutas nuevas
+- public/js/router.js — control de acceso por rol
+- public/components/sidebar.js — filtrado por rol, ítem Sedes y Usuarios
+- public/index.html — login check, scripts nuevos
+- public/modules/conductores.js — fix FK Supabase, fix array response
+- public/modules/preoperacionales.js — fix fecha inicial
+
+
+================================================================================
+10. ESTADO ACTUALIZADO DEL PROYECTO
+================================================================================
+
+FASE 1 — CONTROL DE VEHÍCULOS ........................ COMPLETA
+
+FASE 2 — DASHBOARD, PANEL ADMIN Y REPORTES
+  2.1 Panel de administración web
+      - Estructura frontend .......................... COMPLETADO
+      - Sistema de temas claro/oscuro ................ COMPLETADO
+      - Módulo Flota ................................. COMPLETADO
+      - Módulo Preoperacionales ...................... COMPLETADO
+      - Módulo Alertas (patrón inbox) ................ COMPLETADO
+      - Módulo Conductores .......................... COMPLETADO
+      - Módulo Posoperacionales ...................... COMPLETADO ← v15
+      - Módulo Tanqueos .............................. COMPLETADO ← v15
+      - Módulo Sedes ................................. COMPLETADO ← v15
+      - Módulo Usuarios y Roles ...................... COMPLETADO ← v15
+      - Autenticación JWT + login .................... COMPLETADO ← v15
+      - Control de acceso por roles .................. COMPLETADO ← v15
+      - Arquitectura multi-empresa ................... COMPLETADO ← v15
+  2.2 Dashboard operativo ............................ PENDIENTE
+  2.3 Historial y reportes ........................... PENDIENTE
+  2.4 Integración Power BI ........................... FUTURO
+
+FASE 3 — SEGURIDAD DEL PERSONAL ...................... FUTURO
+
+
+================================================================================
+11. PENDIENTES PARA CONTINUAR
+================================================================================
+
+Prioridad    | Tarea                              | Sesión
+-------------|------------------------------------|---------
+ALTA         | Bug posoperacional WhatsApp         | v16
+ALTA         | Dashboard operativo                 | v16
+MEDIA        | Historial y reportes                | v16-17
+PRE-CLIENTE  | RLS Supabase                        | Antes cliente
+PRE-CLIENTE  | Validación webhook Twilio           | Antes cliente
+PRE-CLIENTE  | Login con contraseña robusta        | Antes cliente
+PRE-CLIENTE  | Comprar dominio                     | Antes cliente
+
+
+================================================================================
+
+_______________________
+Sergio
+Autor y desarrollador
+
+CERO — Sesión de Diseño v15 — 23/03/2026
+Propiedad intelectual de Sergio Estrada
+Todos los derechos reservados
