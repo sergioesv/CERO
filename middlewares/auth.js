@@ -2,8 +2,8 @@
 // Middlewares de autenticacion y autorizacion para el panel web CERO
 
 const jwt = require('jsonwebtoken');
-const { jwtSecret } = require('../config/config');
-const { getAllowedCanonicalRolesForItem, getCanonicalRolesForUser } = require('../data/permisos');
+const { supabase, jwtSecret } = require('../config/config');
+const { classifyRoleName, getAllowedCanonicalRolesForItem } = require('../data/permisos');
 
 const verificarToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -26,8 +26,24 @@ const verificarToken = async (req, res, next) => {
 const verificarPermiso = (modulo, accion) => {
   return async (req, res, next) => {
     try {
-      console.log('Rol usuario:', req.usuario?.roles);
-      const rolesCanonicos = await getCanonicalRolesForUser(req.usuario?.id, req.usuario?.roles);
+      console.log('verificarPermiso - usuario:', req.usuario?.id, 'roles:', req.usuario?.roles);
+      console.log('verificarPermiso - modulo:', modulo, 'accion:', accion);
+
+      const { data, error } = await supabase
+        .from('usuarios_roles')
+        .select('roles(nombre)')
+        .eq('usuario_id', req.usuario?.id)
+        .eq('activo', true);
+
+      console.log('verificarPermiso - data:', JSON.stringify(data));
+      console.log('verificarPermiso - error:', error);
+
+      if (error) {
+        throw error;
+      }
+
+      const rolesFuente = (data || []).map((item) => item.roles?.nombre).filter(Boolean);
+      const rolesCanonicos = [...new Set(rolesFuente.map(classifyRoleName).filter(Boolean))];
       const permitidos = getAllowedCanonicalRolesForItem(modulo, accion);
 
       if (rolesCanonicos.some((rol) => permitidos.includes(rol))) {
