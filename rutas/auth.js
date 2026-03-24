@@ -58,7 +58,6 @@ router.post('/login', async (req, res) => {
     .eq('usuario_id', usuario.id)
     .eq('activo', true);
 
-  const roles = rolesData?.map(r => r.roles?.nombre).filter(Boolean) || [];
   const sedes = [...new Set(rolesData?.map(r => r.sede_id).filter(Boolean))];
 
   // Generar JWT con datos del usuario (expira en 8 horas)
@@ -68,7 +67,6 @@ router.post('/login', async (req, res) => {
       nombre: usuario.nombre,
       email: usuario.email,
       empresa_id: usuario.empresa_id,
-      roles,
       sedes
     },
     jwtSecret,
@@ -87,7 +85,6 @@ router.post('/login', async (req, res) => {
       id: usuario.id,
       nombre: usuario.nombre,
       email: usuario.email,
-      roles,
       sedes
     }
   });
