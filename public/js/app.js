@@ -46,19 +46,8 @@ const App = {
 
     Router.register('vehiculos/preoperacionales', () => Preoperacionales.render());
 
-    Router.register('vehiculos/posoperacionales', () => {
-      document.getElementById('main').innerHTML = `
-        <div class="main-header"><div><h1 class="main-title">Posoperacionales</h1></div></div>
-        <div class="main-content"><p class="text-secondary">Modulo pendiente</p></div>
-      `;
-    });
-
-    Router.register('vehiculos/tanqueos', () => {
-      document.getElementById('main').innerHTML = `
-        <div class="main-header"><div><h1 class="main-title">Tanqueos</h1></div></div>
-        <div class="main-content"><p class="text-secondary">Modulo pendiente</p></div>
-      `;
-    });
+    Router.register('vehiculos/posoperacionales', () => PosoperacionalesModule.render());
+    Router.register('vehiculos/tanqueos', () => TanqueosModule.render());
 
     Router.register('seguridad/index', () => {
       document.getElementById('main').innerHTML = `
