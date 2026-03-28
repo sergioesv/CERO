@@ -138,7 +138,7 @@
   <script>
     // Si ya hay token activo, ir directo al panel
     if (sessionStorage.getItem('cero_token')) {
-      window.location.replace('/panel');
+      window.location.replace('/panel#vehiculos/dashboard');
     }
 
     var form = document.getElementById('form-login');
@@ -165,7 +165,7 @@
 
         if (res.ok && data.token) {
           sessionStorage.setItem('cero_token', data.token);
-          window.location.replace('/panel');
+          window.location.replace('/panel#vehiculos/dashboard');
         } else {
           errorMsg.classList.add('visible');
           btn.disabled = false;

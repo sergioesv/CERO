@@ -12,7 +12,7 @@ const Router = {
 
   navigate(path) { window.location.hash = path; },
 
-  getPath() { return window.location.hash.slice(1) || 'vehiculos/preoperacionales'; },
+  getPath() { return window.location.hash.slice(1) || 'vehiculos/dashboard'; },
 
   handleRoute() {
     const path = this.getPath();
@@ -77,7 +77,7 @@ const Router = {
       <div class="main-content" style="text-align: center; padding-top: 100px;">
         <h1 style="font-size: 48px; color: var(--text-tertiary);">404</h1>
         <p class="text-secondary">Pagina no encontrada</p>
-        <button class="btn btn-primary" onclick="Router.navigate('vehiculos/flota')" style="margin-top: 20px;">Ir al inicio</button>
+        <button class="btn btn-primary" onclick="Router.navigate('vehiculos/dashboard')" style="margin-top: 20px;">Ir al inicio</button>
       </div>
     `;
   }

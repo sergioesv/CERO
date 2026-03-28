@@ -3,6 +3,12 @@ const Sidebar = {
     vehiculos: {
       sections: [
         {
+          title: 'Resumen',
+          items: [
+            { id: 'dashboard', label: 'Dashboard', route: 'vehiculos/dashboard' }
+          ]
+        },
+        {
           title: 'Operación',
           items: [
             { id: 'preoperacionales', label: 'Preoperacionales', route: 'vehiculos/preoperacionales' },
