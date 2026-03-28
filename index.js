@@ -54,6 +54,9 @@ app.use((err, req, res, next) => {
 const authRutas = require('./rutas/auth');
 app.use('/auth', authRutas);
 
+const rutasDashboard = require('./rutas/dashboard');
+app.use(rutasDashboard);
+
 // ═══════════════════════════════════════════════════════════
 // CANALES
 // ═══════════════════════════════════════════════════════════
