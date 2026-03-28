@@ -229,8 +229,25 @@ function severidadInferida(n) {
   return 'informativo';
 }
 
+/**
+ * Parsea novedades de forma segura — puede venir como array, string JSON u objeto.
+ */
+function parsearNovedades(novedades) {
+  if (Array.isArray(novedades)) return novedades;
+  if (!novedades) return [];
+  if (typeof novedades === 'string') {
+    try {
+      var p = JSON.parse(novedades);
+      return Array.isArray(p) ? p : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
 function preopTieneBloqueo(novedades) {
-  return (novedades || []).some(esNovedadBloqueo);
+  return parsearNovedades(novedades).some(esNovedadBloqueo);
 }
 
 function esDecisionAutorizado(decision) {
@@ -405,7 +422,7 @@ async function detectarAnomalias(sedeIds) {
 
   for (var i = 0; i < preops60.length; i++) {
     var p = preops60[i];
-    var nov = p.novedades || [];
+    var nov = parsearNovedades(p.novedades);
     for (var j = 0; j < nov.length; j++) {
       if (esNovedadBloqueo(nov[j])) {
         var key0 = p.vehiculo_placa + '|' + String(nov[j].item || nov[j].nombre || 'Ítem').toLowerCase().trim();
@@ -435,7 +452,7 @@ async function detectarAnomalias(sedeIds) {
   var cuentaPatron = {};
   for (var i2 = 0; i2 < preops90.length; i2++) {
     var p2 = preops90[i2];
-    var nov2 = p2.novedades || [];
+    var nov2 = parsearNovedades(p2.novedades);
     for (var j2 = 0; j2 < nov2.length; j2++) {
       var it = nov2[j2].item || nov2[j2].nombre || 'Ítem';
       var key2 = p2.vehiculo_placa + '|' + String(it).toLowerCase().trim();
@@ -597,7 +614,7 @@ await refrescarMapaTipos(Object.keys(placasSet));
     var pr = preops[i];
     var fechaIso = pr.fecha + 'T' + (pr.hora || '12:00:00');
     if (preopTieneBloqueo(pr.novedades)) {
-      var novB = (pr.novedades || []).find(esNovedadBloqueo);
+      var novB = parsearNovedades(pr.novedades).find(esNovedadBloqueo);
       eventos.push({
         tipo: 'inspeccion_novedad',
         descripcion: 'Novedad crítica — ' + ((novB && novB.item) || 'inspección'),
@@ -605,7 +622,7 @@ await refrescarMapaTipos(Object.keys(placasSet));
         fecha: new Date(fechaIso).toISOString(),
         severidad: 'critical'
       });
-    } else if ((pr.novedades || []).length) {
+    } else if (parsearNovedades(pr.novedades).length) {
       eventos.push({
         tipo: 'inspeccion_novedad',
         descripcion: 'Inspección con novedades',
@@ -703,7 +720,7 @@ async function datosBaseIndice(sedeIds, sedeIdConfig) {
     .lte('timestamp_alerta', finIso);
 
   var auths = (aRes.data || []).filter(function (x) {
-    return (x.novedades_bloqueo && x.novedades_bloqueo.length) || false;
+    return parsearNovedades(x.novedades_bloqueo).length > 0;
   });
   var totalBloqueos = auths.length;
   var conDecision = auths.filter(function (x) { return x.decision != null; }).length;
@@ -713,7 +730,7 @@ async function datosBaseIndice(sedeIds, sedeIdConfig) {
   var documentosVal = doc.alDiaPct;
 
   var pendientesCrit = (aRes.data || []).filter(function (x) {
-    return x.decision == null && x.novedades_bloqueo && x.novedades_bloqueo.length;
+    return x.decision == null && parsearNovedades(x.novedades_bloqueo).length > 0;
   }).length;
   var novedadesCritVal = Math.max(0, Math.min(100, 100 - pendientesCrit * 10));
 
@@ -874,7 +891,7 @@ async function obtenerItemsMasNovedades(sedeIds, periodo) {
   var cuenta = {};
 
   for (var i = 0; i < preops.length; i++) {
-    var nov = preops[i].novedades || [];
+    var nov = parsearNovedades(preops[i].novedades);
     for (var j = 0; j < nov.length; j++) {
       var nom = nov[j].item || nov[j].nombre || 'Ítem';
       if (!cuenta[nom]) cuenta[nom] = { c: 0, bloqueo: 0, alerta: 0, info: 0 };
@@ -986,7 +1003,7 @@ async function obtenerReincidencia(sedeIds) {
 
   for (var i = 0; i < preops.length; i++) {
     var p = preops[i];
-    var nov = p.novedades || [];
+    var nov = parsearNovedades(p.novedades);
     for (var j = 0; j < nov.length; j++) {
       var it = nov[j].item || nov[j].nombre || '';
       var key = p.vehiculo_placa + '|' + String(it).toLowerCase();
@@ -1130,7 +1147,9 @@ async function obtenerDatosGeneral(sedeIds, periodo) {
   var cumplAnt = Math.min(100, Math.round((preopsMesAnt.length / espAnt) * 100));
   var cumplDelta = cumplimiento - cumplAnt;
 
-  var riesgosPrev = preops.filter(preopTieneBloqueo).length;
+  var riesgosPrev = preops.filter(function (p) {
+    return preopTieneBloqueo(p.novedades);
+  }).length;
 
   var docM = await metricasDocumentacion(sedeIds);
 
@@ -1151,7 +1170,7 @@ async function obtenerDatosGeneral(sedeIds, periodo) {
   }
 
   var incidentesPrev = authsDecididas.filter(function (a) {
-    return (a.novedades_bloqueo && a.novedades_bloqueo.length);
+    return parsearNovedades(a.novedades_bloqueo).length > 0;
   }).length;
 
   var indice = await calcularIndiceSeguridadOperativa(sedeIds);
@@ -1221,7 +1240,7 @@ async function obtenerDatosActivos(sedeIds, periodo, tipoFiltro) {
   var preops = await fetchPreoperacionalesRango(sedeIds, rng.inicio, rng.fin);
   var preopsPrev = await fetchPreoperacionalesRango(sedeIds, rngPrevIni, rngPrevFin);
 
-  var conNov = preops.filter(function (p) { return (p.novedades || []).length > 0; }).length;
+  var conNov = preops.filter(function (p) { return parsearNovedades(p.novedades).length > 0; }).length;
   var inspeccionesDelta = preopsPrev.length
     ? Math.round(((preops.length - preopsPrev.length) / preopsPrev.length) * 100)
     : (preops.length ? 100 : 0);
