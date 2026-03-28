@@ -1,5 +1,6 @@
 const App = {
   routePermissions: {
+    'vehiculos/dashboard': 'dashboard',
     'vehiculos/flota': 'flota',
     'vehiculos/preoperacionales': 'preoperacionales',
     'vehiculos/posoperacionales': 'posoperacionales',
@@ -11,6 +12,7 @@ const App = {
   },
 
   itemPermissions: {
+    dashboard: ['superadmin_plataforma', 'superadmin_emp', 'administrador', 'supervisor'],
     flota: ['superadmin_plataforma', 'superadmin_emp', 'administrador', 'supervisor'],
     preoperacionales: ['superadmin_plataforma', 'superadmin_emp', 'administrador', 'supervisor'],
     posoperacionales: ['superadmin_plataforma', 'superadmin_emp', 'administrador', 'supervisor'],
@@ -30,19 +32,13 @@ const App = {
   },
 
   registerRoutes() {
-    Router.register('vehiculos/index', () => Router.navigate('vehiculos/preoperacionales'));
+    Router.register('vehiculos/index', () => Router.navigate('vehiculos/dashboard'));
+    Router.register('vehiculos/dashboard', () => window.Dashboard && window.Dashboard.render());
     Router.register('vehiculos/flota', () => VehiculosFlota.render());
     Router.register('vehiculos/conductores', () => ConductoresModule.render());
     Router.register('vehiculos/sedes', () => SedesModule.render());
     Router.register('vehiculos/usuarios', () => UsuariosModule.render());
     Router.register('vehiculos/alertas', () => AlertasModule.render());
-
-    Router.register('vehiculos/preoperacionales', () => {
-      document.getElementById('main').innerHTML = `
-        <div class="main-header"><div><h1 class="main-title">Preoperacionales</h1></div></div>
-        <div class="main-content"><p class="text-secondary">Modulo pendiente</p></div>
-      `;
-    });
 
     Router.register('vehiculos/preoperacionales', () => Preoperacionales.render());
 

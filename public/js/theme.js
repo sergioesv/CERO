@@ -20,6 +20,11 @@ const Theme = {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem(this.STORAGE_KEY, theme);
     this.updateToggleButton();
+    try {
+      window.dispatchEvent(new CustomEvent('cero-theme-changed', { detail: { theme: theme } }));
+    } catch (e) {
+      /* noop */
+    }
   },
   
   toggle() {

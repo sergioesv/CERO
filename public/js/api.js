@@ -72,7 +72,22 @@ const API = {
   
   dashboard: {
     resumen() { return API.get('/dashboard/resumen'); },
-    hoy() { return API.get('/dashboard/hoy'); }
+    hoy() { return API.get('/dashboard/hoy'); },
+    /** Dashboard de seguridad operativa (v16) — rutas bajo /api/dashboard */
+    seguridadGeneral(periodo) {
+      var q = periodo ? '?periodo=' + encodeURIComponent(periodo) : '';
+      return API.get('/dashboard/general' + q);
+    },
+    seguridadActivos(periodo, tipo) {
+      var params = new URLSearchParams();
+      if (periodo) params.set('periodo', periodo);
+      if (tipo) params.set('tipo', tipo);
+      var s = params.toString();
+      return API.get('/dashboard/activos' + (s ? '?' + s : ''));
+    },
+    seguridadIndice() {
+      return API.get('/dashboard/indice');
+    }
   }
 };
 
