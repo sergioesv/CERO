@@ -1,8 +1,5 @@
 var posoperacionalesData = require('../../../data/posoperacionales');
-var alertasData = require('../../../data/alertas');
 var pdfPosoperacional = require('../../../servicios/pdfPosoperacional');
-var alertasReglas = require('../../alertas/reglas');
-var alertasNotificador = require('../../alertas/notificador');
 
 function ahoraCO() {
   var utc = new Date();
@@ -59,11 +56,6 @@ function construirDatosSesionPdf(sesion, telefono, ahora) {
   };
 }
 
-async function persistirAlertas(alertas) {
-  if (!alertas || !alertas.length) return { error: null, data: [] };
-  return await alertasData.crearAlertasMasivas(alertas);
-}
-
 async function guardarPosoperacionalCompleto(sesion, telefono) {
   var ahora = ahoraCO();
   var datosGuardar = construirDatosPosoperacional(sesion, telefono, ahora);
@@ -82,21 +74,6 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
     }
   }
 
-  var alertas = alertasReglas.construirAlertasPosoperacional({
-    placa: sesion.placa,
-    novedades: sesion.novedades || [],
-    alertasKm: sesion.alertasKm || [],
-    inconsistenciaKm: !!sesion.inconsistenciaKm,
-    posoperacionalId: posoperacional.id
-  });
-
-  var alertasGuardadas = await persistirAlertas(alertas);
-  if (alertasGuardadas.error) {
-    console.error('Error guardando alertas posoperacionales:', alertasGuardadas.error.message || alertasGuardadas.error);
-  }
-
-  alertasNotificador.notificarAlertas(alertas);
-
   var datosPdf = construirDatosSesionPdf(sesion, telefono, ahora);
   var pdfUrl = await pdfPosoperacional.subirYEnviarPDFPosoperacional(datosPdf, posoperacional.id, telefono);
 
@@ -105,7 +82,6 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
     ahora: ahora,
     datosSesion: datosPdf,
     posoperacional: posoperacional,
-    alertas: alertas,
     pdfUrl: pdfUrl
   };
 }

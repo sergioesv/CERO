@@ -9,20 +9,17 @@ var estadoPosop = require('./estado');
 var mensajes = require('./mensajes');
 var cierre = require('./cierre');
 
-var ESTADOS = {
-  INICIO: 'POSOP_INICIO',
-  ESPERANDO_PLACA: 'POSOP_ESPERANDO_PLACA',
-  ESPERANDO_FOTO_ODOMETRO: 'POSOP_ESPERANDO_FOTO_ODOMETRO',
-  CONFIRMACION_KM: 'POSOP_CONFIRMACION_KM',
-  KM_MANUAL: 'POSOP_KM_MANUAL',
-  TIENE_NOVEDADES: 'POSOP_TIENE_NOVEDADES',
-  DESCRIBIR_NOVEDAD: 'POSOP_DESCRIBIR_NOVEDAD',
-  CONFIRMAR_NOVEDAD: 'POSOP_CONFIRMAR_NOVEDAD',
-  FOTO_NOVEDAD: 'POSOP_FOTO_NOVEDAD',
-  AGREGAR_OTRA_NOVEDAD: 'POSOP_AGREGAR_OTRA_NOVEDAD',
-  OBSERVACIONES: 'POSOP_OBSERVACIONES',
-  CONFIRMACION_FINAL: 'POSOP_CONFIRMACION_FINAL'
-};
+var ESTADOS = estadoPosop.ESTADOS;
+
+/** Menú principal (misma copia que canales/whatsapp.js) si este handler se usa sin el enrutador. */
+var MENSAJE_MENU_PRINCIPAL =
+  '🚗 *SISTEMA CERO*\n' +
+  '_cero papel, cero accidentes_\n\n' +
+  'Selecciona una opción:\n\n' +
+  '1️⃣ Preoperacional (inicio de jornada)\n' +
+  '2️⃣ Posoperacional (cierre de jornada)\n' +
+  '3️⃣ Combustible / tanqueo\n\n' +
+  'Escribe el número:';
 
 function inicializarSesionPosoperacional(sesion) {
   sesion.tipo = 'posoperacional';
@@ -335,7 +332,7 @@ async function manejarPosoperacional(req, res) {
     if (mensaje === '9' || msgUpper === 'CANCELAR' || msgUpper === 'MENU' || msgUpper === 'INICIO') {
       sesiones.eliminarSesion(telefono);
       sesiones.guardarCambios();
-      return responderMenuDesdeModulo(res);
+      return validaciones.responderTwiml(res, MENSAJE_MENU_PRINCIPAL);
     }
 
     if (mensaje === '0' || msgUpper === 'ATRAS') {
