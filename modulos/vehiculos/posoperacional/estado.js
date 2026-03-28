@@ -1,5 +1,21 @@
 var storage = require('../../../servicios/storage');
 
+/** Debe coincidir con el switch en flujo.js (prefijo POSOP_). */
+var ESTADOS = {
+  INICIO: 'POSOP_INICIO',
+  ESPERANDO_PLACA: 'POSOP_ESPERANDO_PLACA',
+  ESPERANDO_FOTO_ODOMETRO: 'POSOP_ESPERANDO_FOTO_ODOMETRO',
+  CONFIRMACION_KM: 'POSOP_CONFIRMACION_KM',
+  KM_MANUAL: 'POSOP_KM_MANUAL',
+  TIENE_NOVEDADES: 'POSOP_TIENE_NOVEDADES',
+  DESCRIBIR_NOVEDAD: 'POSOP_DESCRIBIR_NOVEDAD',
+  CONFIRMAR_NOVEDAD: 'POSOP_CONFIRMAR_NOVEDAD',
+  FOTO_NOVEDAD: 'POSOP_FOTO_NOVEDAD',
+  AGREGAR_OTRA_NOVEDAD: 'POSOP_AGREGAR_OTRA_NOVEDAD',
+  OBSERVACIONES: 'POSOP_OBSERVACIONES',
+  CONFIRMACION_FINAL: 'POSOP_CONFIRMACION_FINAL'
+};
+
 function reiniciarDatosOperativos(sesion) {
   sesion.placa = null;
   sesion.vehiculo = null;
@@ -31,7 +47,7 @@ function volverAKilometraje(sesion) {
   sesion.origenKilometraje = null;
   sesion.kilometrajeConfirmado = false;
   storage.limpiarFotosPorTipo(sesion, ['odometro']);
-  sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+  sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
 }
 
 function agregarNovedades(sesion, novedades) {
@@ -99,6 +115,7 @@ function registrarFotoNovedad(sesion, novedad, url) {
 }
 
 module.exports = {
+  ESTADOS,
   reiniciarDatosOperativos,
   volverAKilometraje,
   agregarNovedades,
