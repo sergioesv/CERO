@@ -15,8 +15,8 @@ async function buscarPreoperacionalDia(placa, fecha) {
   try {
     var resultado = await config.supabase
       .from(TABLA_PREOPERACIONALES)
-      .select('id, placa, kilometraje, fecha, hora, created_at')
-      .eq('placa', placa)
+      .select('id, vehiculo_placa, kilometraje, fecha, hora, created_at')
+      .eq('vehiculo_placa', placa)
       .eq('fecha', fecha)
       .order('hora', { ascending: false })
       .limit(1);
@@ -58,8 +58,8 @@ async function buscarUltimoPreoperacional(placa) {
   try {
     var resultado = await config.supabase
       .from(TABLA_PREOPERACIONALES)
-      .select('id, placa, kilometraje, fecha, hora, created_at')
-      .eq('placa', placa)
+      .select('id, vehiculo_placa, kilometraje, fecha, hora, created_at')
+      .eq('vehiculo_placa', placa)
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false })
       .limit(1);
