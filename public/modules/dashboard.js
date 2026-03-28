@@ -26,6 +26,40 @@ window.Dashboard = {
   },
 
   /**
+   * Capitaliza texto: primera letra de cada palabra en mayúscula, resto en minúscula.
+   * Excepciones: placas (2–4 letras + dígitos) se dejan en mayúscula, 4x2 / 4x4 se mantienen.
+   */
+  capitalizarNombre(texto) {
+    if (!texto) return '';
+    return texto
+      .split(/\s+/)
+      .map(function (palabra) {
+        if (!palabra) return '';
+        // Mantener placas en mayúscula (ej: IDL363, WDS340, MSO120)
+        if (/^[A-Z]{2,4}\d{2,4}[A-Z]?$/i.test(palabra)) return palabra.toUpperCase();
+        // Mantener 4x2, 4x4, etc.
+        if (/^\d[x×]\d$/i.test(palabra)) return palabra.replace(/×/g, 'x').toLowerCase();
+        // Palabras cortas de conexión en minúscula
+        if (['de', 'con', 'y', 'en', 'el', 'la', 'los', 'las'].indexOf(palabra.toLowerCase()) !== -1) {
+          return palabra.toLowerCase();
+        }
+        return palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase();
+      })
+      .filter(Boolean)
+      .join(' ');
+  },
+
+  /**
+   * Tipos distintos de vehículo aún sin tablas de inspección: el backend puede devolver
+   * datos de flota; forzamos vista vacía cuando no hay inspecciones en el período.
+   */
+  _debeMostrarVacioPorTipo(kp) {
+    var tipo = this.tipoActivoActual;
+    var ins = kp && kp.inspecciones_periodo != null ? Number(kp.inspecciones_periodo) : 0;
+    return tipo !== 'todos' && tipo !== 'vehiculo' && ins === 0;
+  },
+
+  /**
    * Indica si Chart.js está cargado.
    */
   _chartDisponible() {
@@ -139,9 +173,10 @@ window.Dashboard = {
       var sev = ev.severidad || 'info';
       var bg = colores[sev] || colores.info;
       var linea = self._escape(ev.descripcion || '');
+      var detFmt = ev.detalle ? self.capitalizarNombre(ev.detalle) : '';
       var sub =
         self.formatearFechaRelativa(ev.fecha) +
-        (ev.detalle ? ' — ' + self._escape(ev.detalle) : '');
+        (detFmt ? ' — ' + self._escape(detFmt) : '');
       html +=
         '<div class="dash-timeline-item"' +
         (isLast ? ' style="padding-bottom:0"' : '') +
@@ -163,10 +198,11 @@ window.Dashboard = {
   /**
    * Barras horizontales para ítems con más novedades.
    */
-  renderBarrasHorizontales(items) {
+  renderBarrasHorizontales(items, mensajeVacio) {
     var self = this;
+    var msgDefault = 'Sin novedades en el período';
     if (!items || !items.length) {
-      return '<p class="dash-muted">Sin novedades en el período</p>';
+      return '<p class="dash-muted">' + self._escape(mensajeVacio || msgDefault) + '</p>';
     }
     var max = Math.max.apply(
       null,
@@ -187,7 +223,7 @@ window.Dashboard = {
       html +=
         '<div class="dash-bar-row">' +
         '<span class="dash-bar-lab">' +
-        self._escape(it.item || '') +
+        self._escape(self.capitalizarNombre(it.item || '')) +
         '</span>' +
         '<div class="dash-bar-trk">' +
         '<div class="dash-bar-fill" style="width:' +
@@ -635,11 +671,26 @@ window.Dashboard = {
       return;
     }
 
-    var kp = d.kpis || {};
-    var meses = d.novedades_por_mes || [];
-    var items = d.items_mas_novedades || [];
-    var atencion = d.activos_atencion || [];
-    var reinc = d.reincidencia || [];
+    var kpRaw = d.kpis || {};
+    var vacioTipo = this._debeMostrarVacioPorTipo(kpRaw);
+
+    var kp = vacioTipo
+      ? {
+          inspecciones_periodo: 0,
+          inspecciones_delta: 0,
+          con_novedades: 0,
+          con_novedades_pct: 0,
+          bloqueos: 0,
+          bloqueos_resueltos: 0,
+          promedio_dias_fuera_servicio: 0,
+          activo_sube_promedio: ''
+        }
+      : kpRaw;
+
+    var meses = vacioTipo ? [] : d.novedades_por_mes || [];
+    var items = vacioTipo ? [] : d.items_mas_novedades || [];
+    var atencion = vacioTipo ? [] : d.activos_atencion || [];
+    var reinc = vacioTipo ? [] : d.reincidencia || [];
 
     var lblInspecciones =
       this.periodoActual === 'hoy'
@@ -651,15 +702,34 @@ window.Dashboard = {
     var deltaIns = kp.inspecciones_delta != null ? kp.inspecciones_delta : 0;
     var deltaColor = deltaIns >= 0 ? '#1D9E75' : '#E24B4A';
 
-    var bloqueosSub =
-      (kp.bloqueos_resueltos || 0) >= (kp.bloqueos || 0) && (kp.bloqueos || 0) > 0
-        ? 'Todos resueltos'
-        : (kp.bloqueos_resueltos || 0) + ' de ' + (kp.bloqueos || 0) + ' resueltos';
+    var bloqueosSub;
+    if (vacioTipo) {
+      bloqueosSub = 'Sin datos para este tipo de activo';
+    } else {
+      bloqueosSub =
+        (kp.bloqueos_resueltos || 0) >= (kp.bloqueos || 0) && (kp.bloqueos || 0) > 0
+          ? 'Todos resueltos'
+          : (kp.bloqueos_resueltos || 0) + ' de ' + (kp.bloqueos || 0) + ' resueltos';
+    }
 
     var placaPeor = kp.activo_sube_promedio || '';
-    var promSub = placaPeor
-      ? '<span style="color:#D85A30">' + this._escape(placaPeor) + ' sube el promedio</span>'
-      : 'Sin outliers destacados';
+    var promSub;
+    if (vacioTipo) {
+      promSub = '—';
+    } else if (placaPeor) {
+      promSub =
+        '<span style="color:#D85A30">' +
+        this._escape(this.capitalizarNombre(placaPeor)) +
+        ' sube el promedio</span>';
+    } else {
+      promSub = 'Sin outliers destacados';
+    }
+
+    var chartBlock = vacioTipo
+      ? '<div class="dash-chart-empty">Sin datos para este tipo de activo</div>'
+      : '<div class="dash-chart-wrap"><canvas id="chart-novedades" height="220"></canvas></div>';
+
+    var msgListaVacio = 'Sin datos para este tipo de activo';
 
     body.innerHTML =
       '<div class="dash-g4">' +
@@ -696,20 +766,34 @@ window.Dashboard = {
       '<span><span class="dash-ld" style="background:#E24B4A"></span>Bloqueos</span>' +
       '<span><span class="dash-ld" style="background:#378ADD"></span>A taller</span>' +
       '<span><span class="dash-ld" style="background:#1D9E75"></span>Autorizados</span></div>' +
-      '<div class="dash-chart-wrap"><canvas id="chart-novedades" height="220"></canvas></div>' +
+      chartBlock +
       '<p class="dash-section-title">Ítems con más novedades</p>' +
-      this.renderBarrasHorizontales(items) +
+      this.renderBarrasHorizontales(items, vacioTipo ? msgListaVacio : null) +
       '<p class="dash-section-title">Activos que requieren atención</p>' +
-      this._htmlActivosAtencion(atencion) +
+      this._htmlActivosAtencion(atencion, vacioTipo) +
       '<p class="dash-section-title">Reincidencia</p>' +
       '<p class="dash-section-sub">Misma novedad 2+ veces en 90 días</p>' +
-      this._htmlReincidencia(reinc);
+      this._htmlReincidencia(reinc, vacioTipo);
 
-    this._renderChartNovedades(meses);
+    if (vacioTipo) {
+      if (this.chartNovedades) {
+        try {
+          this.chartNovedades.destroy();
+        } catch (e) {
+          /* noop */
+        }
+        this.chartNovedades = null;
+      }
+    } else {
+      this._renderChartNovedades(meses);
+    }
   },
 
-  _htmlActivosAtencion(list) {
+  _htmlActivosAtencion(list, vacioTipo) {
     var self = this;
+    if (vacioTipo) {
+      return '<p class="dash-muted">Sin datos para este tipo de activo</p>';
+    }
     if (!list.length) {
       return '<p class="dash-muted">Ningún activo requiere atención urgente en este momento.</p>';
     }
@@ -734,7 +818,7 @@ window.Dashboard = {
         '"><div><span class="dash-placa">' +
         self._escape(a.codigo) +
         '</span><span class="dash-nombre-activo">' +
-        self._escape(a.nombre || '') +
+        self._escape(self.capitalizarNombre(a.nombre || '')) +
         '</span></div><div class="dash-badge-row">' +
         badges +
         (dias > 0 ? '<span class="dash-badge dash-badge-warn">' + dias + 'd taller</span>' : '') +
@@ -743,8 +827,11 @@ window.Dashboard = {
     return html;
   },
 
-  _htmlReincidencia(list) {
+  _htmlReincidencia(list, vacioTipo) {
     var self = this;
+    if (vacioTipo) {
+      return '<p class="dash-muted">Sin datos para este tipo de activo</p>';
+    }
     if (!list.length) {
       return '<p class="dash-muted">Sin reincidencias detectadas</p>';
     }
@@ -759,7 +846,7 @@ window.Dashboard = {
         '"><div><span class="dash-placa">' +
         self._escape(r.codigo) +
         '</span><span class="dash-nombre-activo">' +
-        self._escape(r.item || '') +
+        self._escape(self.capitalizarNombre(r.item || '')) +
         '</span></div><span class="' +
         badgeClass +
         '">' +
@@ -806,13 +893,17 @@ window.Dashboard = {
     if (!window.__ceroDashboardChartThemeHook) {
       window.__ceroDashboardChartThemeHook = true;
       window.addEventListener('cero-theme-changed', function () {
+        var D = window.Dashboard;
+        var da = D && D.datos && D.datos.activos;
         if (
-          window.Dashboard &&
-          window.Dashboard.tabActual === 'activos' &&
-          window.Dashboard.datos.activos &&
-          window.Dashboard.datos.activos.novedades_por_mes
+          D &&
+          D.tabActual === 'activos' &&
+          document.getElementById('chart-novedades') &&
+          da &&
+          da.novedades_por_mes &&
+          !D._debeMostrarVacioPorTipo(da.kpis || {})
         ) {
-          window.Dashboard._renderChartNovedades(window.Dashboard.datos.activos.novedades_por_mes);
+          D._renderChartNovedades(da.novedades_por_mes);
         }
       });
     }

@@ -1057,6 +1057,18 @@ body {
   margin-bottom: var(--spacing-lg);
 }
 
+.dash-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  margin-bottom: var(--spacing-lg);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
 .dash-bar-row {
   display: flex;
   align-items: center;
