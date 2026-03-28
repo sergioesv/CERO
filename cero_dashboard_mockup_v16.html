@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CERO — Dashboard de Seguridad Operativa — Mockup v16</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8f7f4;color:#1a1a1a;min-height:100vh}
+@media(prefers-color-scheme:dark){body{background:#1a1a1a;color:#e5e5e5}}
+.wrap{max-width:960px;margin:0 auto;padding:1.5rem 1rem}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px}
+.header-sub{font-size:12px;color:#888}
+.header-title{font-size:18px;font-weight:600;margin-top:2px}
+.tabs{display:flex;gap:2px;margin-bottom:1.5rem;border-bottom:1px solid rgba(0,0,0,.1);overflow-x:auto}
+@media(prefers-color-scheme:dark){.tabs{border-bottom-color:rgba(255,255,255,.1)}}
+.tab{padding:10px 18px;font-size:13px;cursor:pointer;border:none;background:none;color:#888;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab.a{color:#1a1a1a;font-weight:600;border-bottom-color:#1a1a1a}
+@media(prefers-color-scheme:dark){.tab.a{color:#e5e5e5;border-bottom-color:#e5e5e5}}
+.tab:hover{color:#1a1a1a}
+@media(prefers-color-scheme:dark){.tab:hover{color:#e5e5e5}}
+.pn{display:none}.pn.a{display:block}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+@media(max-width:700px){.g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:400px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.k{background:#fff;border-radius:10px;padding:1rem;border:1px solid rgba(0,0,0,.06)}
+@media(prefers-color-scheme:dark){.k{background:#242424;border-color:rgba(255,255,255,.08)}}
+.kl{font-size:11px;color:#999}
+.kv{font-size:22px;font-weight:600;margin:4px 0 0}
+.ks{font-size:10px;color:#aaa;margin:3px 0 0}
+.km{background:#fff;border-radius:10px;padding:.85rem 1rem;border:1px solid rgba(0,0,0,.06)}
+@media(prefers-color-scheme:dark){.km{background:#242424;border-color:rgba(255,255,255,.08)}}
+.km .kv{font-size:17px}
+.st{font-size:14px;font-weight:600;margin:1.5rem 0 8px}
+.ss{font-size:12px;color:#888;margin:0 0 8px}
+.cr{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:0;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+@media(prefers-color-scheme:dark){.cr{background:#242424;border-color:rgba(255,255,255,.08)}}
+.b{font-size:11px;padding:2px 8px;border-radius:10px}
+.br{color:#791F1F;background:#FCEBEB}.ba{color:#854F0B;background:#FAEEDA}.bg{color:#085041;background:#E1F5EE}.bb{color:#0C447C;background:#E6F1FB}.bx{color:#555;background:#eee}
+@media(prefers-color-scheme:dark){.bx{color:#aaa;background:#333}}
+.tl{border-left:2px solid rgba(0,0,0,.1);margin-left:8px;padding-left:20px}
+@media(prefers-color-scheme:dark){.tl{border-left-color:rgba(255,255,255,.1)}}
+.ti{position:relative;padding-bottom:14px}
+.td{position:absolute;left:-27px;top:2px;width:12px;height:12px;border-radius:50%;border:2px solid #f8f7f4}
+@media(prefers-color-scheme:dark){.td{border-color:#1a1a1a}}
+.pl{display:flex;gap:4px}
+.pi{padding:5px 12px;font-size:11px;border-radius:16px;border:1px solid rgba(0,0,0,.15);background:#fff;color:#888;cursor:pointer}
+@media(prefers-color-scheme:dark){.pi{background:#242424;border-color:rgba(255,255,255,.15);color:#888}}
+.pi.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+@media(prefers-color-scheme:dark){.pi.on{background:#e5e5e5;color:#1a1a1a;border-color:#e5e5e5}}
+.lg{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;font-size:12px;color:#888}
+.ld{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+.cw{position:relative;width:100%;margin-bottom:1.5rem}
+.ft{display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap}
+.fp{padding:5px 14px;font-size:12px;border-radius:16px;border:1px solid rgba(0,0,0,.15);background:#fff;color:#888;cursor:pointer}
+@media(prefers-color-scheme:dark){.fp{background:#242424;border-color:rgba(255,255,255,.15)}}
+.fp.on{background:#1a1a1a;color:#fff}
+@media(prefers-color-scheme:dark){.fp.on{background:#e5e5e5;color:#1a1a1a}}
+.dc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:1.5rem}
+.dci{background:#fff;border-radius:10px;padding:1rem;text-align:center;border:1px solid rgba(0,0,0,.06)}
+@media(prefers-color-scheme:dark){.dci{background:#242424;border-color:rgba(255,255,255,.08)}}
+.br-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.br-lab{font-size:12px;color:#888;width:130px;flex-shrink:0}
+.br-trk{flex:1;background:rgba(0,0,0,.04);border-radius:4px;height:20px}
+@media(prefers-color-scheme:dark){.br-trk{background:rgba(255,255,255,.06)}}
+.br-fl{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px}
+.br-fl span{font-size:10px;color:#fff;font-weight:600}
+.pr{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px}
+@media(prefers-color-scheme:dark){.pr{border-bottom-color:rgba(255,255,255,.06)}}
+.rp-card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:1.25rem;margin-bottom:12px}
+@media(prefers-color-scheme:dark){.rp-card{background:#242424;border-color:rgba(255,255,255,.08)}}
+.rp-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+.rp-row:last-child{margin-bottom:0}
+.rp-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hero{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:1.25rem;margin-bottom:12px;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap}
+@media(prefers-color-scheme:dark){.hero{background:#242424;border-color:rgba(255,255,255,.08)}}
+.watermark{text-align:center;padding:2rem 0 .5rem;font-size:11px;color:#ccc;letter-spacing:1px}
+@media(prefers-color-scheme:dark){.watermark{color:#444}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <p class="header-sub">Dashboard de seguridad operativa</p>
+      <p class="header-title">EDEMSA — Sede Principal</p>
+    </div>
+    <div class="pl">
+      <span class="pi">Hoy</span><span class="pi on">Semana</span><span class="pi">Mes</span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab a" onclick="st('general',this)">General</button>
+    <button class="tab" onclick="st('activos',this)">Activos</button>
+    <button class="tab" onclick="st('seguridad',this)">Seguridad y permisos</button>
+    <button class="tab" onclick="st('reportes',this)">Reportes</button>
+  </div>
+
+  <!-- ========== GENERAL ========== -->
+  <div id="general" class="pn a">
+    <div class="hero">
+      <svg viewBox="0 0 110 110" style="width:100px;height:100px;flex-shrink:0">
+        <circle cx="55" cy="55" r="46" fill="none" stroke="#E1F5EE" stroke-width="9"/>
+        <circle cx="55" cy="55" r="46" fill="none" stroke="#1D9E75" stroke-width="9" stroke-dasharray="289" stroke-dashoffset="23" stroke-linecap="round" transform="rotate(-90 55 55)"/>
+        <text x="55" y="50" text-anchor="middle" font-size="26" font-weight="600" fill="currentColor">92</text>
+        <text x="55" y="66" text-anchor="middle" font-size="10" fill="#888">de 100</text>
+      </svg>
+      <div style="flex:1;min-width:180px">
+        <p style="font-size:15px;font-weight:600;margin-bottom:4px">Índice de seguridad operativa</p>
+        <p style="font-size:12px;color:#888;line-height:1.5;margin-bottom:10px">La operación funciona en condiciones seguras. Se detectaron y resolvieron 3 situaciones de riesgo antes de que algún equipo saliera a operar.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="b bg">+4 pts vs mes anterior</span>
+          <span class="b bb">3 incidentes prevenidos</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="g4">
+      <div class="k"><p class="kl">Riesgos prevenidos</p><p class="kv" style="color:#1D9E75">3</p><p class="ks">Detectados antes de operar</p></div>
+      <div class="k"><p class="kl">Cumplimiento inspecciones</p><p class="kv">96%</p><p class="ks" style="color:#1D9E75">+8% vs mes anterior</p></div>
+      <div class="k"><p class="kl">Activos operativos</p><p class="kv">8 <span style="font-size:13px;color:#888">/ 11</span></p><p class="ks">3 fuera de servicio</p></div>
+      <div class="k"><p class="kl">Documentación al día</p><p class="kv">82%</p><p class="ks" style="color:#D85A30">2 por vencer</p></div>
+    </div>
+
+    <div class="g3">
+      <div class="km"><p class="kl">Ahorro estimado este mes</p><p class="kv">$4.850.000</p><p class="ks">Sanciones y paradas evitadas</p></div>
+      <div class="km"><p class="kl">Costo diario sin inspeccionar</p><p class="kv">$380.000</p><p class="ks">Cuadrilla inactiva + sanción</p></div>
+      <div class="km"><p class="kl">Sanciones prevenidas</p><p class="kv">$2.300.000</p><p class="ks">Documentos bloqueados a tiempo</p></div>
+    </div>
+
+    <p class="st">Situaciones que requieren atención</p>
+    <div class="cr" style="border-left:3px solid #E24B4A"><div><p style="font-size:13px;font-weight:600">Falla recurrente en sistema de frenos</p><p style="font-size:12px;color:#888;margin-top:2px">1 vehículo con la misma novedad crítica 3 veces en 60 días</p></div><span class="b br">Reincidencia</span></div>
+    <div class="cr" style="border-left:3px solid #EF9F27"><div><p style="font-size:13px;font-weight:600">Desgaste acelerado de llantas</p><p style="font-size:12px;color:#888;margin-top:2px">1 vehículo con 5 reportes en 3 meses — posible alineación</p></div><span class="b ba">Patrón</span></div>
+    <div class="cr" style="border-left:3px solid #EF9F27"><div><p style="font-size:13px;font-weight:600">Equipo con tiempo excesivo fuera de servicio</p><p style="font-size:12px;color:#888;margin-top:2px">1 vehículo lleva 18 días — promedio de la flota es 4 días</p></div><span class="b ba">Anomalía</span></div>
+
+    <p class="st">Decisiones del supervisor</p>
+    <div class="dc">
+      <div class="dci"><p class="kv" style="color:#1D9E75">5</p><p style="font-size:12px;color:#888;margin-top:4px">Autorizadas</p></div>
+      <div class="dci"><p class="kv" style="color:#D85A30">2</p><p style="font-size:12px;color:#888;margin-top:4px">A taller</p></div>
+      <div class="dci"><p class="kv" style="color:#E24B4A">1</p><p style="font-size:12px;color:#888;margin-top:4px">Pendiente</p><p style="font-size:10px;color:#E24B4A;margin-top:2px">hace 2h</p></div>
+    </div>
+
+    <p class="st">Actividad reciente</p>
+    <div class="tl">
+      <div class="ti"><div class="td" style="background:#1D9E75"></div><p style="font-size:13px">Inspección completada sin novedades</p><p style="font-size:11px;color:#aaa;margin-top:2px">Hoy 6:45 AM — Camioneta estacas</p></div>
+      <div class="ti"><div class="td" style="background:#E24B4A"></div><p style="font-size:13px">Novedad crítica — sistema de frenos — <span class="b br">BLOQUEO</span></p><p style="font-size:11px;color:#aaa;margin-top:2px">Hoy 6:18 AM — Camioneta panel</p></div>
+      <div class="ti"><div class="td" style="background:#378ADD"></div><p style="font-size:13px">Supervisor autorizó con justificación</p><p style="font-size:11px;color:#aaa;margin-top:2px">Hoy 6:24 AM — Respuesta en 6 min</p></div>
+      <div class="ti" style="padding-bottom:0"><div class="td" style="background:#85B7EB"></div><p style="font-size:13px">Tanqueo registrado — 45 litros</p><p style="font-size:11px;color:#aaa;margin-top:2px">Ayer 5:12 PM — Camioneta estacas</p></div>
+    </div>
+  </div>
+
+  <!-- ========== ACTIVOS ========== -->
+  <div id="activos" class="pn">
+    <div class="ft">
+      <span class="fp on" onclick="sf(this)">Todos</span>
+      <span class="fp" onclick="sf(this)">Vehículos</span>
+      <span class="fp" style="opacity:.4" onclick="sf(this)">Escaleras</span>
+      <span class="fp" style="opacity:.4" onclick="sf(this)">Taladros</span>
+      <span class="fp" style="opacity:.4" onclick="sf(this)">Arnés / EPP</span>
+    </div>
+
+    <div class="g4">
+      <div class="k"><p class="kl">Inspecciones esta semana</p><p class="kv">34</p><p class="ks" style="color:#1D9E75">+12% vs anterior</p></div>
+      <div class="k"><p class="kl">Con novedades</p><p class="kv">8</p><p class="ks">24% del total</p></div>
+      <div class="k"><p class="kl">Bloqueos</p><p class="kv" style="color:#E24B4A">3</p><p class="ks">Todos resueltos</p></div>
+      <div class="k"><p class="kl">Prom. días fuera servicio</p><p class="kv">4.2</p><p class="ks" style="color:#D85A30">1 activo sube promedio</p></div>
+    </div>
+
+    <p class="st" style="margin-top:.5rem">Novedades vs decisión del supervisor</p>
+    <div class="lg">
+      <span><span class="ld" style="background:#E24B4A"></span>Bloqueos</span>
+      <span><span class="ld" style="background:#378ADD"></span>A taller</span>
+      <span><span class="ld" style="background:#1D9E75"></span>Autorizados</span>
+    </div>
+    <div class="cw" style="height:220px"><canvas id="c1"></canvas></div>
+
+    <p class="st">Ítems con más novedades</p>
+    <div style="margin-bottom:1.5rem">
+      <div class="br-row"><span class="br-lab">Líquido de frenos</span><div class="br-trk"><div class="br-fl" style="width:78%;background:#E24B4A"><span>7</span></div></div></div>
+      <div class="br-row"><span class="br-lab">Estado de llantas</span><div class="br-trk"><div class="br-fl" style="width:56%;background:#EF9F27"><span>5</span></div></div></div>
+      <div class="br-row"><span class="br-lab">Aceite motor</span><div class="br-trk"><div class="br-fl" style="width:44%;background:#EF9F27"><span>4</span></div></div></div>
+      <div class="br-row"><span class="br-lab">Pernos de ruedas</span><div class="br-trk"><div class="br-fl" style="width:33%;background:#85B7EB"><span>3</span></div></div></div>
+    </div>
+
+    <p class="st">Activos que requieren atención</p>
+    <div class="cr" style="border-left:3px solid #E24B4A"><div><span style="font-size:13px;font-weight:600">MTX900</span><span style="font-size:12px;color:#888;margin-left:8px">Toyota Hilux</span></div><div style="display:flex;gap:6px"><span class="b br">18d taller</span><span class="b ba">SOAT 5d</span></div></div>
+    <div class="cr" style="border-left:3px solid #EF9F27"><div><span style="font-size:13px;font-weight:600">WDS346</span><span style="font-size:12px;color:#888;margin-left:8px">Renault Kangoo</span></div><div><span class="b ba">12d taller</span></div></div>
+    <div class="cr" style="border-left:3px solid #EF9F27"><div><span style="font-size:13px;font-weight:600">WLQ37D</span><span style="font-size:12px;color:#888;margin-left:8px">Yamaha Moto</span></div><div style="display:flex;gap:6px"><span class="b ba">9d taller</span><span class="b br">Tecno vencida</span></div></div>
+
+    <p class="st">Reincidencia</p>
+    <p class="ss">Misma novedad 2+ veces en 90 días</p>
+    <div class="cr" style="border-left:3px solid #E24B4A"><div><span style="font-size:13px;font-weight:600">WDS340</span><span style="font-size:12px;color:#888;margin-left:6px">Líq. frenos bajo mínimo</span></div><span class="b br">3× / 60d</span></div>
+    <div class="cr" style="border-left:3px solid #EF9F27"><div><span style="font-size:13px;font-weight:600">IDL354</span><span style="font-size:12px;color:#888;margin-left:6px">Llantas — desgaste</span></div><span class="b ba">5× / 90d</span></div>
+  </div>
+
+  <!-- ========== SEGURIDAD Y PERMISOS ========== -->
+  <div id="seguridad" class="pn">
+    <div style="padding:1.5rem;margin-bottom:1.5rem;background:#fff;border-radius:12px;text-align:center;border:1px solid rgba(0,0,0,.06)">
+      <p style="font-size:14px;font-weight:600;color:#888;margin-bottom:6px">Fase 3 — Próximamente</p>
+      <p style="font-size:12px;color:#aaa">Se activará con inspecciones de equipos y permisos de trabajo</p>
+    </div>
+    <div class="g4" style="opacity:.4">
+      <div class="k"><p class="kl">Equipos inspeccionados</p><p class="kv">—</p></div>
+      <div class="k"><p class="kl">Equipos bloqueados</p><p class="kv">—</p></div>
+      <div class="k"><p class="kl">Permisos activos</p><p class="kv">—</p></div>
+      <div class="k"><p class="kl">Pendientes firma SST</p><p class="kv">—</p></div>
+    </div>
+    <p class="st" style="opacity:.4">Inspecciones de equipos</p>
+    <div style="opacity:.4">
+      <div class="pr"><span>Escaleras</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>Taladros y herramienta eléctrica</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>Arnés y línea de vida</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>EPP (casco, guantes, botas)</span><span class="b bx">Sin datos</span></div>
+    </div>
+    <p class="st" style="opacity:.4;margin-top:1.5rem">Permisos de trabajo</p>
+    <div style="opacity:.4">
+      <div class="pr"><span>ATS — Análisis de trabajo seguro</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>Permiso de trabajo en altura</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>Permiso de riesgo eléctrico</span><span class="b bx">Sin datos</span></div>
+      <div class="pr"><span>Permiso de espacio confinado</span><span class="b bx">Sin datos</span></div>
+    </div>
+  </div>
+
+  <!-- ========== REPORTES ========== -->
+  <div id="reportes" class="pn">
+    <div class="hero" style="gap:1.5rem">
+      <svg viewBox="0 0 200 140" style="width:200px;height:140px;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="8" width="180" height="120" rx="8" fill="#f0efeb" stroke="rgba(0,0,0,.1)" stroke-width="0.5"/>
+        <rect x="10" y="8" width="180" height="18" rx="8" fill="#e8e7e3"/>
+        <rect x="10" y="18" width="180" height="8" fill="#e8e7e3"/>
+        <circle cx="22" cy="17" r="3" fill="#E24B4A"/><circle cx="31" cy="17" r="3" fill="#EF9F27"/><circle cx="40" cy="17" r="3" fill="#1D9E75"/>
+        <rect x="10" y="26" width="40" height="102" fill="#e8e7e3" opacity=".5"/>
+        <rect x="16" y="34" width="28" height="4" rx="2" fill="rgba(0,0,0,.15)"/>
+        <rect x="16" y="43" width="22" height="3" rx="1.5" fill="rgba(0,0,0,.08)"/>
+        <rect x="16" y="50" width="26" height="3" rx="1.5" fill="rgba(0,0,0,.08)"/>
+        <rect x="16" y="57" width="20" height="3" rx="1.5" fill="rgba(0,0,0,.08)"/>
+        <rect x="60" y="90" width="14" height="28" rx="2" fill="#1D9E75" opacity=".7"/>
+        <rect x="78" y="78" width="14" height="40" rx="2" fill="#1D9E75" opacity=".8"/>
+        <rect x="96" y="66" width="14" height="52" rx="2" fill="#1D9E75" opacity=".85"/>
+        <rect x="114" y="54" width="14" height="64" rx="2" fill="#1D9E75"/>
+        <rect x="132" y="72" width="14" height="46" rx="2" fill="#378ADD" opacity=".8"/>
+        <rect x="150" y="84" width="14" height="34" rx="2" fill="#378ADD" opacity=".7"/>
+        <polyline points="67,86 85,72 103,60 121,48 139,64 157,78" fill="none" stroke="#D85A30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="67" cy="86" r="3" fill="#D85A30"/><circle cx="85" cy="72" r="3" fill="#D85A30"/><circle cx="103" cy="60" r="3" fill="#D85A30"/><circle cx="121" cy="48" r="3" fill="#D85A30"/><circle cx="139" cy="64" r="3" fill="#D85A30"/><circle cx="157" cy="78" r="3" fill="#D85A30"/>
+        <rect x="58" y="32" width="36" height="22" rx="4" fill="#fff" stroke="rgba(0,0,0,.08)" stroke-width="0.5"/>
+        <text x="76" y="42" text-anchor="middle" font-size="7" font-weight="600" fill="#1D9E75">92</text>
+        <text x="76" y="50" text-anchor="middle" font-size="4" fill="#999">Score</text>
+        <rect x="98" y="32" width="36" height="22" rx="4" fill="#fff" stroke="rgba(0,0,0,.08)" stroke-width="0.5"/>
+        <text x="116" y="42" text-anchor="middle" font-size="7" font-weight="600" fill="#333">96%</text>
+        <text x="116" y="50" text-anchor="middle" font-size="4" fill="#999">Cumpl.</text>
+        <rect x="138" y="32" width="36" height="22" rx="4" fill="#fff" stroke="rgba(0,0,0,.08)" stroke-width="0.5"/>
+        <text x="156" y="42" text-anchor="middle" font-size="7" font-weight="600" fill="#E24B4A">3</text>
+        <text x="156" y="50" text-anchor="middle" font-size="4" fill="#999">Bloq.</text>
+        <circle cx="170" cy="110" r="12" fill="none" stroke="#E1F5EE" stroke-width="4"/>
+        <circle cx="170" cy="110" r="12" fill="none" stroke="#1D9E75" stroke-width="4" stroke-dasharray="62" stroke-dashoffset="15" transform="rotate(-90 170 110)"/>
+        <text x="170" y="112" text-anchor="middle" font-size="6" font-weight="600" fill="#333">82%</text>
+      </svg>
+      <div style="flex:1;min-width:200px">
+        <p style="font-size:16px;font-weight:600;margin-bottom:6px">Reportes avanzados con Power BI</p>
+        <p style="font-size:13px;color:#888;line-height:1.6;margin-bottom:14px">CERO almacena cada inspección, novedad, decisión y cambio de estado. Con Power BI conectado directamente a la base de datos, la información se transforma en análisis profundo.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="b bg">Conexión directa PostgreSQL</span>
+          <span class="b bb">Actualización automática</span>
+          <span class="b bx">Sin costo adicional</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="st" style="margin-top:0">Con 3+ meses de operación</p>
+    <div class="rp-card">
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#E1F5EE"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 15L7 9L11 12L17 5" stroke="#1D9E75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="5" r="2" fill="#1D9E75"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Tendencia del índice de seguridad operativa</p><p style="font-size:12px;color:#888;margin-top:2px">Evolución mensual del score desglosado por tipo de activo.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#FCEBEB"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3V10L14 14" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="10" r="7" stroke="#E24B4A" stroke-width="1.5" fill="none"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Análisis de reincidencia por activo</p><p style="font-size:12px;color:#888;margin-top:2px">Drill-down por vehículo, escalera o equipo. Detecta fallas repetidas.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#FAEEDA"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="12" width="3" height="5" rx="1" fill="#EF9F27"/><rect x="8.5" y="8" width="3" height="9" rx="1" fill="#EF9F27"/><rect x="14" y="4" width="3" height="13" rx="1" fill="#EF9F27"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Novedades por severidad — comparativo mensual</p><p style="font-size:12px;color:#888;margin-top:2px">Bloqueos vs alertas vs informativos. Filtra por activo, sede, turno.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#E6F1FB"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="3" rx="1.5" fill="#378ADD" opacity=".3"/><rect x="3" y="5" width="10" height="3" rx="1.5" fill="#378ADD"/><rect x="3" y="10" width="14" height="3" rx="1.5" fill="#378ADD" opacity=".3"/><rect x="3" y="10" width="6" height="3" rx="1.5" fill="#378ADD"/><rect x="3" y="15" width="14" height="3" rx="1.5" fill="#378ADD" opacity=".3"/><rect x="3" y="15" width="12" height="3" rx="1.5" fill="#378ADD"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Días fuera de servicio y motivos de parada</p><p style="font-size:12px;color:#888;margin-top:2px">Tiempo por activo, motivo, vs promedio. Cuellos de botella.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#EEEDFE"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3C6.13 3 3 6.13 3 10C3 13.87 6.13 17 10 17C13.87 17 17 13.87 17 10" stroke="#534AB7" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10L15 5" stroke="#534AB7" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="10" r="2" fill="#534AB7"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Decisiones del supervisor — análisis de respuesta</p><p style="font-size:12px;color:#888;margin-top:2px">Ratio autorizados vs taller. Tiempo de respuesta. Justificaciones.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#FBEAF0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L8 10L12 13L16 4" stroke="#D4537E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 4H16V7" stroke="#D4537E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Impacto financiero — ROI de CERO</p><p style="font-size:12px;color:#888;margin-top:2px">Multas prevenidas, costo inactividad, ahorro acumulado.</p></div>
+      </div>
+      <div class="rp-row" style="margin-bottom:0">
+        <div class="rp-icon" style="background:#E1F5EE"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="4" y="3" width="12" height="14" rx="2" stroke="#1D9E75" stroke-width="1.5" fill="none"/><path d="M7 7H13M7 10H13M7 13H11" stroke="#1D9E75" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Reporte PESV para Supertransporte</p><p style="font-size:12px;color:#888;margin-top:2px">Indicadores IF, IS, ILI. Exportable para auditorías ARL.</p></div>
+      </div>
+    </div>
+
+    <p class="st">Con 6+ meses de operación</p>
+    <div class="rp-card">
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#E6F1FB"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17H17" stroke="#378ADD" stroke-width="1.2"/><path d="M5 13C6 10 8 8 10 9C12 10 14 6 16 3" stroke="#378ADD" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="10" cy="9" r="2" fill="#E24B4A"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Anomalías de combustible (IA)</p><p style="font-size:12px;color:#888;margin-top:2px">Consumos atípicos. Km vs litros. Fugas o uso indebido.</p></div>
+      </div>
+      <div class="rp-row">
+        <div class="rp-icon" style="background:#FAEEDA"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="4" stroke="#854F0B" stroke-width="1.5" fill="none"/><path d="M4 17C4 13.69 6.69 11 10 11C13.31 11 16 13.69 16 17" stroke="#854F0B" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Indicadores de conducción por operario</p><p style="font-size:12px;color:#888;margin-top:2px">Novedades por conductor, cumplimiento, capacitación.</p></div>
+      </div>
+      <div class="rp-row" style="margin-bottom:0">
+        <div class="rp-icon" style="background:#EEEDFE"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="6" width="6" height="10" rx="1.5" stroke="#534AB7" stroke-width="1.5" fill="none"/><rect x="11" y="3" width="6" height="13" rx="1.5" stroke="#534AB7" stroke-width="1.5" fill="none"/><path d="M5 10H7M5 13H7M13 7H15M13 10H15M13 13H15" stroke="#534AB7" stroke-width="1" stroke-linecap="round"/></svg></div>
+        <div><p style="font-size:13px;font-weight:600">Benchmark entre sedes</p><p style="font-size:12px;color:#888;margin-top:2px">Comparativo de seguridad y costos entre sedes.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="watermark">CERO — cero papel, cero accidentes — Mockup v16 — Inteligencia de Ciudad S.A.S.</div>
+</div>
+
+<script>
+function st(id,el){
+  document.querySelectorAll('.pn').forEach(p=>p.classList.remove('a'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('a'));
+  document.getElementById(id).classList.add('a');
+  el.classList.add('a');
+  if(id==='activos'&&!window._a){
+    const dk=matchMedia('(prefers-color-scheme:dark)').matches;
+    new Chart(document.getElementById('c1'),{
+      type:'bar',
+      data:{labels:['Oct','Nov','Dic','Ene','Feb','Mar'],datasets:[
+        {label:'Bloqueos',data:[8,6,5,4,3,3],backgroundColor:'#E24B4A',borderRadius:3},
+        {label:'Taller',data:[3,3,2,2,2,1],backgroundColor:'#378ADD',borderRadius:3},
+        {label:'Autorizados',data:[5,3,3,2,1,2],backgroundColor:'#1D9E75',borderRadius:3}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{stacked:true,ticks:{color:dk?'#aaa':'#666'},grid:{color:dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.05)'}},x:{stacked:true,ticks:{color:dk?'#aaa':'#666'},grid:{display:false}}}}
+    });
+    window._a=1;
+  }
+}
+function sf(el){el.parentElement.querySelectorAll('.fp').forEach(f=>f.classList.remove('on'));el.classList.add('on')}
+</script>
+</body>
+</html>

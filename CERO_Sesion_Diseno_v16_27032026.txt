@@ -1,0 +1,634 @@
+================================================================================
+CERO — SESIÓN DE DISEÑO v16
+Dashboard de seguridad operativa, tablas genéricas y visión Power BI
+Fecha: 27/03/2026
+================================================================================
+
+AUTOR       Sergio — Ing. Eléctrico
+PROYECTO    CERO — Gestión de Operaciones de Campo
+VERSIÓN     v16.0 — Dashboard + arquitectura genérica de activos
+ESTADO      Fase 2.2 — En diseño
+
+DOCUMENTOS DE REFERENCIA: Sesión de Diseño v15 (23/03/2026).
+
+AVISO LEGAL: Este documento y el sistema descrito son propiedad intelectual
+exclusiva de su autor. Desarrollado de forma independiente en tiempo y
+recursos propios. Inteligencia de Ciudad S.A.S.
+
+
+================================================================================
+1. CONTEXTO Y JUSTIFICACIÓN DE v16
+================================================================================
+
+La sesión v16 diseña el dashboard de seguridad operativa (Fase 2.2) y
+establece la arquitectura genérica de activos que permite a CERO escalar
+de vehículos a cualquier tipo de equipo inspeccionable (escaleras,
+taladros, arnés, EPP) sin rehacer código ni base de datos.
+
+Decisiones estratégicas clave:
+- El dashboard es la carta de presentación de CERO para vender
+- Seguridad vial como protagonista, impacto financiero como susurro
+- Tendencias y análisis profundo van a Power BI, no al panel web
+- Tablas genéricas desde ahora para no rehacer después
+- Fase 1 completamente intacta — no se toca nada que funcione
+
+
+================================================================================
+2. REGLAS DE GIT (ACTUALIZADAS)
+================================================================================
+
+1. Claude Code crea rama claude/<descripcion-corta> para cada tarea
+2. Al terminar, hace push — el workflow la mergea a desarrollo
+   automáticamente
+3. Nunca dejar ramas huérfanas sin mergear
+4. Confirmar siempre con: git status y git log --oneline -3
+5. Código completo, comentado en español, sin placeholders
+
+
+================================================================================
+3. DASHBOARD DE SEGURIDAD OPERATIVA — DISEÑO APROBADO
+================================================================================
+
+3.1 Principios de diseño
+
+- Vista gerencial: el gerente entiende todo en 10 segundos
+- Sin placas ni seriales en la vista General — lenguaje humano
+- Seguridad como protagonista, dinero como susurro
+- Cada pestaña tiene un usuario principal diferente
+- Las pestañas futuras (Seguridad) se muestran en demo, se ocultan
+  en producción hasta que haya datos reales
+
+3.2 Estructura — 4 pestañas
+
+-----------------------------------------------------------
+Pestaña                | Usuario principal | Estado
+-----------------------------------------------------------
+General                | Gerencia / SST    | DISEÑADO
+Activos                | Administrador     | DISEÑADO
+Seguridad y permisos   | SST               | ESTRUCTURA LISTA
+Reportes               | Gerencia          | DISEÑADO
+-----------------------------------------------------------
+
+Selector de período: Hoy / Semana / Mes (arriba, global)
+
+
+================================================================================
+4. PESTAÑA GENERAL — VISTA GERENCIAL
+================================================================================
+
+4.1 Índice de Seguridad Operativa (hero)
+
+Score único de 0 a 100, tipo credit score, mostrado como donut
+grande con número central. Incorpora todos los activos y permisos
+activos en el sistema.
+
+Fórmula parametrizable por empresa. Variables:
+- % cumplimiento de inspecciones
+- Cantidad de bloqueos resueltos vs pendientes
+- Documentos al día vs vencidos
+- Novedades críticas abiertas
+- Tiempo de respuesta del supervisor
+
+Cuando se implemente Fase 3, el índice incorpora automáticamente
+equipos y permisos sin cambiar la estructura.
+
+Muestra: score actual + diferencia vs mes anterior + incidentes
+prevenidos.
+
+4.2 KPIs de seguridad (fila principal)
+
+4 tarjetas:
+- Riesgos prevenidos — bloqueos detectados antes de operar
+- Cumplimiento inspecciones — % con delta vs mes anterior
+- Activos operativos — X de Y, con fuera de servicio
+- Documentación al día — % con alerta de por vencer
+
+4.3 KPIs financieros (el susurro)
+
+3 tarjetas con tipografía más discreta que los KPIs de seguridad:
+- Ahorro estimado este mes — multas + paradas evitadas
+- Costo diario sin inspeccionar — cuadrilla + sanción
+- Sanciones prevenidas — documentos bloqueados a tiempo
+
+Valores parametrizables por empresa en configuracion_sede:
+- costo_dia_vehiculo_parado
+- costo_multa_soat
+- costo_multa_tecnomecanica
+
+4.4 Situaciones que requieren atención
+
+Anomalías de patrón en lenguaje gerencial, SIN placas ni seriales:
+- Reincidencia: "Falla recurrente en sistema de frenos — 1 vehículo
+  con la misma novedad 3 veces en 60 días"
+- Patrón: "Desgaste acelerado de llantas — 1 vehículo con 5 reportes
+  en 3 meses"
+- Anomalía: "Equipo con tiempo excesivo fuera de servicio — 1 vehículo
+  lleva 18 días, promedio es 4"
+
+Se calculan cruzando preoperacionales + historial_estado_activo.
+
+4.5 Decisiones del supervisor
+
+3 tarjetas: Autorizadas / A taller / Pendientes
+Pendientes muestra tiempo sin respuesta.
+
+4.6 Actividad reciente
+
+Timeline vertical con los últimos eventos, SIN placas:
+- "Inspección completada sin novedades — Camioneta estacas"
+- "Novedad crítica — sistema de frenos — BLOQUEO"
+- "Supervisor autorizó con justificación — Respuesta en 6 min"
+- "Tanqueo registrado — 45 litros"
+
+
+================================================================================
+5. PESTAÑA ACTIVOS — VISTA OPERATIVA
+================================================================================
+
+5.1 Filtro por tipo de activo
+
+Barra de pills horizontal:
+Todos | Vehículos | Escaleras | Taladros | Arnés / EPP
+
+Los tipos sin datos aparecen en gris (opacity 0.4).
+Cuando se implemente Fase 3, se activan automáticamente.
+
+5.2 KPIs operativos
+
+4 tarjetas:
+- Inspecciones esta semana (con delta)
+- Con novedades (% del total)
+- Bloqueos generados (con estado)
+- Promedio días fuera de servicio
+
+5.3 Gráfico: Novedades vs decisión del supervisor
+
+Barras apiladas por mes (6 meses):
+- Rojo: Bloqueos
+- Azul: Enviados a taller
+- Verde: Autorizados
+
+Muestra la relación entre lo que se detecta y lo que se decide.
+Si la mayoría se autoriza, puede indicar tolerancia excesiva.
+Si la mayoría va a taller, indica flota en mal estado.
+
+5.4 Ítems con más novedades
+
+Barras horizontales con color por severidad:
+- Rojo: ítems que generan bloqueo
+- Naranja: ítems que generan alerta
+- Azul: ítems informativos
+
+5.5 Activos que requieren atención
+
+Lista con identificación (placas, seriales) — esta vista es para
+el administrador que SÍ sabe qué activo es cada uno.
+Badge de días en taller + documentos por vencer.
+
+5.6 Reincidencia
+
+Misma novedad reportada 2+ veces en 90 días por activo.
+Con placa/serial, descripción de la novedad, frecuencia y última
+fecha.
+
+
+================================================================================
+6. PESTAÑA SEGURIDAD Y PERMISOS — FASE 3
+================================================================================
+
+Estructura lista, sin datos. Se muestra en modo demo, se oculta
+en producción hasta que haya datos reales.
+
+Control de visibilidad: flag en configuracion_sede o por rol
+(superadmin_plataforma siempre la ve para demos).
+
+6.1 KPIs (estructura)
+- Equipos inspeccionados hoy
+- Equipos bloqueados
+- Permisos activos hoy
+- Pendientes firma SST
+
+6.2 Inspecciones de equipos (lista)
+- Escaleras
+- Taladros y herramienta eléctrica
+- Arnés y línea de vida
+- EPP (casco, guantes, botas)
+
+6.3 Permisos de trabajo (lista)
+- ATS — Análisis de trabajo seguro
+- Permiso de trabajo en altura
+- Permiso de riesgo eléctrico
+- Permiso de espacio confinado
+
+
+================================================================================
+7. PESTAÑA REPORTES — VISIÓN POWER BI
+================================================================================
+
+Decisión clave: las tendencias y análisis profundo NO van en el
+panel web. Van a Power BI, que se conecta directamente a Supabase
+(PostgreSQL) y hace el trabajo pesado de visualización.
+
+El panel web responde "¿qué hago ahora?"
+Power BI responde "¿qué pasó en los últimos 6 meses y por qué?"
+
+7.1 Diseño de la pestaña
+
+Hero con ilustración SVG de un mini dashboard (barras, línea de
+tendencia, KPIs, donut) + descripción de Power BI + badges de
+capacidades.
+
+7.2 Reportes disponibles con 3+ meses de datos
+
+-----------------------------------------------------------
+#  | Reporte                                    | Qué muestra
+-----------------------------------------------------------
+1  | Tendencia del índice de seguridad          | Evolución mensual
+   | operativa                                  | por tipo de activo
+-----------------------------------------------------------
+2  | Análisis de reincidencia por activo        | Drill-down, cruza
+   |                                            | con historial taller
+-----------------------------------------------------------
+3  | Novedades por severidad — comparativo      | Bloqueos vs alertas
+   | mensual                                    | por activo/sede/turno
+-----------------------------------------------------------
+4  | Días fuera de servicio y motivos           | Tiempo parado,
+   | de parada                                  | motivo, vs promedio
+-----------------------------------------------------------
+5  | Decisiones del supervisor — análisis       | Ratio, tiempo
+   | de respuesta                               | respuesta, volumen
+-----------------------------------------------------------
+6  | Impacto financiero — ROI de CERO           | Multas prevenidas,
+   |                                            | ahorro, tendencia
+-----------------------------------------------------------
+7  | Reporte PESV para Supertransporte          | IF, IS, ILI para
+   |                                            | auditorías ARL
+-----------------------------------------------------------
+
+7.3 Reportes adicionales con 6+ meses
+
+-----------------------------------------------------------
+#  | Reporte                                    | Qué muestra
+-----------------------------------------------------------
+8  | Anomalías de combustible (IA)              | Km vs litros,
+   |                                            | fugas, uso indebido
+-----------------------------------------------------------
+9  | Indicadores de conducción por operario     | Novedades por
+   |                                            | conductor, patrones
+-----------------------------------------------------------
+10 | Benchmark entre sedes                      | Comparativo de
+   |                                            | seguridad y costos
+-----------------------------------------------------------
+
+
+================================================================================
+8. BASE DE DATOS — TABLAS GENÉRICAS NUEVAS
+================================================================================
+
+Decisión: Camino B — tablas separadas con patrón común.
+Fase 1 completamente intacta. No se tocan preoperacionales,
+posoperacionales, tanqueos, autorizaciones ni sesiones_activas.
+
+8.1 Tabla tipos_activo
+
+CREATE TABLE tipos_activo (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  codigo          text NOT NULL UNIQUE,
+  nombre          text NOT NULL,
+  categoria       text NOT NULL,
+  requiere_inspeccion boolean DEFAULT true,
+  frecuencia_inspeccion text DEFAULT 'diaria',
+  activo          boolean DEFAULT true
+);
+
+Valores iniciales:
+- vehiculo / Vehículo / flota / true / diaria
+- escalera / Escalera / equipo / true / por_uso
+- taladro / Taladro / equipo / true / por_uso
+- arnes / Arnés / epp / true / por_uso
+- epp / EPP / epp / true / diaria
+
+Campos:
+- codigo: identificador único ('vehiculo', 'escalera', etc.)
+- categoria: agrupación ('flota', 'equipo', 'epp')
+- frecuencia_inspeccion: 'diaria', 'semanal', 'mensual', 'por_uso'
+
+8.2 Tabla activos
+
+CREATE TABLE activos (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tipo_activo_id  uuid NOT NULL REFERENCES tipos_activo(id),
+  empresa_id      uuid NOT NULL REFERENCES empresas(id),
+  sede_id         uuid REFERENCES sedes(id),
+  codigo          text NOT NULL UNIQUE,
+  nombre          text NOT NULL,
+  estado          text DEFAULT 'operativo',
+  datos           jsonb DEFAULT '{}',
+  documentos      jsonb DEFAULT '{}',
+  activo          boolean DEFAULT true,
+  created_at      timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_activos_tipo ON activos(tipo_activo_id);
+CREATE INDEX idx_activos_empresa ON activos(empresa_id);
+CREATE INDEX idx_activos_sede ON activos(sede_id);
+CREATE INDEX idx_activos_estado ON activos(estado);
+
+Campos:
+- codigo: placa (vehículos), serial (escaleras), código interno
+- nombre: descripción legible ('Toyota Hilux MSO120', 'Escalera #14')
+- estado: 'operativo', 'taller', 'retirado', 'bloqueado'
+- datos: JSONB con datos específicos del tipo (marca, modelo, año,
+  capacidad, material, largo, etc.)
+- documentos: JSONB con fechas de vencimiento aplicables
+
+Vinculación con vehículos existentes:
+- Se agrega campo activo_id (uuid FK) a tabla vehiculos
+- Cada vehículo existente se vincula a un registro en activos
+- Los flujos de WhatsApp siguen usando la tabla vehiculos
+- El dashboard consulta activos para la vista unificada
+
+8.3 Tabla historial_estado_activo
+
+CREATE TABLE historial_estado_activo (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  activo_id       uuid NOT NULL REFERENCES activos(id),
+  estado_anterior text,
+  estado_nuevo    text NOT NULL,
+  motivo          text,
+  categoria_motivo text,
+  referencia_id   uuid,
+  referencia_tipo text,
+  cambiado_por    uuid,
+  sede_id         uuid REFERENCES sedes(id),
+  timestamp       timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_historial_activo ON historial_estado_activo(activo_id);
+CREATE INDEX idx_historial_timestamp ON historial_estado_activo(timestamp DESC);
+CREATE INDEX idx_historial_estado ON historial_estado_activo(estado_nuevo);
+
+Campos:
+- categoria_motivo: 'documento', 'novedad_bloqueo', 'mantenimiento',
+  'retirado', 'manual'
+- referencia_id: UUID del preoperacional, autorización, etc.
+- referencia_tipo: 'preoperacional', 'autorizacion', 'alerta', 'manual'
+- cambiado_por: UUID de conductor o usuario_panel
+
+Con esta tabla se calcula:
+- Días en cada estado por activo
+- Frecuencia de motivos de parada
+- Reincidencia por activo (mismo motivo N veces en X días)
+- Tiempo promedio fuera de servicio
+- Anomalías (activo con más días que el promedio)
+
+8.4 Tabla permisos_trabajo
+
+CREATE TABLE permisos_trabajo (
+  id                    uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tipo                  text NOT NULL,
+  empresa_id            uuid NOT NULL REFERENCES empresas(id),
+  sede_id               uuid REFERENCES sedes(id),
+  trabajador_id         uuid REFERENCES conductores(id),
+  ubicacion             text,
+  descripcion_trabajo   text,
+  riesgos_identificados jsonb DEFAULT '[]',
+  controles             jsonb DEFAULT '[]',
+  equipos_requeridos    jsonb DEFAULT '[]',
+  estado                text DEFAULT 'borrador',
+  firma_trabajador      boolean DEFAULT false,
+  firma_supervisor      boolean DEFAULT false,
+  firma_sst             boolean DEFAULT false,
+  aprobado_por          uuid,
+  fecha_inicio          timestamptz,
+  fecha_fin             timestamptz,
+  observaciones         text,
+  pdf_url               text,
+  created_at            timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_permisos_tipo ON permisos_trabajo(tipo);
+CREATE INDEX idx_permisos_estado ON permisos_trabajo(estado);
+CREATE INDEX idx_permisos_sede ON permisos_trabajo(sede_id);
+
+Campos:
+- tipo: 'ats', 'altura', 'riesgo_electrico', 'espacio_confinado'
+- estado: 'borrador', 'pendiente', 'aprobado', 'rechazado', 'cerrado'
+- Tres firmas independientes: trabajador, supervisor, SST
+- riesgos_identificados: array de riesgos en JSONB
+- controles: medidas de control aplicadas
+- equipos_requeridos: EPP, herramientas, equipos
+
+8.5 Cambios en tablas existentes
+
+-----------------------------------------------------------
+Tabla              | Campo nuevo   | Tipo    | Notas
+-----------------------------------------------------------
+vehiculos          | activo_id     | uuid FK | Vincula con
+                   |               |         | tabla activos
+-----------------------------------------------------------
+
+Estrategia de migración:
+1. Crear las 4 tablas nuevas
+2. Insertar tipos_activo base (vehiculo, escalera, etc.)
+3. Crear un registro en activos por cada vehículo existente
+4. Actualizar vehiculos.activo_id con el activo correspondiente
+5. Insertar registro inicial en historial_estado_activo por
+   cada vehículo (estado actual como punto de partida)
+
+8.6 Claves de configuración nuevas en configuracion_sede
+
+-----------------------------------------------------------
+Clave                          | Descripción
+-----------------------------------------------------------
+costo_dia_vehiculo_parado      | Costo diario por vehículo
+                               | inactivo (COP)
+costo_multa_soat               | Multa por SOAT vencido
+costo_multa_tecnomecanica      | Multa por tecno vencida
+dashboard_mostrar_seguridad    | true/false — pestaña
+                               | Seguridad visible
+dashboard_auto_refresh         | segundos (0 = manual)
+indice_seguridad_pesos         | JSON con pesos por variable
+-----------------------------------------------------------
+
+
+================================================================================
+9. PATRÓN PARA FUTURAS INSPECCIONES (FASE 3)
+================================================================================
+
+Cuando se implementen inspecciones de escaleras, taladros, arnés,
+cada tipo crea su propia tabla siguiendo este patrón:
+
+CREATE TABLE inspecciones_[tipo] (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  activo_id       uuid NOT NULL REFERENCES activos(id),
+  conductor_id    uuid REFERENCES conductores(id),
+  sede_id         uuid REFERENCES sedes(id),
+  fecha           timestamptz DEFAULT now(),
+  items           jsonb NOT NULL DEFAULT '{}',
+  novedades       jsonb DEFAULT '[]',
+  estado          text DEFAULT 'en_curso',
+  firma_operario  boolean DEFAULT false,
+  firma_timestamp timestamptz,
+  pdf_url         text,
+  created_at      timestamptz DEFAULT now()
+);
+
+Campos obligatorios en novedades JSONB:
+- item: nombre del ítem
+- critico: boolean
+- resultado: 'bueno' / 'malo'
+- severidad: 'informativo' / 'alerta' / 'bloqueo'
+- detalle: texto del sub-pregunta si aplica
+
+El dashboard consulta todas las tablas de inspección con el mismo
+formato de novedades, permitiendo KPIs cruzados.
+
+
+================================================================================
+10. MOCKUP INTERACTIVO
+================================================================================
+
+Archivo entregado: cero_dashboard_mockup_v16.html
+
+Contenido:
+- 4 pestañas navegables (General, Activos, Seguridad, Reportes)
+- Datos de ejemplo basados en flota real EDEMSA (11 vehículos)
+- Gráfico Chart.js en pestaña Activos
+- Ilustración SVG en pestaña Reportes
+- Iconos SVG por cada reporte de Power BI
+- Soporte modo claro/oscuro automático
+- Responsive para móvil
+- Watermark de CERO e Inteligencia de Ciudad S.A.S.
+
+El mockup fue entregado para revisión gráfica con segundas opiniones
+antes de implementación.
+
+
+================================================================================
+11. DECISIONES REGISTRADAS EN v16
+================================================================================
+
+-----------------------------------------------------------
+Decisión                                         | Estado
+-----------------------------------------------------------
+Dashboard con 4 pestañas                         | APROBADO
+General = vista gerencial sin placas              | APROBADO
+Activos = antes "Vehículos" con filtro por tipo  | APROBADO
+Seguridad = visible en demo, oculta en prod      | APROBADO
+Reportes = visión Power BI, no gráficos propios  | APROBADO
+Tendencias y análisis profundo van a Power BI    | APROBADO
+KPIs financieros como "susurro" en General       | APROBADO
+Índice de Seguridad Operativa (score 0-100)      | APROBADO
+Anomalías de patrón en lenguaje gerencial        | APROBADO
+Reincidencia detallada en Activos                | APROBADO
+Novedades vs envíos a taller como gráfico        | APROBADO
+Camino B — tablas separadas, patrón común        | APROBADO
+Fase 1 intacta — no se toca nada                 | APROBADO
+Tabla tipos_activo (catálogo)                    | DISEÑADA
+Tabla activos (registro universal)               | DISEÑADA
+Tabla historial_estado_activo                    | DISEÑADA
+Tabla permisos_trabajo                           | DISEÑADA
+Campo activo_id en tabla vehiculos               | DISEÑADO
+Comparativo de 6 meses para Power BI             | APROBADO
+Costo por no inspeccionar parametrizable         | APROBADO
+Mockup HTML interactivo entregado                | ENTREGADO
+Patrón para futuras inspecciones definido        | DOCUMENTADO
+-----------------------------------------------------------
+
+
+================================================================================
+12. ESTADO ACTUALIZADO DEL PROYECTO
+================================================================================
+
+FASE 1 — CONTROL DE VEHÍCULOS ........................ COMPLETA
+  1.1 Preoperacional WhatsApp con PDF ................. COMPLETADO
+  1.2 Posoperacional WhatsApp con PDF ................. COMPLETADO
+  1.3 Tanqueo/Combustible ............................. COMPLETADO
+  1.4 Alertas automáticas de documentos ............... COMPLETADO
+  + Inscripción automática de conductores ............. COMPLETADO
+  + Sistema de autorización de novedades v12 .......... COMPLETADO
+
+FASE 2 — DASHBOARD, PANEL ADMIN Y REPORTES
+  2.1 Panel de administración web ..................... COMPLETADO (v15)
+      - Todos los módulos implementados
+      - Autenticación JWT + login
+      - Control de acceso por roles
+      - Arquitectura multi-empresa
+  2.2 Dashboard operativo
+      - Diseño completo aprobado ...................... COMPLETADO ← v16
+      - Tablas genéricas diseñadas .................... COMPLETADO ← v16
+      - Mockup interactivo entregado .................. COMPLETADO ← v16
+      - Implementación backend ........................ PENDIENTE
+      - Implementación frontend ....................... PENDIENTE
+  2.3 Historial y reportes ........................... PENDIENTE
+  2.4 Integración Power BI ........................... FUTURO (3+ meses)
+
+FASE 3 — SEGURIDAD DEL PERSONAL ...................... FUTURO
+  3.1 Inspección de escaleras ......................... PENDIENTE
+  3.2 Inspección de taladros .......................... PENDIENTE
+  3.3 Inspección de arnés y EPP ....................... PENDIENTE
+  3.4 ATS (Análisis de Trabajo Seguro) ................ PENDIENTE
+  3.5 Permiso de trabajo en altura .................... PENDIENTE
+  3.6 Permiso de riesgo eléctrico ..................... PENDIENTE
+  3.7 Permiso de espacio confinado .................... PENDIENTE
+
+FASE 4 — MANTENIMIENTO ............................... FUTURO
+
+FASE 5 — INTELIGENCIA Y REPORTES ..................... FUTURO
+
+FASE 6 — ESCALA Y CANALES ............................ FUTURO
+
+
+================================================================================
+13. ORDEN DE IMPLEMENTACIÓN — PRÓXIMAS SESIONES
+================================================================================
+
+-----------------------------------------------------------
+Prioridad | Tarea                              | Por qué
+-----------------------------------------------------------
+1         | Crear 4 tablas nuevas en Supabase  | Base del
+          | (tipos_activo, activos,            | dashboard
+          |  historial_estado_activo,          |
+          |  permisos_trabajo)                 |
+-----------------------------------------------------------
+2         | Migrar vehículos a tabla activos   | Vincular
+          | + activo_id en vehiculos           | datos reales
+-----------------------------------------------------------
+3         | Backend: endpoints del dashboard   | Datos para
+          | (/api/dashboard/general,           | el frontend
+          |  /api/dashboard/activos,           |
+          |  /api/dashboard/indice)            |
+-----------------------------------------------------------
+4         | Backend: cálculo del Índice de     | Score en
+          | Seguridad Operativa                | tiempo real
+-----------------------------------------------------------
+5         | Backend: detección de anomalías    | Reincidencia
+          | y patrones                         | y patrones
+-----------------------------------------------------------
+6         | Frontend: módulo Dashboard con     | Vista final
+          | 4 pestañas según mockup            |
+-----------------------------------------------------------
+7         | Registrar cambios de estado en     | Alimentar
+          | historial_estado_activo desde       | historial
+          | flujos existentes (alertas,        |
+          | autorizaciones, panel)             |
+-----------------------------------------------------------
+8         | Bug posoperacional WhatsApp        | Fix pendiente
+          | (reportado en v15)                 | desde v15
+-----------------------------------------------------------
+PRE-CLI   | RLS Supabase                       | Seguridad
+PRE-CLI   | Validación webhook Twilio          | Seguridad
+PRE-CLI   | Comprar dominio                    | Infra
+-----------------------------------------------------------
+
+
+================================================================================
+
+_______________________
+Sergio
+Autor y desarrollador
+
+CERO — Sesión de Diseño v16 — 27/03/2026
+Propiedad intelectual de Sergio Estrada — Inteligencia de Ciudad S.A.S.
+Todos los derechos reservados
