@@ -48,7 +48,7 @@ async function listarPosoperacionales(req, res) {
 
     let query = supabase
       .from('posoperacionales')
-      .select('*, vehiculos:vehiculo_placa(tipo, marca)')
+      .select('*, vehiculos:vehiculo_placa(tipo, marca), conductores:conductor_id(nombre)')
       .order('created_at', { ascending: false })
       .limit(100);
 

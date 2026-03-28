@@ -91,7 +91,10 @@ window.PosoperacionalesModule = (() => {
         {
           key: 'conductor_nombre',
           label: 'Conductor',
-          render: (valor) => Utils.escaparHTML(valor || '—')
+          render: (valor, row) =>
+            Utils.escaparHTML(
+              (row.conductores && row.conductores.nombre) || valor || '—'
+            )
         },
         {
           key: 'km_referencia',
@@ -162,7 +165,7 @@ window.PosoperacionalesModule = (() => {
           </div>
           <div class="detail-item">
             <span class="detail-label">Conductor</span>
-            <span class="detail-value">${Utils.escaparHTML(registro.conductor_nombre || '—')}</span>
+            <span class="detail-value">${Utils.escaparHTML((registro.conductores && registro.conductores.nombre) || registro.conductor_nombre || '—')}</span>
           </div>
           ${detalle}
         </div>

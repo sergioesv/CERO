@@ -16,23 +16,28 @@ function definirEstadoGeneral(sesion) {
   return 'OK';
 }
 
-function construirDatosPosoperacional(sesion, telefono, ahora) {
+function construirDatosPosoperacional(sesion, ahora) {
+  var conductorId = sesion.conductor && sesion.conductor.id ? sesion.conductor.id : null;
+  var sedeId =
+    sesion.vehiculo && sesion.vehiculo.sede_id != null ? sesion.vehiculo.sede_id : null;
+
   return {
     vehiculo_placa: sesion.placa,
-    conductor_nombre: sesion.conductor ? sesion.conductor.nombre : null,
-    conductor_telefono: String(telefono || '').replace('whatsapp:', ''),
+    conductor_id: conductorId,
     kilometraje_final: sesion.kilometrajeFinal,
     km_referencia: sesion.kmReferencia,
     diferencia_km: sesion.diferenciaKm,
+    inconsistencia_km: !!sesion.inconsistenciaKm,
+    kilometraje_confirmado: !!sesion.kilometrajeConfirmado,
     alertas_km: sesion.alertasKm || [],
     origen_kilometraje: sesion.origenKilometraje || null,
-    kilometraje_confirmado: !!sesion.kilometrajeConfirmado,
-    inconsistencia_km: !!sesion.inconsistenciaKm,
+    horas_trabajadas: null,
     estado_general: definirEstadoGeneral(sesion),
     novedades: sesion.novedades || [],
     observaciones: sesion.observacion || null,
     firmado: true,
-    firmado_timestamp: ahora.toISOString()
+    firmado_timestamp: ahora.toISOString(),
+    sede_id: sedeId
   };
 }
 
@@ -58,7 +63,7 @@ function construirDatosSesionPdf(sesion, telefono, ahora) {
 
 async function guardarPosoperacionalCompleto(sesion, telefono) {
   var ahora = ahoraCO();
-  var datosGuardar = construirDatosPosoperacional(sesion, telefono, ahora);
+  var datosGuardar = construirDatosPosoperacional(sesion, ahora);
   var creado = await posoperacionalesData.crearPosoperacional(datosGuardar);
 
   if (creado.error || !creado.data) {
