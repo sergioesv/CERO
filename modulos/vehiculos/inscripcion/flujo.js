@@ -10,6 +10,7 @@ var sesiones     = require('../../../servicios/sesiones');
 var mensajes     = require('./mensajes');
 var validaciones = require('./validaciones');
 var estadoMod    = require('./estado');
+var nav          = require('../compartido/navegacion');
 
 var ESTADOS = estadoMod.ESTADOS;
 
@@ -104,7 +105,7 @@ async function manejarInscripcion(req, res) {
     estadoMod.limpiarInscripcion(sesion);
     sesion.tipo = null;
     sesiones.guardarCambios();
-    return responderMenuDesdeModulo(res);
+    return responder(res, nav.textoMenuPrincipal());
   }
 
   // ── REINICIAR: reinicia desde el primer paso ──────────────────────────────

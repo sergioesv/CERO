@@ -4,6 +4,7 @@ var storage = require('../../../servicios/storage');
 var vehiculosData = require('../../../data/vehiculos');
 var tanqueosData = require('../../../data/tanqueos');
 var validaciones = require('./validaciones');
+var nav = require('../compartido/navegacion');
 
 var sesiones = require('../../../servicios/sesiones');
 
@@ -390,7 +391,7 @@ async function manejarTanqueo(req, res) {
   if (mensaje === '9' || mensajeMayus === 'CANCELAR' || mensajeMayus === 'MENU' || mensajeMayus === 'INICIO') {
     sesiones.eliminarSesion(telefono);
     await sesiones.guardarCambios();
-    return responderMenuDesdeModulo(res);
+    return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
   }
 
   // REINICIAR → reiniciar el flujo de tanqueo

@@ -1,4 +1,10 @@
-var config = require('../../../config/config');
+/**
+ * Flujo WhatsApp posoperacional — placa por texto, odómetro por OCR compartido,
+ * novedades en texto libre, firma y cierre numéricos.
+ */
+
+'use strict';
+
 var sesiones = require('../../../servicios/sesiones');
 var storage = require('../../../servicios/storage');
 var visual = require('../compartido/validacionVisual');
@@ -8,18 +14,10 @@ var validaciones = require('./validaciones');
 var estadoPosop = require('./estado');
 var mensajes = require('./mensajes');
 var cierre = require('./cierre');
+var kilometrajeCompartido = require('../compartido/kilometraje');
+var nav = require('../compartido/navegacion');
 
 var ESTADOS = estadoPosop.ESTADOS;
-
-/** Menú principal (misma copia que canales/whatsapp.js) si este handler se usa sin el enrutador. */
-var MENSAJE_MENU_PRINCIPAL =
-  '🚗 *SISTEMA CERO*\n' +
-  '_cero papel, cero accidentes_\n\n' +
-  'Selecciona una opción:\n\n' +
-  '1️⃣ Preoperacional (inicio de jornada)\n' +
-  '2️⃣ Posoperacional (cierre de jornada)\n' +
-  '3️⃣ Combustible / tanqueo\n\n' +
-  'Escribe el número:';
 
 function inicializarSesionPosoperacional(sesion) {
   sesion.tipo = 'posoperacional';
@@ -28,6 +26,9 @@ function inicializarSesionPosoperacional(sesion) {
   estadoPosop.reiniciarDatosOperativos(sesion);
 }
 
+/**
+ * Aplica km detectado o manual con validación contra referencia (posoperacional).
+ */
 function aplicarResultadoKilometraje(sesion, kilometraje, origen) {
   sesion.kmDetectado = kilometraje;
   sesion.origenKilometrajePendiente = origen || 'ocr';
@@ -47,53 +48,96 @@ function aplicarResultadoKilometraje(sesion, kilometraje, origen) {
 }
 
 function mensajeConfirmacionSegunKilometraje(sesion) {
-  if (sesion.inconsistenciaKm && sesion.alertasKm && sesion.alertasKm.length) {
-    return mensajes.mensajeAlertaKilometraje(sesion);
-  }
-  return mensajes.mensajeConfirmacionKilometraje(sesion);
+  return mensajes.mensajeConfirmacionSegunKilometraje(sesion);
 }
 
-async function manejarAtras(res, sesion) {
-  switch (sesion.estado) {
-    case ESTADOS.ESPERANDO_PLACA:
-      sesion.estado = ESTADOS.INICIO;
-      return validaciones.responderTwiml(res, mensajes.mensajeInicio());
-
-    case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
-    case ESTADOS.CONFIRMACION_KM:
-    case ESTADOS.KM_MANUAL:
-      sesion.estado = ESTADOS.ESPERANDO_PLACA;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la placa.\n\n' + mensajes.mensajeInicio());
-
-    case ESTADOS.TIENE_NOVEDADES:
-      estadoPosop.volverAKilometraje(sesion);
-      return validaciones.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeSolicitudOdometro(sesion.vehiculo || {}, sesion.kmReferenciaMeta));
-
-    case ESTADOS.DESCRIBIR_NOVEDAD:
-    case ESTADOS.CONFIRMAR_NOVEDAD:
-      sesion.estado = ESTADOS.TIENE_NOVEDADES;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la pregunta de novedades.\n\n' + mensajes.mensajePreguntaNovedades());
-
-    case ESTADOS.FOTO_NOVEDAD:
-    case ESTADOS.AGREGAR_OTRA_NOVEDAD:
-      sesion.estado = ESTADOS.DESCRIBIR_NOVEDAD;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a registrar la novedad.\n\n' + mensajes.mensajeSolicitarNovedad());
-
-    case ESTADOS.OBSERVACIONES:
-      if (sesion.novedades && sesion.novedades.length) {
-        sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-        return validaciones.responderTwiml(res, '◀️ Volvemos a las novedades.\n\n' + mensajes.mensajeAgregarOtraNovedad());
+/**
+ * Construye arreglo novedades para guardado/PDF si solo hay texto libre.
+ */
+function asegurarNovedadesDesdeTextoLibre(sesion) {
+  if (sesion.novedadesTexto && (!sesion.novedades || sesion.novedades.length === 0)) {
+    sesion.novedades = [
+      {
+        id: 'nov_libre_' + Date.now(),
+        item: 'Novedades al cierre',
+        estado: sesion.novedadesTexto,
+        texto_original: sesion.novedadesTexto,
+        critico: false,
+        categoria: 'otro',
+        severidad: 'media',
+        requiereFoto: false,
+        fuente: 'texto_libre'
       }
-      sesion.estado = ESTADOS.TIENE_NOVEDADES;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la pregunta de novedades.\n\n' + mensajes.mensajePreguntaNovedades());
-
-    case ESTADOS.CONFIRMACION_FINAL:
-      sesion.estado = ESTADOS.OBSERVACIONES;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a observaciones.\n\n' + mensajes.mensajeObservaciones());
-
-    default:
-      return validaciones.responderTwiml(res, 'No se puede retroceder desde aquí. Escribe *CANCELAR* para salir.');
+    ];
   }
+}
+
+async function procesarFotoOdometroPosop(res, sesion, mediaUrl) {
+  if (!mediaUrl) {
+    return validaciones.responderTwiml(res, '📸 Necesito una foto del odómetro para continuar.');
+  }
+
+  return await kilometrajeCompartido.procesarFotoOdometro(res, sesion, mediaUrl, {
+    tipoFlujo: 'posoperacional',
+    estadoConfirmacion: ESTADOS.ODOMETRO_CONFIRMACION,
+    responderFn: validaciones.responderTwiml,
+    procesarLecturaPos: async function(res, sesion, km, lecturaKm) {
+      sesion.kmDetectado = km;
+      sesion.kmLecturaFueraRango = false;
+
+      if (km == null) {
+        sesion.estado = ESTADOS.ODOMETRO_MANUAL;
+        return validaciones.responderTwiml(
+          res,
+          '⚠️ No pude leer el odómetro con seguridad.\n\nEscribe el kilometraje manualmente usando solo números.'
+        );
+      }
+
+      aplicarResultadoKilometraje(sesion, km, 'ocr');
+      sesion.estado = ESTADOS.ODOMETRO_CONFIRMACION;
+      return validaciones.responderTwiml(res, mensajeConfirmacionSegunKilometraje(sesion));
+    }
+  });
+}
+
+async function manejarKilometrajeManual(sesion, mensaje) {
+  var kilometraje = visual.parsearKilometraje(mensaje);
+  if (kilometraje === null) {
+    return '❌ Escribe solo números para el kilometraje.\n\nEjemplo: *47889*';
+  }
+
+  aplicarResultadoKilometraje(sesion, kilometraje, 'manual');
+  sesion.estado = ESTADOS.ODOMETRO_CONFIRMACION;
+  return mensajeConfirmacionSegunKilometraje(sesion);
+}
+
+async function manejarConfirmacionKilometraje(sesion, mensaje) {
+  var ml = String(mensaje || '').trim().toLowerCase();
+
+  if (ml === '1' || ml === '1️⃣') {
+    estadoPosop.registrarFotoOdometro(
+      sesion,
+      sesion.fotoOdometroTemporal,
+      sesion.kmDetectado,
+      sesion.origenKilometrajePendiente || 'ocr'
+    );
+    sesion.estado = ESTADOS.NOVEDADES;
+    return mensajes.mensajeNovedades();
+  }
+
+  if (ml === '2' || ml === '2️⃣') {
+    sesion.estado = ESTADOS.ODOMETRO_MANUAL;
+    return '✍️ Escribe el kilometraje correcto (solo números).';
+  }
+
+  if (ml === '3' || ml === '3️⃣') {
+    sesion.fotoOdometroTemporal = null;
+    sesion.kmDetectado = null;
+    sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+    return '📸 Envía otra foto del odómetro.';
+  }
+
+  return 'Responde con *1*, *2* o *3*.';
 }
 
 async function manejarPlaca(sesion, telefono, mensaje) {
@@ -104,7 +148,7 @@ async function manejarPlaca(sesion, telefono, mensaje) {
 
   var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
   if (carga.error || !carga.vehiculo) {
-    return '❌ El vehículo *' + placa + '* no existe en la base.\n\nVerifica la placa.';
+    return '❌ Placa no encontrada. Verifica e intenta de nuevo.';
   }
 
   if (carga.vehiculo.bloqueado) {
@@ -118,195 +162,79 @@ async function manejarPlaca(sesion, telefono, mensaje) {
   sesion.kmReferencia = sesion.kmReferenciaMeta.kilometraje;
   sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
 
-  return mensajes.mensajeSolicitudOdometro(carga.vehiculo, sesion.kmReferenciaMeta);
+  return mensajes.mensajeVehiculoConfirmado(carga.vehiculo, sesion.kmReferenciaMeta);
 }
 
-async function manejarFotoOdometro(sesion, mediaUrl) {
-  if (!mediaUrl) {
-    return '📸 Necesito una foto del odómetro para continuar.';
+async function manejarAtras(res, sesion) {
+  switch (sesion.estado) {
+    case ESTADOS.ESPERANDO_PLACA:
+      sesion.estado = ESTADOS.INICIO;
+      return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
+
+    case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
+    case ESTADOS.ODOMETRO_CONFIRMACION:
+    case ESTADOS.ODOMETRO_MANUAL:
+      sesion.estado = ESTADOS.ESPERANDO_PLACA;
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos a la placa.\n\n' + mensajes.mensajeInicioPosoperacional()
+      );
+
+    case ESTADOS.NOVEDADES:
+      estadoPosop.volverAKilometraje(sesion);
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos al kilometraje.\n\n' +
+          mensajes.mensajeVehiculoConfirmado(sesion.vehiculo || {}, sesion.kmReferenciaMeta)
+      );
+
+    case ESTADOS.DESCRIBIR_NOVEDADES:
+      sesion.novedadesTexto = null;
+      sesion.estado = ESTADOS.NOVEDADES;
+      return validaciones.responderTwiml(res, mensajes.mensajeNovedades());
+
+    case ESTADOS.OBSERVACION:
+      if (sesion.novedadesTexto) {
+        sesion.estado = ESTADOS.DESCRIBIR_NOVEDADES;
+        return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
+      }
+      sesion.estado = ESTADOS.NOVEDADES;
+      return validaciones.responderTwiml(res, mensajes.mensajeNovedades());
+
+    case ESTADOS.OBSERVACION_TEXTO:
+      sesion.estado = ESTADOS.OBSERVACION;
+      return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+
+    case ESTADOS.CONFIRMACION:
+      sesion.estado = ESTADOS.OBSERVACION;
+      return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+
+    default:
+      return validaciones.responderTwiml(res, 'No se puede retroceder desde aquí. Escribe *9* para el menú.');
   }
-
-  sesion.fotoOdometroTemporal = mediaUrl;
-  var resultado = await visual.resolverFotoOdometroOperativa(
-    mediaUrl,
-    sesion.kmReferenciaMeta,
-    validaciones.MAX_KM_SALTO_POSOP
-  );
-
-  if (resultado.tipo === 'manual') {
-    sesion.estado = ESTADOS.KM_MANUAL;
-    return '⚠️ No pude leer el odómetro con seguridad.\n\nEscribe el kilometraje manualmente.';
-  }
-
-  aplicarResultadoKilometraje(sesion, resultado.kilometraje, 'ocr');
-  sesion.estado = ESTADOS.CONFIRMACION_KM;
-  return mensajeConfirmacionSegunKilometraje(sesion);
-}
-
-function parsearKilometraje(mensaje) {
-  return visual.parsearKilometraje(mensaje);
-}
-
-async function manejarKilometrajeManual(sesion, mensaje) {
-  var kilometraje = parsearKilometraje(mensaje);
-  if (kilometraje === null) {
-    return '❌ Escribe solo números para el kilometraje.\n\nEjemplo: *47889*';
-  }
-
-  aplicarResultadoKilometraje(sesion, kilometraje, 'manual');
-  sesion.estado = ESTADOS.CONFIRMACION_KM;
-  return mensajeConfirmacionSegunKilometraje(sesion);
-}
-
-async function manejarConfirmacionKilometraje(sesion, mensaje) {
-  if (mensaje === '1') {
-    estadoPosop.registrarFotoOdometro(
-      sesion,
-      sesion.fotoOdometroTemporal,
-      sesion.kmDetectado,
-      sesion.origenKilometrajePendiente || 'ocr'
-    );
-    sesion.estado = ESTADOS.TIENE_NOVEDADES;
-    return mensajes.mensajePreguntaNovedades();
-  }
-
-  if (mensaje === '2') {
-    sesion.estado = ESTADOS.KM_MANUAL;
-    return '✍️ Escribe el kilometraje correcto.';
-  }
-
-  if (mensaje === '3') {
-    sesion.fotoOdometroTemporal = null;
-    sesion.kmDetectado = null;
-    sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-    return '📸 Envía otra foto del odómetro.';
-  }
-
-  return 'Responde con *1*, *2* o *3*.';
-}
-
-async function manejarPreguntaNovedades(sesion, mensaje) {
-  if (mensaje === '1') {
-    sesion.estado = ESTADOS.DESCRIBIR_NOVEDAD;
-    return mensajes.mensajeSolicitarNovedad();
-  }
-
-  if (mensaje === '2') {
-    sesion.estado = ESTADOS.OBSERVACIONES;
-    return mensajes.mensajeObservaciones();
-  }
-
-  if (mensaje === '3') {
-    return manejarAtrasInternoNovedades(sesion);
-  }
-
-  return 'Responde con *1* si hubo novedades, *2* si no hubo, o *3* para atrás.';
-}
-
-function manejarAtrasInternoNovedades(sesion) {
-  estadoPosop.volverAKilometraje(sesion);
-  return '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeSolicitudOdometro(sesion.vehiculo || {}, sesion.kmReferenciaMeta);
-}
-
-async function manejarDescripcionNovedad(sesion, mensaje) {
-  if (!mensaje) {
-    return mensajes.mensajeSolicitarNovedad();
-  }
-
-  var interpretadas = await validaciones.interpretarNovedadLibre(mensaje);
-  sesion.novedadesInterpretadasTemp = interpretadas;
-  sesion.estado = ESTADOS.CONFIRMAR_NOVEDAD;
-  return mensajes.mensajeConfirmarNovedadInterpretada(interpretadas);
-}
-
-async function manejarConfirmacionNovedad(sesion, mensaje) {
-  if (mensaje === '1') {
-    estadoPosop.agregarNovedades(sesion, sesion.novedadesInterpretadasTemp || []);
-    sesion.novedadesInterpretadasTemp = [];
-
-    var siguiente = estadoPosop.siguienteNovedadConFoto(sesion);
-    if (siguiente) {
-      sesion.estado = ESTADOS.FOTO_NOVEDAD;
-      return mensajes.mensajeSolicitarFotoNovedad(siguiente, sesion.fotosNovedadPendientes.length);
-    }
-
-    sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-    return mensajes.mensajeAgregarOtraNovedad();
-  }
-
-  if (mensaje === '2') {
-    sesion.estado = ESTADOS.DESCRIBIR_NOVEDAD;
-    return '✍️ Escribe de nuevo la novedad.';
-  }
-
-  if (mensaje === '3') {
-    sesion.novedadesInterpretadasTemp = [];
-    sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-    return mensajes.mensajeAgregarOtraNovedad();
-  }
-
-  return 'Responde con *1*, *2* o *3*.';
-}
-
-async function manejarFotoNovedad(sesion, mensaje, mediaUrl) {
-  var actual = estadoPosop.siguienteNovedadConFoto(sesion);
-  if (!actual) {
-    sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-    return mensajes.mensajeAgregarOtraNovedad();
-  }
-
-  if (!mediaUrl) {
-    if (String(mensaje || '').toUpperCase() === 'NO') {
-      sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-      return mensajes.mensajeAgregarOtraNovedad();
-    }
-    return '📸 En este paso necesito una foto.\n\nEnvía la evidencia o escribe *NO* para continuar sin foto.';
-  }
-
-  estadoPosop.registrarFotoNovedad(sesion, actual, mediaUrl);
-  var siguiente = estadoPosop.siguienteNovedadConFoto(sesion);
-  if (siguiente) {
-    sesion.estado = ESTADOS.FOTO_NOVEDAD;
-    return mensajes.mensajeSolicitarFotoNovedad(siguiente, sesion.fotosNovedadPendientes.length);
-  }
-
-  sesion.estado = ESTADOS.AGREGAR_OTRA_NOVEDAD;
-  return mensajes.mensajeAgregarOtraNovedad();
-}
-
-async function manejarAgregarOtraNovedad(sesion, mensaje) {
-  if (mensaje === '1') {
-    sesion.estado = ESTADOS.DESCRIBIR_NOVEDAD;
-    return mensajes.mensajeSolicitarNovedad();
-  }
-
-  if (mensaje === '2') {
-    sesion.estado = ESTADOS.OBSERVACIONES;
-    return mensajes.mensajeObservaciones();
-  }
-
-  return 'Responde con *1* para agregar otra novedad o *2* para continuar.';
-}
-
-async function manejarObservaciones(sesion, mensaje) {
-  sesion.observacion = String(mensaje || '').trim().toLowerCase() === 'no' ? null : String(mensaje || '').trim();
-  sesion.estado = ESTADOS.CONFIRMACION_FINAL;
-  return mensajes.mensajeConfirmacionFinal(sesion, validaciones.generarResumenPosoperacional(sesion));
 }
 
 async function manejarConfirmacionFinal(sesion, telefono, mensaje) {
-  if (String(mensaje || '').toUpperCase() !== 'SI') {
-    return 'Escribe *SI* para firmar y cerrar el posoperacional.\nTambién puedes escribir *ATRAS* o *CANCELAR*.';
+  var ml = String(mensaje || '').trim().toLowerCase();
+
+  if (ml === '1' || ml === '1️⃣') {
+    asegurarNovedadesDesdeTextoLibre(sesion);
+    var guardado = await cierre.guardarPosoperacionalCompleto(sesion, telefono);
+    if (guardado.error) {
+      console.error('Error guardando posoperacional:', guardado.error.message || guardado.error);
+      return '❌ No pude guardar el posoperacional. Intenta de nuevo o contacta al supervisor.';
+    }
+
+    sesiones.eliminarSesion(telefono);
+    return mensajes.mensajeFirmaPosoperacional(guardado.datosSesion, guardado.pdfUrl);
   }
 
-  var guardado = await cierre.guardarPosoperacionalCompleto(sesion, telefono);
-  if (guardado.error) {
-    console.error('Error guardando posoperacional:', guardado.error.message || guardado.error);
-    return '❌ No pude guardar el posoperacional. Intenta de nuevo o contacta al supervisor.';
+  if (ml === '2' || ml === '2️⃣') {
+    sesion.estado = ESTADOS.OBSERVACION;
+    return '◀️ Corregir observación.\n\n' + mensajes.mensajeObservacion();
   }
 
-  sesiones.eliminarSesion(telefono);
-  return mensajes.mensajeFinalizado(guardado.datosSesion, guardado.pdfUrl);
+  return 'Responde *1* para firmar y cerrar o *2* para corregir. *0* atrás.';
 }
 
 async function manejarPosoperacional(req, res) {
@@ -314,6 +242,7 @@ async function manejarPosoperacional(req, res) {
   var mensaje = (req.body.Body || '').trim();
   var mediaUrls = storage.obtenerMediaUrls(req);
   var mediaUrl = mediaUrls[0] || null;
+  var numMedia = mediaUrls.length;
   var sesion;
 
   if (!sesiones.bloquear(telefono)) {
@@ -328,21 +257,22 @@ async function manejarPosoperacional(req, res) {
     }
 
     var msgUpper = mensaje.toUpperCase();
+    var msgLower = mensaje.toLowerCase();
 
-    if (mensaje === '9' || msgUpper === 'CANCELAR' || msgUpper === 'MENU' || msgUpper === 'INICIO') {
+    if (nav.esMenu(mensaje)) {
       sesiones.eliminarSesion(telefono);
       sesiones.guardarCambios();
-      return validaciones.responderTwiml(res, MENSAJE_MENU_PRINCIPAL);
+      return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
     }
 
-    if (mensaje === '0' || msgUpper === 'ATRAS') {
+    if (nav.esAtras(mensaje)) {
       return await manejarAtras(res, sesion);
     }
 
     switch (sesion.estado) {
       case ESTADOS.INICIO:
         sesion.estado = ESTADOS.ESPERANDO_PLACA;
-        return validaciones.responderTwiml(res, mensajes.mensajeInicio());
+        return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
 
       case ESTADOS.ESPERANDO_PLACA:
         if (mediaUrl) {
@@ -351,51 +281,85 @@ async function manejarPosoperacional(req, res) {
         return validaciones.responderTwiml(res, await manejarPlaca(sesion, telefono, mensaje));
 
       case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
-        return validaciones.responderTwiml(res, await manejarFotoOdometro(sesion, mediaUrl));
+        return await procesarFotoOdometroPosop(res, sesion, mediaUrl);
 
-      case ESTADOS.KM_MANUAL:
+      case ESTADOS.ODOMETRO_MANUAL:
         if (mediaUrl) {
           sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-          return validaciones.responderTwiml(res, await manejarFotoOdometro(sesion, mediaUrl));
+          return await procesarFotoOdometroPosop(res, sesion, mediaUrl);
         }
         return validaciones.responderTwiml(res, await manejarKilometrajeManual(sesion, mensaje));
 
-      case ESTADOS.CONFIRMACION_KM:
+      case ESTADOS.ODOMETRO_CONFIRMACION:
+        if (numMedia > 0 && mediaUrl) {
+          return await procesarFotoOdometroPosop(res, sesion, mediaUrl);
+        }
         return validaciones.responderTwiml(res, await manejarConfirmacionKilometraje(sesion, mensaje));
 
-      case ESTADOS.TIENE_NOVEDADES:
-        return validaciones.responderTwiml(res, await manejarPreguntaNovedades(sesion, mensaje));
-
-      case ESTADOS.DESCRIBIR_NOVEDAD:
-        if (mediaUrl) {
-          return validaciones.responderTwiml(res, 'En este paso necesito texto.\n\n' + mensajes.mensajeSolicitarNovedad());
+      case ESTADOS.NOVEDADES: {
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          sesion.estado = ESTADOS.DESCRIBIR_NOVEDADES;
+          return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
         }
-        return validaciones.responderTwiml(res, await manejarDescripcionNovedad(sesion, mensaje));
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.novedadesTexto = null;
+          sesion.novedades = [];
+          sesion.estado = ESTADOS.OBSERVACION;
+          return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+        }
+        return validaciones.responderTwiml(res, mensajes.mensajeNovedades());
+      }
 
-      case ESTADOS.CONFIRMAR_NOVEDAD:
-        return validaciones.responderTwiml(res, await manejarConfirmacionNovedad(sesion, mensaje));
-
-      case ESTADOS.FOTO_NOVEDAD:
-        return validaciones.responderTwiml(res, await manejarFotoNovedad(sesion, mensaje, mediaUrl));
-
-      case ESTADOS.AGREGAR_OTRA_NOVEDAD:
-        return validaciones.responderTwiml(res, await manejarAgregarOtraNovedad(sesion, mensaje));
-
-      case ESTADOS.OBSERVACIONES:
+      case ESTADOS.DESCRIBIR_NOVEDADES:
         if (mediaUrl) {
-          return validaciones.responderTwiml(res, 'En este paso solo necesito texto.\n\n' + mensajes.mensajeObservaciones());
+          return validaciones.responderTwiml(res, 'En este paso necesito texto.\n\n' + mensajes.mensajeDescribirNovedades());
         }
         if (!mensaje) {
-          return validaciones.responderTwiml(res, mensajes.mensajeObservaciones());
+          return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
         }
-        return validaciones.responderTwiml(res, await manejarObservaciones(sesion, mensaje));
+        sesion.novedadesTexto = String(mensaje).trim();
+        sesion.novedades = [];
+        sesion.estado = ESTADOS.OBSERVACION;
+        return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
 
-      case ESTADOS.CONFIRMACION_FINAL:
+      case ESTADOS.OBSERVACION: {
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          sesion.observacion = null;
+          sesion.estado = ESTADOS.CONFIRMACION;
+          asegurarNovedadesDesdeTextoLibre(sesion);
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeResumenPosoperacional(
+              sesion,
+              validaciones.generarResumenPosoperacional(sesion)
+            )
+          );
+        }
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.estado = ESTADOS.OBSERVACION_TEXTO;
+          return validaciones.responderTwiml(res, '✍️ Escribe la observación final.');
+        }
+        return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+      }
+
+      case ESTADOS.OBSERVACION_TEXTO:
+        if (mediaUrl) {
+          return validaciones.responderTwiml(res, 'En este paso solo texto.\n\nEscribe la observación.');
+        }
+        sesion.observacion = String(mensaje || '').trim() || null;
+        sesion.estado = ESTADOS.CONFIRMACION;
+        asegurarNovedadesDesdeTextoLibre(sesion);
+        return validaciones.responderTwiml(
+          res,
+          mensajes.mensajeResumenPosoperacional(sesion, validaciones.generarResumenPosoperacional(sesion))
+        );
+
+      case ESTADOS.CONFIRMACION:
         return validaciones.responderTwiml(res, await manejarConfirmacionFinal(sesion, telefono, mensaje));
 
       default:
         sesion.estado = ESTADOS.ESPERANDO_PLACA;
-        return validaciones.responderTwiml(res, mensajes.mensajeInicio());
+        return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
     }
   } catch (error) {
     console.error('Error en flujo posoperacional:', error.message || error);

@@ -1,35 +1,28 @@
-// modulos/vehiculos/posoperacional/mensajes.js
-// Textos de UX del flujo posoperacional.
-// Sistema de diseño unificado CERO:
-//   Opciones  → 1️⃣ Texto
-//   Navegación → Escribe ATRAS o CANCELAR (texto, no botones)
-//   Confirmar  → Escribe *SI* para firmar
-//   Separadores → solo en resúmenes/confirmación final
-//   Tono       → informal, español correcto
+/**
+ * Textos UX posoperacional — opciones numéricas y pie de navegación alineado al preoperacional.
+ */
 
 'use strict';
 
-// ── Pie de navegación estándar ────────────────────────────────────────────────
+var nav = require('../compartido/navegacion');
 
-var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+var PIE_NAV = nav.PIE_NAV;
 
-// ============================================================================
-// INICIO
-// ============================================================================
-
-function mensajeInicio() {
+/**
+ * Paso inicial: solicitar placa (texto).
+ */
+function mensajeInicioPosoperacional() {
   return (
     '🏁 *Posoperacional*\n\n' +
-    'Escribe la *placa del vehículo* para iniciar el cierre de jornada.' +
+    'Escribe la *placa del vehículo* para cerrar la jornada.' +
     PIE_NAV
   );
 }
 
-// ============================================================================
-// ODÓMETRO
-// ============================================================================
-
-function mensajeSolicitudOdometro(vehiculo, referencia) {
+/**
+ * Tras validar placa: datos del vehículo y pedir foto de odómetro.
+ */
+function mensajeVehiculoConfirmado(vehiculo, referencia) {
   var msg =
     '✅ *' + (vehiculo.placa || '') + '*\n' +
     ([vehiculo.tipo, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') || 'Vehículo registrado') +
@@ -37,16 +30,19 @@ function mensajeSolicitudOdometro(vehiculo, referencia) {
 
   if (referencia && typeof referencia.kilometraje === 'number') {
     msg += '\n\nÚltimo registrado: *' + referencia.kilometraje.toLocaleString('es-CO') + ' km*';
-    if (referencia.origen === 'preoperacional_dia')    msg += ' (preoperacional del día)';
+    if (referencia.origen === 'preoperacional_dia') msg += ' (preoperacional del día)';
     if (referencia.origen === 'ultimo_posoperacional') msg += ' (último posoperacional)';
     if (referencia.origen === 'ultimo_preoperacional') msg += ' (último preoperacional)';
-    if (referencia.origen === 'vehiculo')              msg += ' (último km del vehículo)';
+    if (referencia.origen === 'vehiculo') msg += ' (último km del vehículo)';
   }
 
   msg += PIE_NAV;
   return msg;
 }
 
+/**
+ * Confirmación de lectura OCR (km en rango o con alerta).
+ */
 function mensajeConfirmacionKilometraje(sesion) {
   var msg =
     '🔎 *Lectura del odómetro*\n' +
@@ -89,98 +85,65 @@ function mensajeAlertaKilometraje(sesion) {
   return msg;
 }
 
-// ============================================================================
-// NOVEDADES
-// ============================================================================
+function mensajeConfirmacionSegunKilometraje(sesion) {
+  if (sesion.inconsistenciaKm && sesion.alertasKm && sesion.alertasKm.length) {
+    return mensajeAlertaKilometraje(sesion);
+  }
+  return mensajeConfirmacionKilometraje(sesion);
+}
 
-function mensajePreguntaNovedades() {
+/**
+ * Pregunta si hubo novedades al cierre.
+ */
+function mensajeNovedades() {
   return (
     '🛠️ *¿Hubo novedades al finalizar la jornada?*\n\n' +
-    '1️⃣ Sí\n' +
-    '2️⃣ No' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+    '1️⃣ Sí, reportar novedades\n' +
+    '2️⃣ No, todo en orden' +
+    PIE_NAV
   );
 }
 
-function mensajeSolicitarNovedad() {
+/**
+ * Texto libre para describir novedades.
+ */
+function mensajeDescribirNovedades() {
   return (
-    '✍️ *Describe la novedad*\n\n' +
-    'Ejemplos:\n' +
-    '• Luz trasera dañada\n' +
-    '• El rodillo de las llantas suena raro\n' +
-    '• Parachoques rayado\n\n' +
-    '_Escribe una novedad por mensaje._' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+    '📝 *Describe las novedades encontradas*\n\n' +
+    'Ejemplo: llanta trasera baja, luz trasera no enciende' +
+    PIE_NAV
   );
 }
 
-function mensajeConfirmarNovedadInterpretada(novedades) {
-  var novedad = (novedades || [])[0];
-  if (!novedad) {
-    return 'No pude interpretar la novedad. Escríbela de nuevo con un poco más de detalle.';
-  }
-
-  return (
-    '🤖 *Interpreté esta novedad:*\n' +
-    '• Categoría: *' + novedad.categoria + '*\n' +
-    '• Ítem: *' + novedad.item + '*\n' +
-    '• Estado: *' + novedad.estado + '*\n' +
-    '• Severidad: *' + novedad.severidad + '*\n' +
-    '• Criticidad: *' + (novedad.critico ? 'crítica' : 'no crítica') + '*\n' +
-    '\n1️⃣ Confirmar\n' +
-    '2️⃣ Escribir de nuevo\n' +
-    '3️⃣ Cancelar esta novedad' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
-  );
-}
-
-function mensajeSolicitarFotoNovedad(novedad, pendientes) {
-  var totalPendientes = typeof pendientes === 'number' ? pendientes : 1;
-  return (
-    '📸 *Foto de evidencia*\n' +
-    'Pendientes: *' + totalPendientes + '*\n\n' +
-    'Ítem: *' + novedad.item + '*\n' +
-    'Detalle: _' + (novedad.texto_original || novedad.estado || 'Con novedad') + '_\n\n' +
-    'Envía una foto clara de la novedad.' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
-  );
-}
-
-function mensajeAgregarOtraNovedad() {
-  return (
-    '➕ *¿Registrar otra novedad?*\n\n' +
-    '1️⃣ Sí\n' +
-    '2️⃣ No, continuar' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
-  );
-}
-
-// ============================================================================
-// OBSERVACIONES
-// ============================================================================
-
-function mensajeObservaciones() {
+/**
+ * Observación final: menú numérico.
+ */
+function mensajeObservacion() {
   return (
     '💬 *Observación final*\n\n' +
-    'Escribe una observación o *no* si no aplica.' +
-    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+    '1️⃣ Sin observaciones\n' +
+    '2️⃣ Escribir observación' +
+    PIE_NAV
   );
 }
 
-// ============================================================================
-// CONFIRMACIÓN FINAL Y FIRMA
-// ============================================================================
-
-function mensajeConfirmacionFinal(sesion, resumen) {
+/**
+ * Resumen + firma (1/2) y cancelar vía 0.
+ */
+function mensajeResumenPosoperacional(sesion, resumenTexto) {
   return (
-    resumen + '\n\n' +
-    '📷 Fotos adjuntas: *' + ((sesion.fotos || []).length) + '*\n' +
-    '\n✍️ Escribe *SI* para firmar y cerrar el posoperacional.\n' +
-    '◀️ *ATRAS* para corregir  •  ✖️ *CANCELAR* para anular'
+    resumenTexto +
+    '\n\n📷 Fotos adjuntas: *' + ((sesion.fotos || []).length) + '*\n' +
+    '\n1️⃣ Firmar y cerrar\n' +
+    '2️⃣ Corregir\n' +
+    '0️⃣ _Cancelar_ (vuelve a observación)'
   );
 }
 
-function mensajeFinalizado(datosSesion, pdfUrl) {
+/**
+ * Mensaje tras guardar y enviar PDF.
+ */
+function mensajeFirmaPosoperacional(datosSesion, pdfUrl) {
   var msg =
     '───────────────\n' +
     '✅ *POSOPERACIONAL FIRMADO*\n' +
@@ -206,16 +169,14 @@ function mensajeFinalizado(datosSesion, pdfUrl) {
 }
 
 module.exports = {
-  mensajeInicio,
-  mensajeSolicitudOdometro,
+  mensajeInicioPosoperacional,
+  mensajeVehiculoConfirmado,
   mensajeConfirmacionKilometraje,
   mensajeAlertaKilometraje,
-  mensajePreguntaNovedades,
-  mensajeSolicitarNovedad,
-  mensajeConfirmarNovedadInterpretada,
-  mensajeSolicitarFotoNovedad,
-  mensajeAgregarOtraNovedad,
-  mensajeObservaciones,
-  mensajeConfirmacionFinal,
-  mensajeFinalizado
+  mensajeConfirmacionSegunKilometraje,
+  mensajeNovedades,
+  mensajeDescribirNovedades,
+  mensajeObservacion,
+  mensajeResumenPosoperacional,
+  mensajeFirmaPosoperacional
 };

@@ -12,6 +12,7 @@ const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo')
 const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
 const flujoTanqueo        = require('../modulos/vehiculos/tanqueo/flujo');
 const flujoInscripcion    = require('../modulos/vehiculos/inscripcion/flujo');
+const nav                 = require('../modulos/vehiculos/compartido/navegacion');
 const vehiculosData       = require('../data/vehiculos');
 
 // ============================================================================
@@ -114,16 +115,7 @@ async function manejarMenuPrincipal(req, res, sesion, mensaje) {
 // ============================================================================
 
 function responderMenu(res) {
-  const menu =
-    '🚗 *SISTEMA CERO*\n' +
-    '_cero papel, cero accidentes_\n\n' +
-    'Selecciona una opción:\n\n' +
-    '1️⃣ Preoperacional (inicio de jornada)\n' +
-    '2️⃣ Posoperacional (cierre de jornada)\n' +
-    '3️⃣ Combustible / tanqueo\n\n' +
-    'Escribe el número:';
-
-  return responderTwiml(res, menu);
+  return responderTwiml(res, nav.textoMenuPrincipal());
 }
 
 function responderRaiz(req, res) {
