@@ -1,21 +1,29 @@
+/**
+ * Sesión y datos operativos del posoperacional (WhatsApp).
+ * Estados con prefijo POSOP_ — única fuente de verdad para flujo.js.
+ */
+
+'use strict';
+
 var storage = require('../../../servicios/storage');
 
-/** Debe coincidir con el switch en flujo.js (prefijo POSOP_). */
+/** Estados del flujo posoperacional (texto en sesión). */
 var ESTADOS = {
   INICIO: 'POSOP_INICIO',
   ESPERANDO_PLACA: 'POSOP_ESPERANDO_PLACA',
   ESPERANDO_FOTO_ODOMETRO: 'POSOP_ESPERANDO_FOTO_ODOMETRO',
-  CONFIRMACION_KM: 'POSOP_CONFIRMACION_KM',
-  KM_MANUAL: 'POSOP_KM_MANUAL',
-  TIENE_NOVEDADES: 'POSOP_TIENE_NOVEDADES',
-  DESCRIBIR_NOVEDAD: 'POSOP_DESCRIBIR_NOVEDAD',
-  CONFIRMAR_NOVEDAD: 'POSOP_CONFIRMAR_NOVEDAD',
-  FOTO_NOVEDAD: 'POSOP_FOTO_NOVEDAD',
-  AGREGAR_OTRA_NOVEDAD: 'POSOP_AGREGAR_OTRA_NOVEDAD',
-  OBSERVACIONES: 'POSOP_OBSERVACIONES',
-  CONFIRMACION_FINAL: 'POSOP_CONFIRMACION_FINAL'
+  ODOMETRO_CONFIRMACION: 'POSOP_ODOMETRO_CONFIRMACION',
+  ODOMETRO_MANUAL: 'POSOP_ODOMETRO_MANUAL',
+  NOVEDADES: 'POSOP_NOVEDADES',
+  DESCRIBIR_NOVEDADES: 'POSOP_DESCRIBIR_NOVEDADES',
+  OBSERVACION: 'POSOP_OBSERVACION',
+  OBSERVACION_TEXTO: 'POSOP_OBSERVACION_TEXTO',
+  CONFIRMACION: 'POSOP_CONFIRMACION'
 };
 
+/**
+ * Reinicia datos de un nuevo cierre (conserva tipo posoperacional si aplica).
+ */
 function reiniciarDatosOperativos(sesion) {
   sesion.placa = null;
   sesion.vehiculo = null;
@@ -28,15 +36,18 @@ function reiniciarDatosOperativos(sesion) {
   sesion.alertasKm = [];
   sesion.inconsistenciaKm = false;
   sesion.origenKilometraje = null;
+  sesion.origenKilometrajePendiente = null;
   sesion.kilometrajeConfirmado = false;
   sesion.fotoOdometroTemporal = null;
   sesion.novedades = [];
-  sesion.fotosNovedadPendientes = [];
-  sesion.novedadTemporal = null;
+  sesion.novedadesTexto = null;
   sesion.observacion = null;
   sesion.fotos = [];
 }
 
+/**
+ * Vuelve al paso de foto de odómetro (sin kilometraje confirmado).
+ */
 function volverAKilometraje(sesion) {
   sesion.kilometrajeFinal = null;
   sesion.kmDetectado = null;
@@ -45,50 +56,15 @@ function volverAKilometraje(sesion) {
   sesion.inconsistenciaKm = false;
   sesion.diferenciaKm = null;
   sesion.origenKilometraje = null;
+  sesion.origenKilometrajePendiente = null;
   sesion.kilometrajeConfirmado = false;
   storage.limpiarFotosPorTipo(sesion, ['odometro']);
   sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
 }
 
-function agregarNovedades(sesion, novedades) {
-  if (!Array.isArray(sesion.novedades)) sesion.novedades = [];
-
-  (novedades || []).forEach(function(novedad) {
-    if (!novedad || !novedad.item) return;
-
-    var existente = sesion.novedades.find(function(actual) {
-      return actual.item === novedad.item && actual.estado === novedad.estado;
-    });
-
-    if (!existente) {
-      sesion.novedades.push(novedad);
-    }
-  });
-}
-
-function prepararFotosNovedad(sesion) {
-  var pendientes = [];
-  var fotos = Array.isArray(sesion.fotos) ? sesion.fotos : [];
-
-  (sesion.novedades || []).forEach(function(novedad) {
-    if (!novedad || novedad.requiereFoto === false) return;
-
-    var yaTieneFoto = fotos.some(function(foto) {
-      return foto && foto.tipo === 'novedad' && foto.novedadId === novedad.id;
-    });
-
-    if (!yaTieneFoto) pendientes.push(novedad);
-  });
-
-  sesion.fotosNovedadPendientes = pendientes;
-  return pendientes;
-}
-
-function siguienteNovedadConFoto(sesion) {
-  var pendientes = prepararFotosNovedad(sesion);
-  return pendientes.length ? pendientes[0] : null;
-}
-
+/**
+ * Registra foto de odómetro y km final confirmado.
+ */
 function registrarFotoOdometro(sesion, url, kilometraje, origen) {
   sesion.kilometrajeFinal = kilometraje;
   sesion.kilometrajeConfirmado = true;
@@ -101,26 +77,9 @@ function registrarFotoOdometro(sesion, url, kilometraje, origen) {
   });
 }
 
-function registrarFotoNovedad(sesion, novedad, url) {
-  if (!novedad || !url) return;
-
-  sesion.fotos.push({
-    tipo: 'novedad',
-    url: url,
-    descripcion: novedad.item + ' - ' + (novedad.estado || 'Con novedad'),
-    novedadId: novedad.id
-  });
-
-  prepararFotosNovedad(sesion);
-}
-
 module.exports = {
   ESTADOS,
   reiniciarDatosOperativos,
   volverAKilometraje,
-  agregarNovedades,
-  prepararFotosNovedad,
-  siguienteNovedadConFoto,
-  registrarFotoOdometro,
-  registrarFotoNovedad
+  registrarFotoOdometro
 };

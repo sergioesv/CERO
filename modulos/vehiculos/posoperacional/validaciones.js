@@ -351,6 +351,8 @@ function generarResumenPosoperacional(sesion) {
     sesion.novedades.forEach(function(novedad) {
       resumen += '• ' + novedad.item + ' - ' + (novedad.estado || 'Con novedad') + '\n';
     });
+  } else if (sesion.novedadesTexto) {
+    resumen += '🛠️ Novedades: _' + sesion.novedadesTexto + '_\n';
   } else {
     resumen += '✅ Sin novedades reportadas\n';
   }

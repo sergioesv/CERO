@@ -3,7 +3,7 @@
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto
 //   Navegación → Escribe ATRAS o CANCELAR (texto, no botones)
-//   Confirmar  → Escribe *SI* para firmar
+//   Confirmar  → 1️⃣ Firmar (numérico)
 //   Separadores → solo en resúmenes/confirmación final
 //   Tono       → informal, español correcto
 
@@ -129,17 +129,22 @@ function primerMensajeInspeccion(sesion) {
   );
 }
 
+function mensajeFotoAdicional(prefijo) {
+  return (
+    (prefijo ? prefijo + '\n\n' : '') +
+    '📸 *¿Fotos adicionales?*\n\n' +
+    'Envía fotos extra si quieres agregar evidencia,\n' +
+    'o escribe *1* para continuar a la observación final.' +
+    PIE_NAV
+  );
+}
+
 function mensajeFotoNovedad(sesion, prepararFotosNovedad, prefijo) {
   prepararFotosNovedad(sesion);
 
   if (!sesion.fotosNovedadPendientes.length) {
     sesion.estado = 'FOTO_ADICIONAL';
-    return (
-      (prefijo ? prefijo + '\n\n' : '') +
-      '📸 *¿Fotos adicionales?*\n' +
-      'Envía fotos extra si quieres agregar evidencia,\n' +
-      'o escribe *no* para continuar.'
-    );
+    return mensajeFotoAdicional(prefijo);
   }
 
   var novedad = sesion.fotosNovedadPendientes[0];
@@ -156,6 +161,23 @@ function mensajeFotoNovedad(sesion, prepararFotosNovedad, prefijo) {
 // ============================================================================
 // CONFIRMACIÓN FINAL Y FIRMA
 // ============================================================================
+
+/**
+ * Menú de observación final (antes del resumen): solo números.
+ */
+function mensajeMenuObservacionFinal() {
+  return (
+    '💬 *Observación final*\n\n' +
+    '1️⃣ Sin observaciones\n' +
+    '2️⃣ Escribir observación' +
+    PIE_NAV
+  );
+}
+
+/** Paso de texto libre tras elegir 2 en observación final. */
+function mensajeEscribirObservacionFinal() {
+  return '✍️ Escribe tu observación final (texto libre).' + PIE_NAV;
+}
 
 function mensajeConfirmacionFinal(sesion) {
   var msg =
@@ -179,8 +201,9 @@ function mensajeConfirmacionFinal(sesion) {
   if (sesion.observacion) msg += '💬 _' + sesion.observacion + '_\n';
 
   msg +=
-    '\n✍️ Escribe *SI* para firmar\n' +
-    '0️⃣ _Atrás_ para corregir  •  9️⃣ _Menú principal_';
+    '\n1️⃣ Firmar y cerrar\n' +
+    '2️⃣ Corregir (volver a observación)\n' +
+    '0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 
   return msg;
 }
@@ -217,8 +240,11 @@ module.exports = {
   mensajeConfirmacionPlacaSugerida,
   mensajeConfirmacionOdometro,
   mensajeKilometrajeFueraRango,
+  mensajeFotoAdicional,
   mensajeFotoNovedad,
   primerMensajeInspeccion,
+  mensajeMenuObservacionFinal,
+  mensajeEscribirObservacionFinal,
   mensajeConfirmacionFinal,
   mensajeFinalFirma
 };
