@@ -7,6 +7,7 @@
 var nav = require('../compartido/navegacion');
 
 var PIE_NAV = nav.PIE_NAV;
+var PIE_MENU = nav.PIE_MENU;
 
 /**
  * Paso inicial: solicitar placa (texto).
@@ -136,7 +137,7 @@ function mensajeResumenPosoperacional(sesion, resumenTexto) {
     '\n\n📷 Fotos adjuntas: *' + ((sesion.fotos || []).length) + '*\n' +
     '\n1️⃣ Firmar y cerrar\n' +
     '2️⃣ Corregir\n' +
-    '0️⃣ _Cancelar_ (vuelve a observación)'
+    '0️⃣ _Cancelar_ (vuelve a fotos adicionales)'
   );
 }
 
@@ -165,7 +166,23 @@ function mensajeFirmaPosoperacional(datosSesion, pdfUrl) {
     ? '\n📄 PDF generado y enviado por WhatsApp.'
     : '\n📄 Registro guardado. El PDF no se pudo enviar automáticamente.';
 
+  // Pie de menú: el operario debe saber que puede escribir 9 para volver al menú principal
+  msg += PIE_MENU;
+
   return msg;
+}
+
+/**
+ * Paso de fotos adicionales al cierre — mismo patrón que preoperacional.
+ */
+function mensajeFotoAdicionalPosop(prefijo) {
+  return (
+    (prefijo ? prefijo + '\n\n' : '') +
+    '📸 *¿Fotos adicionales?*\n\n' +
+    'Envía una foto del cierre de jornada para agregar evidencia, o:\n\n' +
+    '1️⃣ Continuar al resumen final' +
+    PIE_NAV
+  );
 }
 
 module.exports = {
@@ -178,5 +195,6 @@ module.exports = {
   mensajeDescribirNovedades,
   mensajeObservacion,
   mensajeResumenPosoperacional,
-  mensajeFirmaPosoperacional
+  mensajeFirmaPosoperacional,
+  mensajeFotoAdicionalPosop
 };

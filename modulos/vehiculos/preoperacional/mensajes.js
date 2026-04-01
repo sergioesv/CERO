@@ -133,8 +133,8 @@ function mensajeFotoAdicional(prefijo) {
   return (
     (prefijo ? prefijo + '\n\n' : '') +
     '📸 *¿Fotos adicionales?*\n\n' +
-    'Envía fotos extra si quieres agregar evidencia,\n' +
-    'o escribe *1* para continuar a la observación final.' +
+    'Envía una foto para agregar evidencia, o:\n\n' +
+    '1️⃣ Continuar a la observación final' +
     PIE_NAV
   );
 }
@@ -228,6 +228,9 @@ function mensajeFinalFirma(datosSesion, fechaTexto, novedadesCriticas, pdfUrl) {
   msg += pdfUrl
     ? '\n📄 PDF generado y enviado por WhatsApp.'
     : '\n📄 Preoperacional firmado. El PDF no se pudo enviar automáticamente.';
+
+  // Pie de menú: el operario debe saber que puede escribir 9 para volver al menú principal
+  msg += PIE_MENU;
 
   return msg;
 }

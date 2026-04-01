@@ -849,7 +849,8 @@ async function manejarPreoperacional(req, res) {
               validacion: 'Evidencia adicional recibida',
               validada: true
             });
-            return preop.responderTwiml(res, '✅ 1 foto guardada\n\nEnvía otra foto o escribe *1* para continuar a la observación final.');
+            // Confirmar recepción y mostrar opciones con formato unificado y PIE_NAV
+            return preop.responderTwiml(res, mensajes.mensajeFotoAdicional('✅ Foto guardada'));
           }
 
           if (msgLower === '1' || msgLower === '1️⃣') {
@@ -857,7 +858,8 @@ async function manejarPreoperacional(req, res) {
             return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
           }
 
-          return preop.responderTwiml(res, '📸 Envía una foto adicional o escribe *1* para continuar a la observación final.');
+          // Fallback: mostrar opciones nuevamente con formato correcto
+          return preop.responderTwiml(res, mensajes.mensajeFotoAdicional());
         }
 
         case 'OBSERVACION': {

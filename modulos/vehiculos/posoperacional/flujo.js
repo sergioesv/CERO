@@ -205,9 +205,15 @@ async function manejarAtras(res, sesion) {
       sesion.estado = ESTADOS.OBSERVACION;
       return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
 
-    case ESTADOS.CONFIRMACION:
+    // Volver al paso de evidencias antes del resumen (coherente con PIE_NAV del mensaje)
+    case ESTADOS.FOTO_ADICIONAL:
+      storage.limpiarFotosPorTipo(sesion, ['adicional_posop']);
       sesion.estado = ESTADOS.OBSERVACION;
       return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+
+    case ESTADOS.CONFIRMACION:
+      sesion.estado = ESTADOS.FOTO_ADICIONAL;
+      return validaciones.responderTwiml(res, mensajes.mensajeFotoAdicionalPosop());
 
     default:
       return validaciones.responderTwiml(res, 'No se puede retroceder desde aquí. Escribe *9* para el menú.');
@@ -325,15 +331,8 @@ async function manejarPosoperacional(req, res) {
       case ESTADOS.OBSERVACION: {
         if (msgLower === '1' || msgLower === '1️⃣') {
           sesion.observacion = null;
-          sesion.estado = ESTADOS.CONFIRMACION;
-          asegurarNovedadesDesdeTextoLibre(sesion);
-          return validaciones.responderTwiml(
-            res,
-            mensajes.mensajeResumenPosoperacional(
-              sesion,
-              validaciones.generarResumenPosoperacional(sesion)
-            )
-          );
+          sesion.estado = ESTADOS.FOTO_ADICIONAL;
+          return validaciones.responderTwiml(res, mensajes.mensajeFotoAdicionalPosop());
         }
         if (msgLower === '2' || msgLower === '2️⃣') {
           sesion.estado = ESTADOS.OBSERVACION_TEXTO;
@@ -347,12 +346,39 @@ async function manejarPosoperacional(req, res) {
           return validaciones.responderTwiml(res, 'En este paso solo texto.\n\nEscribe la observación.');
         }
         sesion.observacion = String(mensaje || '').trim() || null;
-        sesion.estado = ESTADOS.CONFIRMACION;
-        asegurarNovedadesDesdeTextoLibre(sesion);
-        return validaciones.responderTwiml(
-          res,
-          mensajes.mensajeResumenPosoperacional(sesion, validaciones.generarResumenPosoperacional(sesion))
-        );
+        sesion.estado = ESTADOS.FOTO_ADICIONAL;
+        return validaciones.responderTwiml(res, mensajes.mensajeFotoAdicionalPosop());
+
+      case ESTADOS.FOTO_ADICIONAL: {
+        // Acepta fotos de evidencia del cierre de jornada
+        if (mediaUrl) {
+          sesion.fotos.push({
+            tipo: 'adicional_posop',
+            url: mediaUrl,
+            descripcion: 'Foto adicional cierre de jornada',
+            validacion: 'Evidencia adicional recibida',
+            validada: true
+          });
+          // Confirmar y mostrar opciones de nuevo para más fotos
+          return validaciones.responderTwiml(res, mensajes.mensajeFotoAdicionalPosop('✅ Foto guardada'));
+        }
+
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          // Continuar al resumen con asegurarNovedades
+          sesion.estado = ESTADOS.CONFIRMACION;
+          asegurarNovedadesDesdeTextoLibre(sesion);
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeResumenPosoperacional(
+              sesion,
+              validaciones.generarResumenPosoperacional(sesion)
+            )
+          );
+        }
+
+        // Fallback: mostrar menú de nuevo
+        return validaciones.responderTwiml(res, mensajes.mensajeFotoAdicionalPosop());
+      }
 
       case ESTADOS.CONFIRMACION:
         return validaciones.responderTwiml(res, await manejarConfirmacionFinal(sesion, telefono, mensaje));
