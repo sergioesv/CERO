@@ -173,6 +173,47 @@ function mensajeFirmaPosoperacional(datosSesion, pdfUrl) {
 }
 
 /**
+ * Paso de fotos del estado general del vehículo al cierre de jornada.
+ * El conductor puede enviar varias fotos para mostrar cómo entrega el vehículo.
+ */
+function mensajeFotoEstadoGeneral(prefijo) {
+  return (
+    (prefijo ? prefijo + '\n\n' : '') +
+    '📸 *Fotos del estado del vehículo*\n\n' +
+    'Envía fotos del estado en que entregas el vehículo\n' +
+    '(carrocería, cabina, exterior), o:\n\n' +
+    '1️⃣ Continuar sin fotos de estado' +
+    nav.PIE_NAV
+  );
+}
+
+/**
+ * Solicita foto de evidencia de la novedad reportada.
+ */
+function mensajeFotoNovedad(prefijo) {
+  return (
+    (prefijo ? prefijo + '\n\n' : '') +
+    '📸 *Foto de la novedad*\n\n' +
+    'Envía una foto que evidencie el problema, o:\n\n' +
+    '1️⃣ Continuar sin foto' +
+    nav.PIE_NAV
+  );
+}
+
+/**
+ * Solicita clasificación de gravedad de la novedad reportada.
+ */
+function mensajeGravedadNovedad() {
+  return (
+    '⚠️ *¿Qué tan grave es la novedad?*\n\n' +
+    '1️⃣ Crítica — requiere revisión antes de operar\n' +
+    '2️⃣ Moderada — puede esperar mantenimiento programado\n' +
+    '3️⃣ Leve — informativa, sin urgencia' +
+    nav.PIE_NAV
+  );
+}
+
+/**
  * Paso de fotos adicionales al cierre — mismo patrón que preoperacional.
  */
 function mensajeFotoAdicionalPosop(prefijo) {
@@ -196,5 +237,8 @@ module.exports = {
   mensajeObservacion,
   mensajeResumenPosoperacional,
   mensajeFirmaPosoperacional,
-  mensajeFotoAdicionalPosop
+  mensajeFotoAdicionalPosop,
+  mensajeFotoEstadoGeneral,
+  mensajeFotoNovedad,
+  mensajeGravedadNovedad
 };

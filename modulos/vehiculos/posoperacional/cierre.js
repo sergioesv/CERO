@@ -1,5 +1,6 @@
 var posoperacionalesData = require('../../../data/posoperacionales');
 var pdfPosoperacional = require('../../../servicios/pdf/posoperacional');
+var alertasNotificador = require('../../alertas/notificador');
 
 function ahoraCO() {
   var utc = new Date();
@@ -56,6 +57,8 @@ function construirDatosSesionPdf(sesion, telefono, ahora) {
     alertasKm: sesion.alertasKm || [],
     novedades: sesion.novedades || [],
     observacion: sesion.observacion || null,
+    novedadTexto: sesion.novedadTexto || null,
+    novedadSeveridad: sesion.novedadSeveridad || null,
     fotos: sesion.fotos || [],
     firmado: true,
     fecha: ahora.toISOString(),
@@ -73,6 +76,12 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
   }
 
   var posoperacional = creado.data;
+
+  // Si hay novedad crítica, notificar al supervisor igual que en el preoperacional
+  var novedadesCriticas = (sesion.novedades || []).filter(function(n) { return n.critico; });
+  if (novedadesCriticas.length > 0) {
+    alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas);
+  }
 
   if (sesion.fotos && sesion.fotos.length) {
     var resFotos = await posoperacionalesData.guardarFotosPosoperacional(posoperacional.id, sesion.fotos);

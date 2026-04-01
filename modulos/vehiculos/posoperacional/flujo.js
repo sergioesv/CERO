@@ -52,21 +52,24 @@ function mensajeConfirmacionSegunKilometraje(sesion) {
 }
 
 /**
- * Construye arreglo novedades para guardado/PDF si solo hay texto libre.
+ * Construye arreglo novedades para guardado/PDF si solo hay texto libre (flujo legacy).
+ * Si ya hay novedades con severidad desde el flujo nuevo, no modifica.
  */
 function asegurarNovedadesDesdeTextoLibre(sesion) {
+  if (sesion.novedades && sesion.novedades.length > 0) return;
+
   if (sesion.novedadesTexto && (!sesion.novedades || sesion.novedades.length === 0)) {
     sesion.novedades = [
       {
-        id: 'nov_libre_' + Date.now(),
-        item: 'Novedades al cierre',
-        estado: sesion.novedadesTexto,
+        id:             'nov_libre_' + Date.now(),
+        item:           'Novedades al cierre',
+        estado:         sesion.novedadesTexto,
+        texto:          sesion.novedadesTexto,
         texto_original: sesion.novedadesTexto,
-        critico: false,
-        categoria: 'otro',
-        severidad: 'media',
-        requiereFoto: false,
-        fuente: 'texto_libre'
+        critico:        false,
+        categoria:      'otro',
+        severidad:      'leve',
+        fuente:         'texto_libre'
       }
     ];
   }
@@ -121,8 +124,8 @@ async function manejarConfirmacionKilometraje(sesion, mensaje) {
       sesion.kmDetectado,
       sesion.origenKilometrajePendiente || 'ocr'
     );
-    sesion.estado = ESTADOS.NOVEDADES;
-    return mensajes.mensajeNovedades();
+    sesion.estado = ESTADOS.FOTO_ESTADO_GENERAL;
+    return mensajes.mensajeFotoEstadoGeneral();
   }
 
   if (ml === '2' || ml === '2️⃣') {
@@ -180,20 +183,39 @@ async function manejarAtras(res, sesion) {
         '◀️ Volvemos a la placa.\n\n' + mensajes.mensajeInicioPosoperacional()
       );
 
+    // Volver al paso de fotos de estado (después del odómetro confirmado)
     case ESTADOS.NOVEDADES:
-      estadoPosop.volverAKilometraje(sesion);
-      return validaciones.responderTwiml(
-        res,
-        '◀️ Volvemos al kilometraje.\n\n' +
-          mensajes.mensajeVehiculoConfirmado(sesion.vehiculo || {}, sesion.kmReferenciaMeta)
-      );
+      sesion.estado = ESTADOS.FOTO_ESTADO_GENERAL;
+      return validaciones.responderTwiml(res, mensajes.mensajeFotoEstadoGeneral());
+
+    case ESTADOS.FOTO_ESTADO_GENERAL:
+      storage.limpiarFotosPorTipo(sesion, ['estado_general']);
+      sesion.estado = ESTADOS.ODOMETRO_CONFIRMACION;
+      return validaciones.responderTwiml(res, mensajes.mensajeConfirmacionSegunKilometraje(sesion));
 
     case ESTADOS.DESCRIBIR_NOVEDADES:
       sesion.novedadesTexto = null;
+      sesion.novedadTexto = null;
       sesion.estado = ESTADOS.NOVEDADES;
       return validaciones.responderTwiml(res, mensajes.mensajeNovedades());
 
+    case ESTADOS.FOTO_NOVEDAD:
+      storage.limpiarFotosPorTipo(sesion, ['novedad']);
+      sesion.estado = ESTADOS.DESCRIBIR_NOVEDADES;
+      return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
+
+    case ESTADOS.GRAVEDAD_NOVEDAD:
+      sesion.estado = ESTADOS.FOTO_NOVEDAD;
+      return validaciones.responderTwiml(res, mensajes.mensajeFotoNovedad());
+
     case ESTADOS.OBSERVACION:
+      // Flujo con novedad clasificada: volver a elegir gravedad
+      if (sesion.novedades && sesion.novedades.length > 0 && sesion.novedadTexto) {
+        sesion.novedades = [];
+        sesion.novedadSeveridad = null;
+        sesion.estado = ESTADOS.GRAVEDAD_NOVEDAD;
+        return validaciones.responderTwiml(res, mensajes.mensajeGravedadNovedad());
+      }
       if (sesion.novedadesTexto) {
         sesion.estado = ESTADOS.DESCRIBIR_NOVEDADES;
         return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
@@ -302,6 +324,32 @@ async function manejarPosoperacional(req, res) {
         }
         return validaciones.responderTwiml(res, await manejarConfirmacionKilometraje(sesion, mensaje));
 
+      case ESTADOS.FOTO_ESTADO_GENERAL: {
+        // El conductor envía fotos del estado del vehículo al entregarlo
+        if (mediaUrl) {
+          sesion.fotos.push({
+            tipo:        'estado_general',
+            url:         mediaUrl,
+            descripcion: 'Estado general del vehículo al cierre',
+            validada:    true
+          });
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeFotoEstadoGeneral('✅ Foto guardada')
+          );
+        }
+
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          sesion.estado = ESTADOS.NOVEDADES;
+          return validaciones.responderTwiml(res, mensajes.mensajeNovedades());
+        }
+
+        return validaciones.responderTwiml(
+          res,
+          mensajes.mensajeFotoEstadoGeneral()
+        );
+      }
+
       case ESTADOS.NOVEDADES: {
         if (msgLower === '1' || msgLower === '1️⃣') {
           sesion.estado = ESTADOS.DESCRIBIR_NOVEDADES;
@@ -309,6 +357,8 @@ async function manejarPosoperacional(req, res) {
         }
         if (msgLower === '2' || msgLower === '2️⃣') {
           sesion.novedadesTexto = null;
+          sesion.novedadTexto = null;
+          sesion.novedadSeveridad = null;
           sesion.novedades = [];
           sesion.estado = ESTADOS.OBSERVACION;
           return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
@@ -323,10 +373,92 @@ async function manejarPosoperacional(req, res) {
         if (!mensaje) {
           return validaciones.responderTwiml(res, mensajes.mensajeDescribirNovedades());
         }
-        sesion.novedadesTexto = String(mensaje).trim();
+        sesion.novedadTexto = String(mensaje).trim();
         sesion.novedades = [];
+        sesion.estado = ESTADOS.FOTO_NOVEDAD;
+        return validaciones.responderTwiml(res, mensajes.mensajeFotoNovedad());
+
+      case ESTADOS.FOTO_NOVEDAD: {
+        if (mediaUrl) {
+          sesion.fotos.push({
+            tipo:        'novedad',
+            url:         mediaUrl,
+            descripcion: 'Foto de novedad al cierre',
+            validada:    true
+          });
+          sesion.estado = ESTADOS.GRAVEDAD_NOVEDAD;
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeGravedadNovedad()
+          );
+        }
+
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          sesion.estado = ESTADOS.GRAVEDAD_NOVEDAD;
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeGravedadNovedad()
+          );
+        }
+
+        return validaciones.responderTwiml(
+          res,
+          mensajes.mensajeFotoNovedad()
+        );
+      }
+
+      case ESTADOS.GRAVEDAD_NOVEDAD: {
+        if (mediaUrl) {
+          return validaciones.responderTwiml(
+            res,
+            '⌨️ En este paso necesito un número (1, 2 o 3).\n\n' +
+            mensajes.mensajeGravedadNovedad()
+          );
+        }
+
+        var severidad;
+        var esCritica;
+
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          severidad = 'critica';
+          esCritica = true;
+        } else if (msgLower === '2' || msgLower === '2️⃣') {
+          severidad = 'moderada';
+          esCritica = false;
+        } else if (msgLower === '3' || msgLower === '3️⃣') {
+          severidad = 'leve';
+          esCritica = false;
+        } else {
+          return validaciones.responderTwiml(
+            res,
+            mensajes.mensajeGravedadNovedad()
+          );
+        }
+
+        sesion.novedadSeveridad = severidad;
+        sesion.novedades = [{
+          item:           'Novedades al cierre',
+          estado:         sesion.novedadTexto || '',
+          texto:          sesion.novedadTexto || '',
+          texto_original: sesion.novedadTexto || '',
+          severidad:      severidad,
+          critico:        esCritica,
+          categoria:      'cierre',
+          fuente:         'texto_libre'
+        }];
+
+        if (esCritica) {
+          sesion.estado = ESTADOS.OBSERVACION;
+          return validaciones.responderTwiml(
+            res,
+            '🚨 *Novedad crítica registrada*\n_El supervisor será notificado_\n\n' +
+            mensajes.mensajeObservacion()
+          );
+        }
+
         sesion.estado = ESTADOS.OBSERVACION;
         return validaciones.responderTwiml(res, mensajes.mensajeObservacion());
+      }
 
       case ESTADOS.OBSERVACION: {
         if (msgLower === '1' || msgLower === '1️⃣') {
