@@ -1,5 +1,5 @@
 var sesiones = require('../../../servicios/sesiones');
-var pdf = require('../../../servicios/pdf');
+var pdf = require('../../../servicios/pdf/preoperacional');
 var config = require('../../../config/config');
 var inspeccionesData = require('../../../data/inspecciones');
 var vehiculosData = require('../../../data/vehiculos');

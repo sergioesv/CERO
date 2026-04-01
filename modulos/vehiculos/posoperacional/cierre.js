@@ -1,5 +1,5 @@
 var posoperacionalesData = require('../../../data/posoperacionales');
-var pdfPosoperacional = require('../../../servicios/pdfPosoperacional');
+var pdfPosoperacional = require('../../../servicios/pdf/posoperacional');
 
 function ahoraCO() {
   var utc = new Date();
@@ -47,6 +47,8 @@ function construirDatosSesionPdf(sesion, telefono, ahora) {
     vehiculo: sesion.vehiculo || null,
     conductorNombre: sesion.conductor ? sesion.conductor.nombre : null,
     conductorTelefono: String(telefono || '').replace('whatsapp:', ''),
+    conductorCedula: sesion.conductor ? (sesion.conductor.cedula || null) : null,
+    conductorLicenciaVencimiento: sesion.conductor ? (sesion.conductor.licencia_vencimiento || null) : null,
     kilometrajeFinal: sesion.kilometrajeFinal,
     kmReferencia: sesion.kmReferencia,
     kmReferenciaOrigen: sesion.kmReferenciaMeta ? sesion.kmReferenciaMeta.origen : null,
