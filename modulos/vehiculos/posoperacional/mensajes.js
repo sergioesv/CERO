@@ -137,7 +137,7 @@ function mensajeResumenPosoperacional(sesion, resumenTexto) {
     '\n\n📷 Fotos adjuntas: *' + ((sesion.fotos || []).length) + '*\n' +
     '\n1️⃣ Firmar y cerrar\n' +
     '2️⃣ Corregir\n' +
-    '0️⃣ _Cancelar_ (vuelve a fotos adicionales)'
+    '0️⃣ _Cancelar_ (vuelve a observación)'
   );
 }
 
@@ -213,19 +213,6 @@ function mensajeGravedadNovedad() {
   );
 }
 
-/**
- * Paso de fotos adicionales al cierre — mismo patrón que preoperacional.
- */
-function mensajeFotoAdicionalPosop(prefijo) {
-  return (
-    (prefijo ? prefijo + '\n\n' : '') +
-    '📸 *¿Fotos adicionales?*\n\n' +
-    'Envía una foto del cierre de jornada para agregar evidencia, o:\n\n' +
-    '1️⃣ Continuar al resumen final' +
-    PIE_NAV
-  );
-}
-
 module.exports = {
   mensajeInicioPosoperacional,
   mensajeVehiculoConfirmado,
@@ -237,7 +224,6 @@ module.exports = {
   mensajeObservacion,
   mensajeResumenPosoperacional,
   mensajeFirmaPosoperacional,
-  mensajeFotoAdicionalPosop,
   mensajeFotoEstadoGeneral,
   mensajeFotoNovedad,
   mensajeGravedadNovedad

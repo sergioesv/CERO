@@ -1,3 +1,4 @@
+var inspeccionesData = require('../../../data/inspecciones');
 var posoperacionalesData = require('../../../data/posoperacionales');
 var pdfPosoperacional = require('../../../servicios/pdf/posoperacional');
 var alertasNotificador = require('../../alertas/notificador');
@@ -76,6 +77,15 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
   }
 
   var posoperacional = creado.data;
+
+  if (sesion.vehiculo && sesion.vehiculo.id && typeof sesion.kilometrajeFinal === 'number') {
+    var resKm = await inspeccionesData.actualizarKilometrajeVehiculo(
+      sesion.vehiculo.id, sesion.kilometrajeFinal
+    );
+    if (resKm.error) {
+      console.error('Error actualizando kilometraje vehiculo en posop:', resKm.error);
+    }
+  }
 
   // Si hay novedad crítica, notificar al supervisor igual que en el preoperacional
   var novedadesCriticas = (sesion.novedades || []).filter(function(n) { return n.critico; });
