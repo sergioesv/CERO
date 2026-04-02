@@ -31,6 +31,11 @@ const App = {
     console.log('CERO Panel listo');
   },
 
+  cerrarSesion: function() {
+    sessionStorage.removeItem('cero_token');
+    window.location.href = '/login';
+  },
+
   registerRoutes() {
     Router.register('vehiculos/index', () => Router.navigate('vehiculos/dashboard'));
     Router.register('vehiculos/dashboard', () => window.Dashboard && window.Dashboard.render());
@@ -133,3 +138,4 @@ App.canAccessRoute = function canAccessRoute(path) {
 window.getRolesFromToken = getRolesFromToken;
 document.addEventListener('DOMContentLoaded', () => App.init());
 window.App = App;
+window.CeroApp = App;

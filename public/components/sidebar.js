@@ -91,6 +91,11 @@ const Sidebar = {
       });
       html += '</div>';
     });
+    html += `<div class="sidebar-footer">
+  <button class="sidebar-logout" onclick="CeroApp.cerrarSesion()">
+    Cerrar sesión
+  </button>
+</div>`;
     container.innerHTML = html;
   },
   
