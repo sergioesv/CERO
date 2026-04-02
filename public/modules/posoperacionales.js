@@ -127,53 +127,67 @@ window.PosoperacionalesModule = (() => {
   }
 
   function renderDrawer(registro) {
-    const titulo = document.getElementById('posop-drawer-titulo');
-    const contenido = document.getElementById('posop-drawer-contenido');
-    if (!titulo || !contenido) return;
+  const titulo = document.getElementById('posop-drawer-titulo');
+  const contenido = document.getElementById('posop-drawer-contenido');
+  if (!titulo || !contenido) return;
 
-    titulo.textContent = registro.vehiculo_placa || 'Detalle';
+  titulo.textContent = registro.vehiculo_placa || 'Detalle';
 
-    const detalle = Object.entries(registro)
-      .filter(([key]) => key !== 'vehiculos')
-      .map(([key, value]) => {
-        let texto = '—';
-        if (Array.isArray(value) || (value && typeof value === 'object')) {
-          texto = Utils.escaparHTML(JSON.stringify(value, null, 2));
-        } else if (value !== null && value !== undefined && value !== '') {
-          texto = Utils.escaparHTML(String(value));
-        }
-
-        return `
-          <div class="detail-item">
-            <span class="detail-label">${Utils.escaparHTML(key)}</span>
-            <span class="detail-value" style="white-space:pre-wrap;">${texto}</span>
+  // Novedades
+  let novedadesHtml = '<p class="text-secondary text-sm">Sin novedades</p>';
+  let novedades = registro.novedades || [];
+  if (typeof novedades === 'string') {
+    try { novedades = JSON.parse(novedades); } catch { novedades = []; }
+  }
+  if (Array.isArray(novedades) && novedades.length > 0) {
+    novedadesHtml = novedades.map(n => {
+      const sev = { bloqueo: 'danger', alerta: 'warning', informativo: 'neutral', media: 'warning' };
+      const badge = Badge.render(n.severidad || n.estado || '—', sev[n.severidad] || sev[n.estado] || 'neutral');
+      return `
+        <div class="detail-item" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+            <span class="font-medium text-sm">${Utils.escaparHTML(n.item || '—')}</span>
+            ${badge}
           </div>
-        `;
-      })
-      .join('');
-
-    const pdfHtml = registro.pdf_url
-      ? `<div class="drawer-section"><a href="${Utils.escaparHTML(registro.pdf_url)}" target="_blank" class="btn btn-primary" style="width:100%;text-align:center;">Ver PDF</a></div>`
-      : '';
-
-    contenido.innerHTML = `
-      <div class="drawer-section">
-        <div class="detail-grid">
-          <div class="detail-item">
-            <span class="detail-label">Vehiculo</span>
-            <span class="detail-value">${Utils.escaparHTML(([registro.vehiculos?.marca, registro.vehiculos?.tipo].filter(Boolean).join(' ')) || '—')}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Conductor</span>
-            <span class="detail-value">${Utils.escaparHTML((registro.conductores && registro.conductores.nombre) || registro.conductor_nombre || '—')}</span>
-          </div>
-          ${detalle}
-        </div>
-      </div>
-      ${pdfHtml}
-    `;
+          ${n.estado ? `<span class="text-xs text-secondary">${Utils.escaparHTML(n.estado)}</span>` : ''}
+          ${n.texto_original ? `<span class="text-xs" style="color:var(--color-text-tertiary);">"${Utils.escaparHTML(n.texto_original)}"</span>` : ''}
+        </div>`;
+    }).join('');
   }
 
+  const conductor = (registro.conductores && registro.conductores.nombre) || registro.conductor_nombre || '—';
+  const vehiculo = [registro.vehiculos?.marca, registro.vehiculos?.tipo].filter(Boolean).join(' ') || '—';
+  const kmInicial = Utils.formatearNumero(registro.km_referencia);
+  const kmFinal = Utils.formatearNumero(registro.kilometraje_final);
+  const recorrido = (registro.km_referencia && registro.kilometraje_final)
+    ? Utils.formatearNumero(registro.kilometraje_final - registro.km_referencia) + ' km'
+    : '—';
+
+  const pdfHtml = registro.pdf_url
+    ? `<div class="drawer-section"><a href="${Utils.escaparHTML(registro.pdf_url)}" target="_blank" class="btn btn-primary" style="width:100%;text-align:center;">Ver PDF</a></div>`
+    : '';
+
+  contenido.innerHTML = `
+    <div class="drawer-section">
+      <div class="detail-grid">
+        <div class="detail-item"><span class="detail-label">Vehículo</span><span class="detail-value">${Utils.escaparHTML(vehiculo)}</span></div>
+        <div class="detail-item"><span class="detail-label">Conductor</span><span class="detail-value">${Utils.escaparHTML(conductor)}</span></div>
+        <div class="detail-item"><span class="detail-label">KM inicial</span><span class="detail-value">${kmInicial}</span></div>
+        <div class="detail-item"><span class="detail-label">KM final</span><span class="detail-value">${kmFinal}</span></div>
+        <div class="detail-item"><span class="detail-label">Recorrido</span><span class="detail-value">${recorrido}</span></div>
+        <div class="detail-item"><span class="detail-label">Estado</span><span class="detail-value">${estadoBadge(registro.estado_general)}</span></div>
+        <div class="detail-item"><span class="detail-label">Observaciones</span><span class="detail-value">${Utils.escaparHTML(registro.observaciones || 'Sin observaciones')}</span></div>
+        <div class="detail-item"><span class="detail-label">Fecha</span><span class="detail-value">${formatFechaHora(registro.created_at)}</span></div>
+      </div>
+    </div>
+    <div class="drawer-section">
+      <p class="detail-label" style="margin-bottom:8px;">Novedades</p>
+      ${novedadesHtml}
+    </div>
+    ${pdfHtml}
+  `;
+}
+  
   async function cargarDatos() {
     try {
       const query = buildQuery();
