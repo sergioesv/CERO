@@ -375,7 +375,7 @@ function registrarDashboard(app) {
   app.get('/api/tanqueos',                  verificarToken, listarTanqueos);
 
   // Sedes
-  app.get('/api/sedes',              verificarToken, verificarPermiso('sedes', 'ver'), listarSedes);
+  app.get('/api/sedes',              verificarToken, listarSedes);
   app.post('/api/sedes',             verificarToken, verificarPermiso('sedes', 'ver'), crearSede);
   app.put('/api/sedes/:id',          verificarToken, verificarPermiso('sedes', 'ver'), actualizarSede);
   app.patch('/api/sedes/:id/estado', verificarToken, cambiarEstadoSede);
