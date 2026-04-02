@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════
 
 var config = require('../config/config');
+var activosData = require('./activos');
 
 // ───────────────────────────────────────────────────────────
 // Obtiene vehículos con documentos próximos a vencer o vencidos
@@ -123,6 +124,21 @@ async function bloquearVehiculo(placa, motivo) {
   }
 
   console.log('🔒 Vehículo ' + placa + ' bloqueado: ' + motivo);
+
+  // Sincronizar estado en tabla activos y registrar en historial
+  // Operación no bloqueante — no afecta el flujo de alertas si falla
+  activosData.registrarCambioEstado(
+    placa,
+    'bloqueado',
+    motivo,
+    'alerta_documento',
+    null,
+    null,
+    'sistema'
+  ).catch(function(err) {
+    console.error('❌ Error registrando historial desde alertas:', err.message);
+  });
+
   return true;
 }
 

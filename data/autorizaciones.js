@@ -8,6 +8,7 @@
 
 var config = require('../config/config');
 var notificador = require('../modulos/alertas/notificador');
+var activosData = require('./activos');
 
 // ─────────────────────────────────────────────────────────────────
 // HELPERS DE DOCUMENTOS
@@ -201,12 +202,49 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
 
   var autorizacion = resCheck.data;
 
-  // 3. Si decision = taller, cambiar estado del vehículo
+  // 3. Sincronizar estado en vehiculos, activos e historial según decisión
+  var estadoNuevoActivo = null;
+  var motivoHistorial = 'Decisión supervisor: ' + decision;
+  if (justificacion) motivoHistorial += ' — ' + justificacion;
+
   if (decision === 'taller' && autorizacion.vehiculo_placa) {
+    // Mover a taller
     await config.supabase
       .from(config.TABLES.vehiculos)
       .update({ estado: 'taller' })
       .eq('placa', autorizacion.vehiculo_placa);
+    estadoNuevoActivo = 'taller';
+
+  } else if (decision === 'restringir' && autorizacion.vehiculo_placa) {
+    // Bloquear vehículo
+    await config.supabase
+      .from(config.TABLES.vehiculos)
+      .update({ bloqueado: true, motivo_bloqueo: motivoHistorial })
+      .eq('placa', autorizacion.vehiculo_placa);
+    estadoNuevoActivo = 'bloqueado';
+
+  } else if (decision === 'autorizar' && autorizacion.vehiculo_placa) {
+    // Desbloquear y marcar operativo
+    await config.supabase
+      .from(config.TABLES.vehiculos)
+      .update({ bloqueado: false, motivo_bloqueo: null, estado: 'operativo' })
+      .eq('placa', autorizacion.vehiculo_placa);
+    estadoNuevoActivo = 'operativo';
+  }
+
+  // Registrar en historial_estado_activo si aplica
+  if (estadoNuevoActivo && autorizacion.vehiculo_placa) {
+    activosData.registrarCambioEstado(
+      autorizacion.vehiculo_placa,
+      estadoNuevoActivo,
+      motivoHistorial,
+      'autorizacion',
+      autorizacionId,
+      'autorizaciones_novedad',
+      'supervisor'
+    ).catch(function(err) {
+      console.error('❌ Error registrando historial desde autorizacion:', err.message);
+    });
   }
 
   // 4. Buscar teléfono del conductor y notificar por WhatsApp

@@ -2,6 +2,7 @@ var inspeccionesData = require('../../../data/inspecciones');
 var posoperacionalesData = require('../../../data/posoperacionales');
 var pdfPosoperacional = require('../../../servicios/pdf/posoperacional');
 var alertasNotificador = require('../../alertas/notificador');
+var activosData = require('../../../data/activos');
 
 function ahoraCO() {
   var utc = new Date();
@@ -87,10 +88,27 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
     }
   }
 
-  // Si hay novedad crítica, notificar al supervisor igual que en el preoperacional
+  // Novedades críticas: notificar supervisor y registrar cambio de estado
   var novedadesCriticas = (sesion.novedades || []).filter(function(n) { return n.critico; });
   if (novedadesCriticas.length > 0) {
     alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas);
+
+    // Registrar en historial — novedad crítica implica atención requerida
+    var descripcionNovedad = novedadesCriticas.map(function(n) {
+      return n.descripcion || n.tipo || 'novedad crítica';
+    }).join(', ');
+
+    activosData.registrarCambioEstado(
+      sesion.placa,
+      'bloqueado',
+      'Posoperacional — novedad crítica: ' + descripcionNovedad,
+      'posoperacional',
+      posoperacional.id,
+      'posoperacionales',
+      'sistema'
+    ).catch(function(err) {
+      console.error('❌ Error registrando historial desde posoperacional:', err.message);
+    });
   }
 
   if (sesion.fotos && sesion.fotos.length) {

@@ -96,6 +96,7 @@ app.get('/alertas/ejecutar', async function (req, res) {
 
 const { supabase } = require('./config/config');
 const autorizacionesData = require('./data/autorizaciones');
+const activosData = require('./data/activos');
 
 // ───────────────────────────────────────────────────────────
 // VEHÍCULOS
@@ -167,11 +168,13 @@ app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'),
 // PUT /api/vehiculos/:placa — actualiza un vehículo
 app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
   try {
+    const placa = req.params.placa.toUpperCase();
     const campos = {};
     if (req.body.tipo !== undefined) campos.tipo = req.body.tipo;
     if (req.body.marca !== undefined) campos.marca = req.body.marca;
     if (req.body.modelo !== undefined) campos.modelo = req.body.modelo;
     if (req.body.año !== undefined) campos.año = req.body.año;
+    if (req.body.anio !== undefined) campos.año = req.body.anio;
     if (req.body.kilometraje !== undefined) campos.kilometraje = req.body.kilometraje;
     if (req.body.soat_vencimiento !== undefined) campos.soat_vencimiento = req.body.soat_vencimiento;
     if (req.body.tecnomecanica_vencimiento !== undefined) campos.tecnomecanica_vencimiento = req.body.tecnomecanica_vencimiento;
@@ -182,11 +185,28 @@ app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
     const { data, error } = await supabase
       .from('vehiculos')
       .update(campos)
-      .eq('placa', req.params.placa.toUpperCase())
+      .eq('placa', placa)
       .select()
       .single();
-    
+
     if (error) throw error;
+
+    // Si cambió el estado, sincronizar en activos e historial
+    if (req.body.estado !== undefined) {
+      const usuarioId = req.usuario ? (req.usuario.id || req.usuario.email || 'panel') : 'panel';
+      activosData.registrarCambioEstado(
+        placa,
+        req.body.estado,
+        'Cambio manual desde panel de administración',
+        'panel_admin',
+        null,
+        null,
+        usuarioId
+      ).catch(function(err) {
+        console.error('❌ Error registrando historial desde panel:', err.message);
+      });
+    }
+
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error actualizando vehículo:', error);
@@ -208,6 +228,13 @@ app.post('/api/vehiculos/:placa/bloquear', async function (req, res) {
       .single();
     
     if (error) throw error;
+
+    activosData.registrarCambioEstado(
+      req.params.placa.toUpperCase(), 'bloqueado',
+      req.body.motivo || 'Bloqueado manualmente',
+      'panel_admin', null, null, 'panel'
+    ).catch(function(err) { console.error('❌ historial bloqueo:', err.message); });
+
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error bloqueando vehículo:', error);
@@ -229,6 +256,13 @@ app.post('/api/vehiculos/:placa/desbloquear', async function (req, res) {
       .single();
     
     if (error) throw error;
+
+    activosData.registrarCambioEstado(
+      req.params.placa.toUpperCase(), 'operativo',
+      'Desbloqueado desde panel',
+      'panel_admin', null, null, 'panel'
+    ).catch(function(err) { console.error('❌ historial desbloqueo:', err.message); });
+
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error desbloqueando vehículo:', error);
