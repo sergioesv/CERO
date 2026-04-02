@@ -365,6 +365,7 @@ app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 've
       cargo: req.body.cargo || 'Conductor',
       activo: true
     };
+    if (req.body.sede_id !== undefined) conductor.sede_id = req.body.sede_id || null;
     
     const { data, error } = await supabase
       .from('conductores')
@@ -391,6 +392,7 @@ app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
     if (req.body.licencia_vencimiento !== undefined) campos.licencia_vencimiento = req.body.licencia_vencimiento;
     if (req.body.cargo !== undefined) campos.cargo = req.body.cargo;
     if (req.body.activo !== undefined) campos.activo = req.body.activo;
+    if (req.body.sede_id !== undefined) campos.sede_id = req.body.sede_id;
     
     const { data, error } = await supabase
       .from('conductores')

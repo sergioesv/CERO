@@ -1,18 +1,17 @@
 // =============================================================================
 // Módulo Conductores — Panel web CERO
 // Patrón: stats cards + tabla + drawer lateral
+// v2 — campo sede agregado, diseño mejorado
 // =============================================================================
 
 window.ConductoresModule = (() => {
-  // --------------------------------------------------------------------------
-  // Estado interno del módulo
-  // --------------------------------------------------------------------------
   let conductores = [];
+  let sedes = [];
   let conductorSeleccionado = null;
-  let filtroActivo = 'todos'; // 'todos' | 'activos' | 'inactivos' | 'vencidos'
+  let filtroActivo = 'todos';
 
   // --------------------------------------------------------------------------
-  // Punto de entrada — llamado por el router al navegar a Conductores
+  // Render principal
   // --------------------------------------------------------------------------
   function render() {
     const main = document.getElementById('main');
@@ -27,10 +26,8 @@ window.ConductoresModule = (() => {
         </div>
       </div>
       <div class="main-content">
-        <!-- Stat cards -->
         <div id="conductores-stats" class="stats-grid"></div>
 
-        <!-- Barra de filtros y búsqueda -->
         <div class="filters-row">
           <div class="search-box">
             <input
@@ -49,7 +46,6 @@ window.ConductoresModule = (() => {
           </select>
         </div>
 
-        <!-- Tabla -->
         <div id="conductores-tabla">
           <table class="table">
             <thead>
@@ -57,18 +53,18 @@ window.ConductoresModule = (() => {
                 <th>Nombre</th>
                 <th>Cédula</th>
                 <th>Cargo</th>
+                <th>Sede</th>
                 <th>Categoría</th>
                 <th>Licencia vence</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody id="conductores-tbody">
-              <tr><td colspan="6" class="table-empty">Cargando...</td></tr>
+              <tr><td colspan="7" class="table-empty">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Drawer lateral -->
         <div id="conductor-drawer" class="drawer">
           <div class="drawer-content" id="conductor-drawer-content"></div>
         </div>
@@ -80,34 +76,44 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Carga de datos desde la API
+  // Carga de datos — conductores y sedes en paralelo
   // --------------------------------------------------------------------------
   async function cargarDatos() {
     try {
-      const respuesta = await API.conductores.listar();
-      const conductoresData = respuesta.data || respuesta || [];
-      conductores = conductoresData;
+      const [resConductores, resSedes] = await Promise.all([
+        API.conductores.listar(),
+        API.get('/sedes').catch(() => ({ data: [] }))
+      ]);
+
+      conductores = resConductores.data || resConductores || [];
+      sedes = (resSedes.datos || resSedes.data || []);
+
       renderStats();
       renderTabla(conductores);
     } catch (err) {
       console.error('Error cargando conductores:', err);
       const tbody = document.getElementById('conductores-tbody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Error al cargar conductores</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Error al cargar conductores</td></tr>';
     }
   }
 
   // --------------------------------------------------------------------------
-  // Render de stat cards (clicables como filtro)
+  // Helper — nombre de sede por id
+  // --------------------------------------------------------------------------
+  function nombreSede(sedeId) {
+    if (!sedeId) return '—';
+    const sede = sedes.find(s => s.id === sedeId);
+    return sede ? sede.nombre : '—';
+  }
+
+  // --------------------------------------------------------------------------
+  // Stats cards
   // --------------------------------------------------------------------------
   function renderStats() {
     const hoy = new Date();
-
-    const activos    = conductores.filter(c => c.activo);
-    const inactivos  = conductores.filter(c => !c.activo);
-    const vencidos   = conductores.filter(c => {
-      if (!c.licencia_vencimiento) return false;
-      return new Date(c.licencia_vencimiento) < hoy;
-    });
+    const activos   = conductores.filter(c => c.activo);
+    const inactivos = conductores.filter(c => !c.activo);
+    const vencidos  = conductores.filter(c => c.licencia_vencimiento && new Date(c.licencia_vencimiento) < hoy);
 
     const statsEl = document.getElementById('conductores-stats');
     if (!statsEl) return;
@@ -133,26 +139,50 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Render de tabla
+  // Tabla
   // --------------------------------------------------------------------------
   function renderTabla(lista) {
     const tbody = document.getElementById('conductores-tbody');
     if (!tbody) return;
 
     if (!lista || lista.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Sin conductores para mostrar</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Sin conductores para mostrar</td></tr>';
       return;
     }
 
     tbody.innerHTML = lista.map(c => {
       const estadoLicencia = calcularEstadoLicencia(c.licencia_vencimiento);
+      const sede = nombreSede(c.sede_id);
       return `
         <tr class="table-row" onclick="ConductoresModule.abrirDrawer('${c.id}')">
-          <td>${c.nombre}</td>
-          <td>${c.cedula || '—'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="
+                width:32px;height:32px;border-radius:50%;
+                background:var(--color-background-secondary);
+                border:1px solid var(--color-border-tertiary);
+                display:flex;align-items:center;justify-content:center;
+                font-size:13px;font-weight:500;color:var(--color-text-secondary);
+                flex-shrink:0;
+              ">${c.nombre.charAt(0).toUpperCase()}</div>
+              <span>${c.nombre}</span>
+            </div>
+          </td>
+          <td style="color:var(--color-text-secondary);font-size:13px;">${c.cedula || '—'}</td>
           <td>${c.cargo || '—'}</td>
-          <td>${c.licencia_categoria || '—'}</td>
-          <td class="${estadoLicencia.clase}">${estadoLicencia.texto}</td>
+          <td>
+            ${c.sede_id
+              ? `<span style="
+                  display:inline-flex;align-items:center;gap:4px;
+                  background:var(--color-background-info);
+                  color:var(--color-text-info);
+                  border-radius:4px;padding:2px 8px;font-size:12px;
+                ">${sede}</span>`
+              : '<span style="color:var(--color-text-tertiary);font-size:12px;">Sin sede</span>'
+            }
+          </td>
+          <td style="font-size:13px;">${c.licencia_categoria || '—'}</td>
+          <td class="${estadoLicencia.clase}" style="font-size:13px;">${estadoLicencia.texto}</td>
           <td>${c.activo
             ? '<span class="badge badge-success">Activo</span>'
             : '<span class="badge badge-danger">Inactivo</span>'
@@ -163,24 +193,22 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Calcula estado de licencia: vencida, por vencer o vigente
+  // Estado licencia
   // --------------------------------------------------------------------------
   function calcularEstadoLicencia(fechaStr) {
     if (!fechaStr) return { texto: 'Sin registro', clase: 'text-muted' };
-
-    const hoy  = new Date();
+    const hoy   = new Date();
     const fecha = new Date(fechaStr);
     const dias  = Math.ceil((fecha - hoy) / 86400000);
     const textoFecha = fecha.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    if (dias < 0)   return { texto: `VENCIDA — ${textoFecha}`,        clase: 'text-danger' };
-    if (dias <= 7)  return { texto: `Vence en ${dias}d — ${textoFecha}`, clase: 'text-danger' };
-    if (dias <= 30) return { texto: `Vence en ${dias}d — ${textoFecha}`, clase: 'text-warning' };
+    if (dias < 0)   return { texto: `VENCIDA — ${textoFecha}`,            clase: 'text-danger' };
+    if (dias <= 7)  return { texto: `Vence en ${dias}d — ${textoFecha}`,  clase: 'text-danger' };
+    if (dias <= 30) return { texto: `Vence en ${dias}d — ${textoFecha}`,  clase: 'text-warning' };
     return { texto: `Vigente — ${textoFecha}`, clase: 'text-success' };
   }
 
   // --------------------------------------------------------------------------
-  // Filtro combinado (texto + select)
+  // Filtros
   // --------------------------------------------------------------------------
   function filtrar() {
     const texto  = (document.getElementById('conductores-search')?.value || '').toLowerCase();
@@ -203,9 +231,6 @@ window.ConductoresModule = (() => {
     renderTabla(lista);
   }
 
-  // --------------------------------------------------------------------------
-  // Filtro desde stat card (actualiza select y filtra)
-  // --------------------------------------------------------------------------
   function aplicarFiltroCard(valor) {
     filtroActivo = valor;
     const select = document.getElementById('conductores-filtro');
@@ -215,18 +240,32 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Drawer — abrir con detalle del conductor
+  // Drawer
   // --------------------------------------------------------------------------
   function abrirDrawer(id) {
     conductorSeleccionado = conductores.find(c => c.id === id);
     if (!conductorSeleccionado) return;
 
-    const c       = conductorSeleccionado;
+    const c         = conductorSeleccionado;
     const estadoLic = calcularEstadoLicencia(c.licencia_vencimiento);
+    const sede      = nombreSede(c.sede_id);
 
     document.getElementById('conductor-drawer-content').innerHTML = `
       <div class="drawer-header">
-        <h2 class="drawer-title">${c.nombre}</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="
+            width:44px;height:44px;border-radius:50%;
+            background:var(--color-background-secondary);
+            border:1px solid var(--color-border-secondary);
+            display:flex;align-items:center;justify-content:center;
+            font-size:18px;font-weight:500;color:var(--color-text-secondary);
+            flex-shrink:0;
+          ">${c.nombre.charAt(0).toUpperCase()}</div>
+          <div>
+            <h2 class="drawer-title" style="margin:0;">${c.nombre}</h2>
+            <span style="font-size:12px;color:var(--color-text-tertiary);">${c.cargo || 'Sin cargo'}</span>
+          </div>
+        </div>
         <button class="drawer-close" onclick="ConductoresModule.cerrarDrawer()">✕</button>
       </div>
 
@@ -238,11 +277,25 @@ window.ConductoresModule = (() => {
           </div>
           <div class="detail-item">
             <span class="detail-label">Teléfono</span>
-            <span class="detail-value">${c.telefono || 'Sin registro'}</span>
+            <span class="detail-value">${c.telefono && c.telefono !== c.cedula ? c.telefono : 'Sin registro'}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Cargo</span>
             <span class="detail-value">${c.cargo || 'Sin registro'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Sede</span>
+            <span class="detail-value">
+              ${c.sede_id
+                ? `<span style="
+                    display:inline-flex;align-items:center;gap:4px;
+                    background:var(--color-background-info);
+                    color:var(--color-text-info);
+                    border-radius:4px;padding:2px 8px;font-size:12px;
+                  ">${sede}</span>`
+                : '<span style="color:var(--color-text-tertiary);">Sin sede asignada</span>'
+              }
+            </span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Categoría licencia</span>
@@ -279,9 +332,6 @@ window.ConductoresModule = (() => {
     document.getElementById('conductor-overlay').classList.add('open');
   }
 
-  // --------------------------------------------------------------------------
-  // Cerrar drawer
-  // --------------------------------------------------------------------------
   function cerrarDrawer() {
     document.getElementById('conductor-drawer')?.classList.remove('open');
     document.getElementById('conductor-overlay')?.classList.remove('open');
@@ -289,26 +339,22 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Modal de crear / editar conductor
+  // Modal crear / editar
   // --------------------------------------------------------------------------
-  function abrirNuevo() {
-    abrirModal(null);
-  }
-
-  function abrirEditar(id) {
-    const c = conductores.find(c => c.id === id);
-    abrirModal(c);
-  }
+  function abrirNuevo()      { abrirModal(null); }
+  function abrirEditar(id)   { abrirModal(conductores.find(c => c.id === id)); }
 
   function abrirModal(conductor) {
     const esEdicion = !!conductor;
     const c = conductor || {};
-
-    // Formatear fecha para input date (YYYY-MM-DD)
     const fechaLic = c.licencia_vencimiento ? c.licencia_vencimiento.substring(0, 10) : '';
 
-    // Eliminar modal previo si existiera
     document.getElementById('modal-conductor')?.remove();
+
+    // Construir opciones de sede
+    const opcionesSedes = sedes.map(s =>
+      `<option value="${s.id}" ${c.sede_id === s.id ? 'selected' : ''}>${s.nombre}${s.ciudad ? ' — ' + s.ciudad : ''}</option>`
+    ).join('');
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -320,40 +366,58 @@ window.ConductoresModule = (() => {
           <button class="modal-close" onclick="document.getElementById('modal-conductor').remove()">✕</button>
         </div>
         <div class="modal-body">
+
           <div class="form-group">
             <label>Nombre completo *</label>
             <input type="text" id="f-nombre" class="input" value="${c.nombre || ''}" placeholder="Nombre completo" />
           </div>
-          <div class="form-group">
-            <label>Cédula *</label>
-            <input type="text" id="f-cedula" class="input" value="${c.cedula || ''}" placeholder="Número de cédula" />
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>Cédula *</label>
+              <input type="text" id="f-cedula" class="input" value="${c.cedula || ''}" placeholder="Número de cédula" />
+            </div>
+            <div class="form-group">
+              <label>Teléfono (con código país)</label>
+              <input type="text" id="f-telefono" class="input" value="${c.telefono && c.telefono !== c.cedula ? c.telefono : ''}" placeholder="573001234567" />
+            </div>
           </div>
-          <div class="form-group">
-            <label>Teléfono (con código país)</label>
-            <input type="text" id="f-telefono" class="input" value="${c.telefono || ''}" placeholder="573001234567" />
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>Cargo</label>
+              <select id="f-cargo" class="input">
+                <option value="">Seleccionar...</option>
+                ${['Conductor','Conductor Ayudante','Operario','Técnico','Supervisor','Administrador','Mensajero','Analista','Director Operativo'].map(op =>
+                  `<option value="${op}" ${c.cargo === op ? 'selected' : ''}>${op}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Sede</label>
+              <select id="f-sede" class="input">
+                <option value="">Sin sede asignada</option>
+                ${opcionesSedes}
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Cargo</label>
-            <select id="f-cargo" class="input">
-              <option value="">Seleccionar...</option>
-              ${['Conductor','Operario','Técnico','Supervisor','Administrador'].map(op =>
-                `<option value="${op}" ${c.cargo === op ? 'selected' : ''}>${op}</option>`
-              ).join('')}
-            </select>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>Categoría de licencia</label>
+              <select id="f-licencia-cat" class="input">
+                <option value="">Seleccionar...</option>
+                ${['A1','A2','B1','B2','B3','C1','C2','C3'].map(cat =>
+                  `<option value="${cat}" ${c.licencia_categoria === cat ? 'selected' : ''}>${cat}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vencimiento de licencia</label>
+              <input type="date" id="f-licencia-venc" class="input" value="${fechaLic}" />
+            </div>
           </div>
-          <div class="form-group">
-            <label>Categoría de licencia</label>
-            <select id="f-licencia-cat" class="input">
-              <option value="">Seleccionar...</option>
-              ${['A2','B1','B2','B3','C1','C2','C3'].map(cat =>
-                `<option value="${cat}" ${c.licencia_categoria === cat ? 'selected' : ''}>${cat}</option>`
-              ).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Vencimiento de licencia</label>
-            <input type="date" id="f-licencia-venc" class="input" value="${fechaLic}" />
-          </div>
+
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="document.getElementById('modal-conductor').remove()">Cancelar</button>
@@ -368,26 +432,29 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Guardar (crear o editar)
+  // Guardar
   // --------------------------------------------------------------------------
   async function guardar(id) {
-    const nombre              = document.getElementById('f-nombre')?.value.trim();
-    const cedula              = document.getElementById('f-cedula')?.value.trim();
-    const telefono            = document.getElementById('f-telefono')?.value.trim();
-    const cargo               = document.getElementById('f-cargo')?.value;
-    const licencia_categoria  = document.getElementById('f-licencia-cat')?.value;
+    const nombre             = document.getElementById('f-nombre')?.value.trim();
+    const cedula             = document.getElementById('f-cedula')?.value.trim();
+    const telefono           = document.getElementById('f-telefono')?.value.trim();
+    const cargo              = document.getElementById('f-cargo')?.value;
+    const sede_id            = document.getElementById('f-sede')?.value || null;
+    const licencia_categoria = document.getElementById('f-licencia-cat')?.value;
     const licencia_vencimiento = document.getElementById('f-licencia-venc')?.value || null;
 
-    // Validaciones básicas
     if (!nombre) return mostrarToast('El nombre es obligatorio', 'error');
     if (!cedula) return mostrarToast('La cédula es obligatoria', 'error');
 
-    const body = { nombre, cedula, telefono, cargo, licencia_categoria, licencia_vencimiento };
+    // Teléfono: si está vacío usar cédula como placeholder (restricción NOT NULL única)
+    const telefonoFinal = telefono || cedula;
+
+    const body = { nombre, cedula, telefono: telefonoFinal, cargo, sede_id, licencia_categoria, licencia_vencimiento };
 
     try {
       const esEdicion = !!id;
       if (esEdicion) await API.conductores.actualizar(id, body);
-      else await API.conductores.crear(body);
+      else           await API.conductores.crear(body);
 
       document.getElementById('modal-conductor')?.remove();
       cerrarDrawer();
@@ -395,17 +462,16 @@ window.ConductoresModule = (() => {
       await cargarDatos();
     } catch (err) {
       console.error('Error guardando conductor:', err);
-      mostrarToast('Error de conexión', 'error');
+      mostrarToast('Error guardando conductor', 'error');
     }
   }
 
   // --------------------------------------------------------------------------
-  // Activar / desactivar conductor
+  // Activar / desactivar
   // --------------------------------------------------------------------------
   async function toggleActivo(id, nuevoEstado) {
     try {
       await API.conductores.actualizar(id, { activo: nuevoEstado });
-
       mostrarToast(nuevoEstado ? 'Conductor activado' : 'Conductor desactivado', 'success');
       cerrarDrawer();
       await cargarDatos();
@@ -415,29 +481,19 @@ window.ConductoresModule = (() => {
   }
 
   // --------------------------------------------------------------------------
-  // Helper toast — usa el sistema global si existe, sino console
+  // Toast
   // --------------------------------------------------------------------------
   function mostrarToast(msg, tipo) {
-    if (window.Toast) {
-      window.Toast.show(msg, tipo);
-    } else {
-      console.log(`[${tipo}] ${msg}`);
-    }
+    if (window.Toast) window.Toast.show(msg, tipo);
+    else console.log(`[${tipo}] ${msg}`);
   }
 
   // --------------------------------------------------------------------------
-  // API pública del módulo
+  // API pública
   // --------------------------------------------------------------------------
   return {
-    render,
-    cargarDatos,
-    filtrar,
-    aplicarFiltroCard,
-    abrirDrawer,
-    cerrarDrawer,
-    abrirNuevo,
-    abrirEditar,
-    guardar,
-    toggleActivo
+    render, cargarDatos, filtrar, aplicarFiltroCard,
+    abrirDrawer, cerrarDrawer, abrirNuevo, abrirEditar,
+    guardar, toggleActivo
   };
 })();
