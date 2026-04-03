@@ -70,7 +70,7 @@ const Sidebar = {
       ? window.App.getCanonicalRoles()
       : [];
 
-    let html = '';
+    let navHtml = '';
     menu.sections.forEach((section, i) => {
       const visibleItems = section.items.filter(item => {
         if (canonicalRoles.includes('supervisor') && (item.id === 'sedes' || item.id === 'usuarios')) {
@@ -82,21 +82,21 @@ const Sidebar = {
 
       if (visibleItems.length === 0) return;
 
-      if (i > 0) html += '<div class="sidebar-divider"></div>';
-      html += `<div class="sidebar-section"><div class="sidebar-section-title">${section.title}</div>`;
+      if (i > 0) navHtml += '<div class="sidebar-divider"></div>';
+      navHtml += `<div class="sidebar-section"><div class="sidebar-section-title">${section.title}</div>`;
       visibleItems.forEach(item => {
         const badge = this.badges[item.id] || (item.badge && item.badge.count > 0 ? item.badge : null);
         const badgeHtml = badge ? `<span class="sidebar-item-badge ${badge.type}">${badge.count}</span>` : '';
-        html += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}" onclick="if(window.innerWidth<=768)toggleSidebar()"><span>${item.label}</span>${badgeHtml}</a>`;
+        navHtml += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}" onclick="if(window.innerWidth<=768)toggleSidebar()"><span>${item.label}</span>${badgeHtml}</a>`;
       });
-      html += '</div>';
+      navHtml += '</div>';
     });
-    html += `<div class="sidebar-footer">
+    const footerHtml = `<div class="sidebar-footer">
   <button class="sidebar-logout" onclick="CeroApp.cerrarSesion()">
     Cerrar sesión
   </button>
 </div>`;
-    container.innerHTML = html;
+    container.innerHTML = `<div class="sidebar-nav">${navHtml}</div>${footerHtml}`;
   },
   
   setActive(viewId) {
