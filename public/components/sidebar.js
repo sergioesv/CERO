@@ -1,112 +1,133 @@
 const Sidebar = {
-  menus: {
-    vehiculos: {
-      sections: [
-        {
-          title: 'Resumen',
-          items: [
-            { id: 'dashboard', label: 'Dashboard', route: 'vehiculos/dashboard' }
-          ]
-        },
-        {
-          title: 'Operación',
-          items: [
-            { id: 'preoperacionales', label: 'Preoperacionales', route: 'vehiculos/preoperacionales' },
-            { id: 'posoperacionales', label: 'Posoperacionales', route: 'vehiculos/posoperacionales' },
-            { id: 'tanqueos', label: 'Tanqueos', route: 'vehiculos/tanqueos' }
-          ]
-        },
-        {
-          title: 'Vehículos',
-          items: [
-            { id: 'flota', label: 'Flota', route: 'vehiculos/flota' },
-            { id: 'conductores', label: 'Conductores', route: 'vehiculos/conductores' },
-            { id: 'alertas', label: 'Alertas', route: 'vehiculos/alertas', badge: { type: 'danger', count: 0 } }
-          ]
-        },
-        {
-          title: 'Empresa',
-          items: [
-            { id: 'sedes',    label: 'Sedes',    route: 'vehiculos/sedes' },
-            { id: 'usuarios', label: 'Usuarios', route: 'vehiculos/usuarios' }
-          ]
-        }
-      ]
-    },
-    seguridad: {
-      sections: [
-        {
-          title: 'Equipos',
-          items: [
-            { id: 'arnes', label: 'Arnés', route: 'seguridad/arnes' },
-            { id: 'escaleras', label: 'Escaleras', route: 'seguridad/escaleras' }
-          ]
-        }
-      ]
-    },
-    reportes: {
-      sections: [
-        {
-          title: 'Reportes',
-          items: [
-            { id: 'historial', label: 'Historial', route: 'reportes/historial' },
-            { id: 'estadisticas', label: 'Estadísticas', route: 'reportes/estadisticas' }
-          ]
-        }
-      ]
-    }
-  },
-  
+
+  // Módulos solo visibles para superadmin_plataforma
+  SOLO_SUPERADMIN: [
+    'equipos', 'personal_campo', 'locaciones',
+    'ats', 'altura', 'riesgo_electrico', 'espacio_confinado'
+  ],
+
   badges: {},
-  
-  render(module) {
+
+  render() {
     const container = document.getElementById('sidebar');
     if (!container) return;
-    
-    const menu = this.menus[module];
-    if (!menu) { container.innerHTML = ''; return; }
-    
+
     const canonicalRoles = window.App && typeof window.App.getCanonicalRoles === 'function'
       ? window.App.getCanonicalRoles()
       : [];
 
-    let navHtml = '';
-    menu.sections.forEach((section, i) => {
-      const visibleItems = section.items.filter(item => {
-        if (canonicalRoles.includes('supervisor') && (item.id === 'sedes' || item.id === 'usuarios')) {
-          return false;
-        }
+    const esSuperAdmin = canonicalRoles.includes('superadmin_plataforma');
 
+    const sections = [
+      {
+        title: 'Resumen',
+        items: [
+          { id: 'dashboard', label: 'Dashboard', route: 'dashboard' }
+        ]
+      },
+      {
+        title: 'Inspecciones',
+        items: [
+          { id: 'preoperacionales',  label: 'Vehículos',   route: 'preoperacionales' },
+          { id: 'equipos',           label: 'Equipos',     route: 'equipos',          soloSuperAdmin: true },
+          { id: 'personal_campo',    label: 'Personal',    route: 'personal_campo',   soloSuperAdmin: true },
+          { id: 'locaciones',        label: 'Locaciones',  route: 'locaciones',       soloSuperAdmin: true }
+        ]
+      },
+      {
+        title: 'Permisos de trabajo',
+        soloSuperAdmin: true,
+        items: [
+          { id: 'ats',               label: 'ATS',                    route: 'ats',               soloSuperAdmin: true },
+          { id: 'altura',            label: 'Trabajo en altura',      route: 'altura',            soloSuperAdmin: true },
+          { id: 'riesgo_electrico',  label: 'Riesgo eléctrico',       route: 'riesgo_electrico',  soloSuperAdmin: true },
+          { id: 'espacio_confinado', label: 'Espacio confinado',      route: 'espacio_confinado', soloSuperAdmin: true }
+        ]
+      },
+      {
+        title: 'Registro operativo',
+        items: [
+          { id: 'tanqueos',     label: 'Tanqueos', route: 'tanqueos' },
+          { id: 'alertas',      label: 'Alertas',  route: 'alertas',  badge: { type: 'danger', count: 0 } },
+          { id: 'posoperacionales', label: 'Posoperacionales', route: 'posoperacionales' }
+        ]
+      },
+      {
+        title: 'Activos',
+        items: [
+          { id: 'flota',        label: 'Flota',        route: 'flota' },
+          { id: 'conductores',  label: 'Conductores',  route: 'conductores' }
+        ]
+      },
+      {
+        title: 'Empresa',
+        items: [
+          { id: 'sedes',    label: 'Sedes',    route: 'sedes' },
+          { id: 'usuarios', label: 'Usuarios', route: 'usuarios' }
+        ]
+      }
+    ];
+
+    let html = '';
+    let firstVisibleSection = true;
+
+    sections.forEach((section) => {
+      if (section.soloSuperAdmin && !esSuperAdmin) return;
+
+      const visibleItems = section.items.filter(item => {
+        if (item.soloSuperAdmin && !esSuperAdmin) return false;
         return !window.App || window.App.canAccessItem(item.id);
       });
 
       if (visibleItems.length === 0) return;
 
-      if (i > 0) navHtml += '<div class="sidebar-divider"></div>';
-      navHtml += `<div class="sidebar-section"><div class="sidebar-section-title">${section.title}</div>`;
+      if (!firstVisibleSection) html += '<div class="sidebar-divider"></div>';
+      firstVisibleSection = false;
+
+      html += '<div class="sidebar-section">';
+
+      const labelExtra = section.soloSuperAdmin
+        ? ' <span style="font-size:9px;opacity:0.5;vertical-align:middle;">BETA</span>'
+        : '';
+      html += `<div class="sidebar-section-title">${section.title}${labelExtra}</div>`;
+
       visibleItems.forEach(item => {
         const badge = this.badges[item.id] || (item.badge && item.badge.count > 0 ? item.badge : null);
         const badgeHtml = badge ? `<span class="sidebar-item-badge ${badge.type}">${badge.count}</span>` : '';
-        navHtml += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}" onclick="if(window.innerWidth<=768)toggleSidebar()"><span>${item.label}</span>${badgeHtml}</a>`;
+
+        const proximamente = item.soloSuperAdmin
+          ? ' style="opacity:0.6;"'
+          : '';
+
+        html += `<a href="#${item.route}" class="sidebar-item" data-view="${item.id}"
+          onclick="if(window.innerWidth<=768)toggleSidebar()"
+          ${proximamente}>
+          <span>${item.label}</span>
+          ${item.soloSuperAdmin ? '<span style="font-size:10px;opacity:0.5;margin-left:auto;">pronto</span>' : ''}
+          ${badgeHtml}
+        </a>`;
       });
-      navHtml += '</div>';
+
+      html += '</div>';
     });
+
     const footerHtml = `<div class="sidebar-footer">
   <button class="sidebar-logout" onclick="CeroApp.cerrarSesion()">
     Cerrar sesión
   </button>
 </div>`;
-    container.innerHTML = `<div class="sidebar-nav">${navHtml}</div>${footerHtml}`;
+    container.innerHTML = `<div class="sidebar-nav">${html}</div>${footerHtml}`;
   },
-  
+
   setActive(viewId) {
     const container = document.getElementById('sidebar');
     if (!container) return;
     container.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+    if (viewId == null || viewId === '') return;
     const active = container.querySelector(`[data-view="${viewId}"]`);
     if (active) active.classList.add('active');
   },
-  
+
   updateBadge(itemId, count, type = 'danger') {
     this.badges[itemId] = { type, count };
   }
