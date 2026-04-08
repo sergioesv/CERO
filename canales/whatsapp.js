@@ -133,11 +133,14 @@ function responderError(res) {
 }
 
 function responderTwiml(res, mensaje) {
+  const xmlSalida = '<?xml version="1.0" encoding="UTF-8"?>' +
+                    '<Response><Message>' + escaparXml(mensaje) + '</Message></Response>';
+  
+  // Este log nos dirá si el bot realmente está intentando responder
+  console.log('📤 INTENTANDO ENVIAR A TWILIO:', xmlSalida);
+  
   res.set('Content-Type', 'text/xml');
-  res.send(
-    '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<Response><Message>' + escaparXml(mensaje) + '</Message></Response>'
-  );
+  res.send(xmlSalida);
 }
 
 function escaparXml(texto) {
