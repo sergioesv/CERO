@@ -20,14 +20,29 @@ const vehiculosData       = require('../data/vehiculos');
 // ============================================================================
 
 async function webhookWhatsApp(req, res) {
+  // 1. RESPUESTA INMEDIATA A TWILIO (Para evitar el Error 11200)
+  res.status(200).send('<Response></Response>');
+
   const telefono = req.body.From;
   const mensaje  = (req.body.Body || '').trim();
   const msgUpper = mensaje.toUpperCase();
 
-  try {
-    let sesion = await obtenerSesion(telefono);
+  // 2. LOG FORZADO PARA RAILWAY
+  console.log(`[WHATSAPP] 📨 Nuevo mensaje de ${telefono}: "${mensaje}"`);
 
-    // ── 9 / MENU / INICIO / CANCELAR → menú directo, sin mensaje intermedio ──
+  try {
+    // IMPORTANTE: Si obtenerSesion() falla por el archivo .json, 
+    // lo capturamos aquí para que el bot no muera.
+    let sesion;
+    try {
+        sesion = await obtenerSesion(telefono);
+    } catch (sesionError) {
+        console.error('⚠️ Error al leer sesión (Posible falta de .json):', sesionError.message);
+        // Creamos una sesión en memoria temporal para que no se rompa el código
+        sesion = { tipo: null }; 
+    }
+
+    // ── 9 / MENU / INICIO / CANCELAR → menú directo ──
     if (
       mensaje === '9'       ||
       msgUpper === 'MENU'   ||
@@ -36,26 +51,34 @@ async function webhookWhatsApp(req, res) {
     ) {
       await eliminarSesion(telefono);
       guardarCambios();
-      return responderMenu(res);
+      return responderMenu(res); // Ojo: Esta respuesta ya no le llegará a Twilio por el res.send de arriba.
     }
 
     // ── Enrutar según el tipo de flujo activo ─────────────────────────────────
-    if (sesion.tipo === 'inscripcion') {
+    if (sesion && sesion.tipo === 'inscripcion') {
       return await flujoInscripcion.manejarInscripcion(req, res);
     }
 
-    if (sesion.tipo === 'preoperacional') {
+    if (sesion && sesion.tipo === 'preoperacional') {
       return await flujoPreoperacional.manejarPreoperacional(req, res);
     }
 
-    if (sesion.tipo === 'posoperacional') {
+    if (sesion && sesion.tipo === 'posoperacional') {
       return await flujoPosoperacional.manejarPosoperacional(req, res);
     }
 
-    if (sesion.tipo === 'tanqueo') {
+    if (sesion && sesion.tipo === 'tanqueo') {
       return await flujoTanqueo.manejarTanqueo(req, res);
     }
 
+    // ── Sin tipo activo → verificar registro y mostrar menú ───────────────────
+    return await manejarMenuPrincipal(req, res, sesion, mensaje);
+
+  } catch (error) {
+    console.error('❌ Error general en webhook WhatsApp:', error);
+    // Ya respondimos a Twilio arriba, así que evitamos un error de cabeceras múltiples.
+  }
+}
     // ── Sin tipo activo → verificar registro y mostrar menú ───────────────────
     return await manejarMenuPrincipal(req, res, sesion, mensaje);
 
