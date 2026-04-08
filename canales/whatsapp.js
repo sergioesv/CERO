@@ -1,9 +1,5 @@
 // canales/whatsapp.js
 // Enrutador principal para el canal de WhatsApp.
-// Navegación numérica unificada:
-//   9 (o MENU / INICIO) → menú principal directo, sin mensaje intermedio
-//   0 (o ATRAS)         → delega al módulo activo para retroceder un paso
-//   CANCELAR            → alias de 9 (menú principal)
 
 'use strict';
 
@@ -20,25 +16,20 @@ const vehiculosData       = require('../data/vehiculos');
 // ============================================================================
 
 async function webhookWhatsApp(req, res) {
-  // 1. RESPUESTA INMEDIATA A TWILIO (Para evitar el Error 11200)
-  res.status(200).send('<Response></Response>');
-
   const telefono = req.body.From;
   const mensaje  = (req.body.Body || '').trim();
   const msgUpper = mensaje.toUpperCase();
 
-  // 2. LOG FORZADO PARA RAILWAY
+  // LOG FORZADO PARA RAILWAY
   console.log(`[WHATSAPP] 📨 Nuevo mensaje de ${telefono}: "${mensaje}"`);
 
   try {
-    // IMPORTANTE: Si obtenerSesion() falla por el archivo .json, 
-    // lo capturamos aquí para que el bot no muera.
+    // IMPORTANTE: Protegemos la lectura de la sesión
     let sesion;
     try {
         sesion = await obtenerSesion(telefono);
     } catch (sesionError) {
         console.error('⚠️ Error al leer sesión (Posible falta de .json):', sesionError.message);
-        // Creamos una sesión en memoria temporal para que no se rompa el código
         sesion = { tipo: null }; 
     }
 
@@ -51,7 +42,7 @@ async function webhookWhatsApp(req, res) {
     ) {
       await eliminarSesion(telefono);
       guardarCambios();
-      return responderMenu(res); // Ojo: Esta respuesta ya no le llegará a Twilio por el res.send de arriba.
+      return responderMenu(res);
     }
 
     // ── Enrutar según el tipo de flujo activo ─────────────────────────────────
@@ -71,14 +62,6 @@ async function webhookWhatsApp(req, res) {
       return await flujoTanqueo.manejarTanqueo(req, res);
     }
 
-    // ── Sin tipo activo → verificar registro y mostrar menú ───────────────────
-    return await manejarMenuPrincipal(req, res, sesion, mensaje);
-
-  } catch (error) {
-    console.error('❌ Error general en webhook WhatsApp:', error);
-    // Ya respondimos a Twilio arriba, así que evitamos un error de cabeceras múltiples.
-  }
-}
     // ── Sin tipo activo → verificar registro y mostrar menú ───────────────────
     return await manejarMenuPrincipal(req, res, sesion, mensaje);
 
