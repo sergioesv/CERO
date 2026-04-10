@@ -293,6 +293,7 @@ If a session file contradicts this document, the session file wins — it is mor
 ├── CERO_Sesion_Diseno_v15_23032026.txt
 ├── CERO_Sesion_Diseno_v16_27032026.txt
 ├── CERO_Sesion_Diseno_v17_27032026.txt
+├── eslint.config.cjs
 ├── index.js
 ├── package-lock.json
 ├── package.json
@@ -317,6 +318,8 @@ If a session file contradicts this document, the session file wins — it is mor
 
 | Package | Version |
 |---|---|
-_ninguna_
+| `@eslint/js` | ^10.0.1 |
+| `eslint` | ^10.2.0 |
+| `globals` | ^17.4.0 |
 
 <!-- AUTO-GENERATED END -->
