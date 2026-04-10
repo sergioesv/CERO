@@ -22,9 +22,9 @@ app.use(express.json());
 // RUTAS DE PÁGINAS
 // ═══════════════════════════════════════════════════════════
 
-// GET / → redirige a /login
+// GET / → sirve la landing page pública
 app.get('/', function (req, res) {
-  res.redirect('/login');
+  res.sendFile(__dirname + '/public/landing.html');
 });
 
 // GET /login → sirve la página de login
