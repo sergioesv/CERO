@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+
+<html class="dark scroll-smooth" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CERO | Cero papel. Cero accidentes.</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-surface": "#dee2f2",
+                      "outline-variant": "#3c4a43",
+                      "inverse-primary": "#006c4f",
+                      "surface-container": "#1b1f2b",
+                      "tertiary-fixed-dim": "#ddb7ff",
+                      "primary-fixed-dim": "#38dfab",
+                      "outline": "#85948c",
+                      "on-surface": "#dee2f2",
+                      "error": "#ffb4ab",
+                      "on-primary-fixed-variant": "#00513b",
+                      "on-tertiary-container": "#6e00bb",
+                      "on-error": "#690005",
+                      "on-secondary": "#002e6a",
+                      "on-tertiary": "#490080",
+                      "surface-container-low": "#171b27",
+                      "primary": "#50f0bb",
+                      "surface-container-high": "#252a36",
+                      "on-secondary-container": "#dae4ff",
+                      "surface-tint": "#38dfab",
+                      "surface-container-lowest": "#090e19",
+                      "surface-variant": "#303541",
+                      "surface-bright": "#343946",
+                      "on-surface-variant": "#bacac1",
+                      "tertiary": "#e8ccff",
+                      "on-tertiary-fixed-variant": "#6900b3",
+                      "on-background": "#dee2f2",
+                      "on-secondary-fixed-variant": "#004495",
+                      "background": "#0e131e",
+                      "on-tertiary-fixed": "#2c0051",
+                      "error-container": "#93000a",
+                      "on-error-container": "#ffdad6",
+                      "inverse-on-surface": "#2b303c",
+                      "tertiary-container": "#d5a8ff",
+                      "secondary": "#adc6ff",
+                      "tertiary-fixed": "#f0dbff",
+                      "on-secondary-fixed": "#001a42",
+                      "surface-container-highest": "#303541",
+                      "on-primary-fixed": "#002116",
+                      "surface-dim": "#0e131e",
+                      "surface": "#0e131e",
+                      "on-primary": "#003828",
+                      "secondary-fixed": "#d8e2ff",
+                      "primary-container": "#22d3a0",
+                      "secondary-fixed-dim": "#adc6ff",
+                      "on-primary-container": "#00563e",
+                      "secondary-fixed": "#d8e2ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              },
+              "animation": {
+                'float': 'float 6s ease-in-out infinite',
+                'pulse-slow': 'pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              },
+              "keyframes": {
+                float: {
+                  '0%, 100%': { transform: 'translateY(0) scale(1)' },
+                  '50%': { transform: 'translateY(-20px) scale(1.05)' },
+                }
+              }
+            },
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(80, 240, 187, 0.4);
+            box-shadow: 0 12px 40px -12px rgba(80, 240, 187, 0.2);
+        }
+        .text-glow {
+            text-shadow: 0 0 20px rgba(80, 240, 187, 0.3);
+        }
+        .primary-gradient-btn {
+            background: linear-gradient(135deg, #50f0bb 0%, #22d3a0 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .primary-gradient-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(80, 240, 187, 0.4);
+        }
+        
+        /* Scroll Animation Classes */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
+        .reveal-delay-4 { transition-delay: 0.4s; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary selection:text-on-primary overflow-x-hidden">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-gradient-to-b from-[#0e131e] to-transparent backdrop-blur-sm">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-screen-2xl mx-auto">
+<div class="text-2xl font-black tracking-tighter text-[#50f0bb]">
+            CER<span class="text-white">O</span>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="font-['Inter'] tracking-widest text-xs uppercase text-[#50f0bb] font-bold border-b-2 border-[#50f0bb] pb-1" href="#">Platform</a>
+<a class="font-['Inter'] tracking-widest text-xs uppercase text-[#dee2f2] opacity-80 hover:opacity-100 transition-opacity" href="#">Fleet Management</a>
+<a class="font-['Inter'] tracking-widest text-xs uppercase text-[#dee2f2] opacity-80 hover:opacity-100 transition-opacity" href="#">Sustainability</a>
+<a class="font-['Inter'] tracking-widest text-xs uppercase text-[#dee2f2] opacity-80 hover:opacity-100 transition-opacity" href="#">Pricing</a>
+</div>
+<div>
+<a href="/login" class="px-6 py-2 rounded-full border border-outline/20 text-[#50f0bb] hover:bg-primary/10 transition-all duration-300 active:scale-95 text-sm font-medium">Iniciar sesión</a>
+</div>
+</div>
+</nav>
+<!-- Hero Section -->
+<section class="relative pt-32 pb-20 px-8 overflow-hidden">
+<!-- Atmospheric Depth Background -->
+<div class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-30 animate-pulse-slow"></div>
+<div class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-secondary-container/10 rounded-full blur-[120px] -z-10 opacity-20 animate-float"></div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-tertiary-container/5 rounded-full blur-[150px] -z-10 opacity-10 animate-pulse-slow"></div>
+<div class="max-w-screen-2xl mx-auto flex flex-col lg:flex-row items-center gap-16">
+<div class="flex-1 text-left reveal active">
+<h1 class="text-5xl lg:text-7xl font-extrabold tracking-tighter mb-6 leading-tight">
+                Cero papel. <br/>
+<span class="text-primary text-glow">Cero accidentes.</span>
+</h1>
+<p class="text-xl text-on-surface-variant max-w-xl mb-10 leading-relaxed">
+                Digitalice su operación de campo en segundos. Inspecciones preoperacionales y control de flota vía WhatsApp, sin instalar aplicaciones.
+            </p>
+<div class="flex flex-wrap gap-4">
+<a href="/login" class="primary-gradient-btn text-on-primary font-bold px-8 py-4 rounded-full active:scale-95 flex items-center gap-2">
+                    Acceder al panel
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</a>
+<button class="px-8 py-4 rounded-full border border-outline/20 text-on-surface hover:bg-white/5 transition-all active:scale-95 font-medium hover:scale-105">
+                    Solicitar demo
+                </button>
+</div>
+</div>
+<div class="flex-1 relative reveal active reveal-delay-2">
+<div class="relative z-10 glass-card rounded-[40px] p-4 max-w-sm mx-auto shadow-2xl hover:scale-105">
+<style>
+.phone-shell {
+  position: relative;
+  width: 260px;
+  height: 540px;
+  background: linear-gradient(160deg, #2a2a2e 0%, #1a1a1e 40%, #111114 100%);
+  border-radius: 44px;
+  padding: 3px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.08),
+    inset 0 0 0 1px rgba(255,255,255,0.04),
+    4px 4px 12px rgba(0,0,0,0.6),
+    -2px -2px 8px rgba(255,255,255,0.04),
+    0 30px 80px rgba(0,0,0,0.5);
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .phone-shell { width: 210px; height: 440px; border-radius: 36px; }
+  .phone-shell .phone-inner { border-radius: 34px; }
+}
+.phone-shell::before {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px; right: 3px; bottom: 3px;
+  border-radius: 42px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 10;
+}
+.phone-side-btn {
+  position: absolute;
+  background: linear-gradient(180deg, #2a2a2e, #1a1a1e);
+  border-radius: 2px;
+  box-shadow: -1px 0 2px rgba(0,0,0,0.4);
+}
+.phone-inner {
+  width: 100%;
+  height: 100%;
+  background: #111b21;
+  border-radius: 41px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.phone-statusbar {
+  background: #1f2c34;
+  padding: 10px 18px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.phone-notch {
+  width: 80px;
+  height: 20px;
+  background: #111b21;
+  border-radius: 0 0 14px 14px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.notch-cam { width: 8px; height: 8px; border-radius: 50%; background: #1a1a1e; border: 1px solid #333; }
+.notch-speaker { width: 32px; height: 4px; border-radius: 2px; background: #1a1a1e; }
+.phone-chat-header {
+  background: #1f2c34;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.phone-chat-body {
+  flex: 1;
+  overflow: hidden;
+  background: #0b141a;
+  padding: 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+.msg-date { font-size: 9px; color: #8696a0; background: rgba(17,27,33,0.7); padding: 2px 8px; border-radius: 6px; align-self: center; }
+.msg-in { background: #005c4b; border-radius: 8px 8px 8px 2px; padding: 6px 8px; max-width: 88%; align-self: flex-start; }
+.msg-out { background: #202c33; border-radius: 8px 8px 2px 8px; padding: 6px 8px; max-width: 82%; align-self: flex-end; }
+.msg-text { color: #e9edef; font-size: 10px; line-height: 1.4; }
+.msg-time { color: #8696a0; font-size: 8px; text-align: right; margin-top: 2px; }
+.msg-complete { background: #005c4b; border-radius: 8px 8px 8px 2px; padding: 6px 8px; max-width: 88%; align-self: flex-start; border-left: 2px solid #50f0bb; }
+</style>
+
+<div class="phone-shell">
+  <div class="phone-side-btn" style="width:3px;height:32px;top:100px;right:-4px;"></div>
+  <div class="phone-side-btn" style="width:3px;height:22px;top:90px;left:-4px;"></div>
+  <div class="phone-side-btn" style="width:3px;height:22px;top:120px;left:-4px;"></div>
+  <div class="phone-inner">
+    <div style="position:relative;flex-shrink:0;">
+      <div class="phone-statusbar" style="padding-top:18px;">
+        <span style="color:#e9edef;font-size:9px;font-weight:600;">9:41</span>
+        <div class="phone-notch"></div>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <svg width="12" height="9" viewBox="0 0 12 9" fill="#e9edef"><rect x="0" y="3" width="2" height="6" rx="0.5"/><rect x="3" y="2" width="2" height="7" rx="0.5"/><rect x="6" y="1" width="2" height="8" rx="0.5"/><rect x="9" y="0" width="2" height="9" rx="0.5"/></svg>
+          <svg width="10" height="9" viewBox="0 0 10 9" fill="none" stroke="#e9edef" stroke-width="1"><rect x="0.5" y="2.5" width="7" height="6" rx="1"/><path d="M8 4.5C8.8 4.5 10 5.2 10 6.5"/></svg>
+          <svg width="16" height="9" viewBox="0 0 16 9" fill="none"><rect x="0.5" y="0.5" width="13" height="8" rx="2" stroke="#e9edef" stroke-opacity="0.4"/><rect x="14" y="2.5" width="1.5" height="4" rx="0.5" fill="#e9edef" fill-opacity="0.4"/><rect x="1.5" y="1.5" width="9" height="6" rx="1" fill="#50f0bb"/></svg>
+        </div>
+      </div>
+      <div class="phone-chat-header">
+        <div style="width:28px;height:28px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">C</div>
+        <div style="flex:1;">
+          <p style="color:#e9edef;font-size:11px;font-weight:600;line-height:1;">CERO Bot v2.1</p>
+          <p style="color:#8696a0;font-size:9px;margin-top:1px;">en línea</p>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      </div>
+    </div>
+    <div class="phone-chat-body">
+      <div class="msg-date">Hoy · 07:58</div>
+      <div class="msg-in">
+        <p class="msg-text">Hola Edison 👋 Turno iniciado. ¿Confirma inspección del vehículo <strong>ABC-123</strong>?</p>
+        <p class="msg-time">07:58 ✓✓</p>
+      </div>
+      <div class="msg-out">
+        <p class="msg-text">✅ Sí, confirmo</p>
+        <p class="msg-time">07:59</p>
+      </div>
+      <div class="msg-in">
+        <p class="msg-text">📸 Envíe foto del <strong>odómetro</strong> para continuar</p>
+        <p class="msg-time">07:59 ✓✓</p>
+      </div>
+      <div class="msg-out">
+        <div style="background:#2a3942;border-radius:6px;padding:8px;display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="font-size:16px;">📷</span>
+          <div><p style="color:#e9edef;font-size:9px;font-weight:500;">odometro.jpg</p><p style="color:#8696a0;font-size:8px;">128 KB</p></div>
+        </div>
+        <p class="msg-time">08:01</p>
+      </div>
+      <div class="msg-complete">
+        <p style="color:#50f0bb;font-size:10px;font-weight:700;">✅ Inspección completada</p>
+        <p style="color:#8696a0;font-size:9px;margin-top:1px;">PDF generado · Panel actualizado</p>
+        <p class="msg-time">08:02 ✓✓</p>
+      </div>
+    </div>
+    <div style="background:#1f2c34;padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;">
+      <div style="flex:1;background:#2a3942;border-radius:20px;padding:6px 12px;">
+        <p style="color:#8696a0;font-size:10px;">Mensaje</p>
+      </div>
+      <div style="width:28px;height:28px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- WhatsApp Overlay Simulation -->
+<div class="absolute inset-x-8 bottom-12 bg-surface-container-high/90 backdrop-blur rounded-2xl p-4 border border-white/10 animate-bounce transition-all duration-1000">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm">chat</span>
+</div>
+<span class="text-xs font-bold text-on-surface">CERO Bot v2.1</span>
+</div>
+<p class="text-[10px] text-on-surface-variant">¿Desea iniciar la inspección del vehículo ABC-123?</p>
+</div>
+</div>
+<!-- Decorative Glow Behind Phone -->
+<div class="absolute inset-0 bg-primary/20 blur-[100px] rounded-full -z-10 scale-75 animate-pulse"></div>
+</div>
+</div>
+</section>
+<!-- Stats Bar -->
+<section class="bg-surface-container-low py-12 relative overflow-hidden">
+<div class="max-w-screen-xl mx-auto px-8">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+<div class="flex flex-col items-center text-center reveal">
+<span class="text-3xl font-black text-primary mb-1 counter" data-target="100">0</span><span class="text-3xl font-black text-primary mb-1 mt-[-2.5rem] ml-12">%</span>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">vía WhatsApp</span>
+</div>
+<div class="flex flex-col items-center text-center border-l border-white/5 reveal reveal-delay-1">
+<div class="flex items-baseline">
+<span class="text-3xl font-black text-primary mb-1">&lt; </span>
+<span class="text-3xl font-black text-primary mb-1 counter" data-target="2">0</span>
+<span class="text-3xl font-black text-primary mb-1 ml-2">min</span>
+</div>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">por inspección</span>
+</div>
+<div class="flex flex-col items-center text-center border-l border-white/5 reveal reveal-delay-2">
+<span class="text-3xl font-black text-primary mb-1 counter" data-target="0">0</span>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">apps por instalar</span>
+</div>
+<div class="flex flex-col items-center text-center border-l border-white/5 reveal reveal-delay-3">
+<span class="text-3xl font-black text-primary mb-1">PESV</span>
+<span class="text-xs font-label uppercase tracking-widest text-on-surface-variant">listo para auditoría</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Grid -->
+<section class="py-24 px-8 bg-surface">
+<div class="max-w-screen-2xl mx-auto">
+<div class="mb-16 reveal">
+<span class="label-md uppercase tracking-[0.2em] text-primary font-bold mb-4 block">Capacidades del Sistema</span>
+<h2 class="text-4xl font-bold tracking-tight">Control total de su flota <br/>en la palma de su mano.</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Feature 1 -->
+<div class="glass-card p-8 rounded-[14px] group reveal">
+<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 text-primary group-hover:bg-primary group-hover:text-on-primary transition-all duration-300">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Inspección preoperacional</h3>
+<p class="text-on-surface-variant leading-relaxed">Checklists dinámicos adaptados a cada tipo de vehículo. Cumplimiento inmediato antes de iniciar ruta.</p>
+</div>
+<!-- Feature 2 -->
+<div class="glass-card p-8 rounded-[14px] group reveal reveal-delay-1">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/20 flex items-center justify-center mb-6 text-secondary group-hover:bg-secondary group-hover:text-on-secondary transition-all duration-300">
+<span class="material-symbols-outlined">history_edu</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Cierre posoperacional</h3>
+<p class="text-on-surface-variant leading-relaxed">Registro de novedades al finalizar la jornada. Trazabilidad completa del estado de entrega del activo.</p>
+</div>
+<!-- Feature 3 -->
+<div class="glass-card p-8 rounded-[14px] group reveal reveal-delay-2">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container/20 flex items-center justify-center mb-6 text-tertiary group-hover:bg-tertiary group-hover:text-on-tertiary transition-all duration-300">
+<span class="material-symbols-outlined">local_gas_station</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Control de tanqueo</h3>
+<p class="text-on-surface-variant leading-relaxed">Monitoreo de consumo de combustible y kilometraje. Evite fraudes y optimice costos operativos.</p>
+</div>
+<!-- Feature 4 -->
+<div class="glass-card p-8 rounded-[14px] group reveal">
+<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6 text-primary group-hover:bg-primary group-hover:text-on-primary transition-all duration-300">
+<span class="material-symbols-outlined">notification_important</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Alertas de documentos</h3>
+<p class="text-on-surface-variant leading-relaxed">Recordatorios automáticos de SOAT, Tecnomecánica y licencias por vencerse. Cero multas.</p>
+</div>
+<!-- Feature 5 -->
+<div class="glass-card p-8 rounded-[14px] group reveal reveal-delay-1">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/20 flex items-center justify-center mb-6 text-secondary group-hover:bg-secondary group-hover:text-on-secondary transition-all duration-300">
+<span class="material-symbols-outlined">dashboard_customize</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Panel de administración</h3>
+<p class="text-on-surface-variant leading-relaxed">Visualización de datos en tiempo real. Reportes ejecutivos y KPIs de rendimiento de flota.</p>
+</div>
+<!-- Feature 6 -->
+<div class="glass-card p-8 rounded-[14px] group reveal reveal-delay-2">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container/20 flex items-center justify-center mb-6 text-tertiary group-hover:bg-tertiary group-hover:text-on-tertiary transition-all duration-300">
+<span class="material-symbols-outlined">verified_user</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-on-surface">Sistema de autorizaciones</h3>
+<p class="text-on-surface-variant leading-relaxed">Flujos de aprobación digital para mantenimientos y salidas de vehículos. Control jerárquico.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Compliance Banner -->
+<section class="w-full bg-[#0d221c] py-20 relative overflow-hidden border-y border-primary/10 reveal">
+<div class="max-w-screen-xl mx-auto px-8 flex flex-col items-center text-center relative z-10">
+<span class="material-symbols-outlined text-primary text-5xl mb-6 hover:scale-125 transition-transform duration-500" data-weight="fill">gavel</span>
+<h2 class="text-3xl md:text-4xl font-bold mb-4 text-white">Cumplimiento Normativo: PESV</h2>
+<p class="text-xl text-[#8ec8b6] max-w-2xl mb-8">
+            Alineado con los estándares del Ministerio de Transporte y la <span class="text-white font-bold underline">Resolución 40595 de 2022</span>. Automatice su Plan Estratégico de Seguridad Vial.
+        </p>
+<div class="flex items-center gap-2 text-primary font-bold text-sm tracking-widest uppercase">
+<span class="material-symbols-outlined text-lg animate-pulse">check_circle</span>
+            Auditoría Simplificada
+        </div>
+</div>
+<!-- Decorative subtle grid -->
+<div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#50f0bb 1px, transparent 1px); background-size: 40px 40px;"></div>
+</section>
+<!-- CTA Section -->
+<section class="py-32 px-8">
+<div class="max-w-4xl mx-auto relative group reveal">
+<div class="absolute -inset-1 bg-gradient-to-r from-primary via-secondary to-tertiary rounded-[24px] blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+<div class="relative glass-card rounded-[24px] p-12 lg:p-20 text-center">
+<h2 class="text-4xl lg:text-5xl font-extrabold tracking-tight mb-8">¿Listo para transformar su flota?</h2>
+<p class="text-on-surface-variant text-lg mb-12 max-w-xl mx-auto">
+                Sin apps, sin capacitaciones largas. Sus conductores ya saben usar WhatsApp.
+            </p>
+<div class="flex flex-col sm:flex-row justify-center gap-6">
+<a href="/login" class="primary-gradient-btn text-on-primary font-bold px-10 py-5 rounded-full shadow-xl text-center">
+                    Comenzar ahora
+                </a>
+<button class="px-10 py-5 rounded-full border border-outline/20 text-on-surface hover:bg-white/5 transition-all font-medium hover:scale-105 active:scale-95">
+                    Hablar con un experto
+                </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="w-full border-t border-white/10 bg-surface">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-12 py-16 max-w-screen-2xl mx-auto">
+<div class="mb-8 md:mb-0">
+<div class="text-xl font-bold text-[#dee2f2]">
+                CER<span class="text-primary">O</span>
+            </div>
+<p class="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mt-2">Colombia · 2026</p>
+</div>
+<div class="text-sm font-['Inter'] leading-relaxed text-on-surface-variant text-center">
+            Diseñado por Sergio Estrada Vélez
+            <div class="mt-2 flex justify-center gap-6">
+<a class="hover:text-white transition-colors" href="#">About Us</a>
+<a class="hover:text-white transition-colors" href="#">Security</a>
+<a class="hover:text-white transition-colors" href="#">API Docs</a>
+<a class="hover:text-white transition-colors" href="#">Privacy Policy</a>
+</div>
+</div>
+<div class="mt-8 md:mt-0 text-sm text-[#bacac1]">
+            © 2026 CERO. Todos los derechos reservados.
+        </div>
+</div>
+</footer>
+<script>
+    // Reveal animations on scroll
+    function reveal() {
+        var reveals = document.querySelectorAll(".reveal");
+        for (var i = 0; i < reveals.length; i++) {
+            var windowHeight = window.innerHeight;
+            var elementTop = reveals[i].getBoundingClientRect().top;
+            var elementVisible = 150;
+            if (elementTop < windowHeight - elementVisible) {
+                reveals[i].classList.add("active");
+                
+                // Trigger counter if the element contains one
+                const counters = reveals[i].querySelectorAll('.counter');
+                counters.forEach(counter => {
+                    if (!counter.dataset.counted) {
+                        animateCounter(counter);
+                        counter.dataset.counted = true;
+                    }
+                });
+            }
+        }
+    }
+
+    // Number counter animation
+    function animateCounter(counter) {
+        const target = +counter.getAttribute('data-target');
+        const count = +counter.innerText;
+        const speed = target > 50 ? 200 : 500; // faster for larger numbers
+        const increment = target / speed;
+
+        if (count < target) {
+            counter.innerText = Math.ceil(count + increment);
+            setTimeout(() => animateCounter(counter), 1);
+        } else {
+            counter.innerText = target;
+        }
+    }
+
+    window.addEventListener("scroll", reveal);
+    
+    // Initial check on load
+    window.addEventListener("load", () => {
+        reveal();
+    });
+
+    // Smooth scroll polyfill (though added class scroll-smooth to html)
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelector(this.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+</body></html>
