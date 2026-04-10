@@ -1,0 +1,27 @@
+name: Backend
+
+on:
+  push:
+    branches: [desarrollo]
+  pull_request:
+    branches: [desarrollo]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: npm audit
+        run: npm audit --audit-level=high
