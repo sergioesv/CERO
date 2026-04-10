@@ -1,0 +1,40 @@
+name: Actualizar ARCHITECTURE.md
+
+on:
+  push:
+    branches: [desarrollo]
+    paths-ignore:
+      - 'ARCHITECTURE.md'     # evita loop infinito
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: Regenerar secciones automáticas
+        run: node scripts/update-architecture.js
+
+      - name: Commit si hay cambios
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet ARCHITECTURE.md || (
+            git add ARCHITECTURE.md &&
+            git commit -m "docs: actualiza estructura automática [skip ci]" &&
+            git push
+          )
