@@ -109,6 +109,11 @@ app.get('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
 // POST /api/vehiculos — crea un vehículo
 app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'crear'), async function (req, res) {
   try {
+    // Validar campos obligatorios
+    if (!req.body.placa) {
+      return res.status(400).json({ ok: false, error: 'El campo placa es obligatorio' });
+    }
+
     const vehiculo = {
       placa: req.body.placa.toUpperCase(),
       tipo: req.body.tipo || null,
@@ -327,6 +332,11 @@ app.get('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
 // POST /api/conductores — crea un conductor
 app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 'crear'), async function (req, res) {
   try {
+    // Validar campos obligatorios
+    if (!req.body.nombre || !req.body.cedula) {
+      return res.status(400).json({ ok: false, error: 'Los campos nombre y cedula son obligatorios' });
+    }
+
     const conductor = {
       nombre: req.body.nombre,
       cedula: req.body.cedula,
