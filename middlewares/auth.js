@@ -28,17 +28,11 @@ const verificarPermiso = (modulo, accion) => {
     try {
       if (req.usuario.roles?.includes('superadmin_plataforma')) return next();
 
-      console.log('verificarPermiso - usuario:', req.usuario?.id, 'roles:', req.usuario?.roles);
-      console.log('verificarPermiso - modulo:', modulo, 'accion:', accion);
-
       const { data, error } = await supabase
         .from('usuarios_roles')
         .select('roles(nombre)')
         .eq('usuario_id', req.usuario?.id)
         .eq('activo', true);
-
-      console.log('verificarPermiso - data:', JSON.stringify(data));
-      console.log('verificarPermiso - error:', error);
 
       if (error) {
         throw error;
