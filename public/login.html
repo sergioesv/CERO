@@ -10,144 +10,422 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CERO — Iniciar sesión</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg:           #0e131e;
+      --surface:      #141922;
+      --border:       rgba(255,255,255,0.07);
+      --border-focus: #50f0bb;
+      --primary:      #50f0bb;
+      --primary-dim:  #38dfab;
+      --text:         #dee2f2;
+      --text-muted:   #6b7a8d;
+      --text-label:   #8a9ab0;
+      --error-bg:     rgba(255,75,75,0.08);
+      --error-border: rgba(255,75,75,0.4);
+      --error-text:   #ff8a80;
+    }
+
+    html, body { height: 100%; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #1e1e1e;
-      color: #e4e4e4;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    /* ── Panel izquierdo — marca ── */
+    .brand-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px;
+      overflow: hidden;
+      background: #090e17;
+      border-right: 1px solid var(--border);
+    }
+
+    .brand-panel::before {
+      content: '';
+      position: absolute;
+      top: -120px; left: -120px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(80,240,187,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .brand-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; right: -80px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(80,240,187,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .brand-logo {
+      position: relative;
+      z-index: 1;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .brand-logo span { color: var(--primary); }
+
+    .brand-center {
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-tagline {
+      font-size: 42px;
+      font-weight: 300;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 24px;
+    }
+
+    .brand-tagline strong {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .brand-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 320px;
+    }
+
+    .brand-stats {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: 32px;
+    }
+
+    .stat { display: flex; flex-direction: column; gap: 4px; }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: -0.02em;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-divider {
+      width: 1px;
+      background: var(--border);
+      align-self: stretch;
+    }
+
+    /* ── Panel derecho — formulario ── */
+    .form-panel {
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 48px 40px;
     }
 
-    .login-card {
-      background: #252526;
-      border: 1px solid #3c3c3c;
-      border-radius: 8px;
-      padding: 40px 36px;
+    .login-box {
       width: 100%;
-      max-width: 360px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      max-width: 340px;
     }
 
-    .login-logo {
+    .login-header { margin-bottom: 36px; }
+
+    .login-title {
       font-size: 22px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      color: #e4e4e4;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.01em;
       margin-bottom: 6px;
     }
 
-    .login-subtitle {
-      font-size: 12px;
-      color: #a0a0a0;
-      margin-bottom: 32px;
+    .login-sub {
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .field {
-      margin-bottom: 16px;
-    }
+    /* ── Campos ── */
+    .field { margin-bottom: 18px; }
 
     label {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
-      color: #a0a0a0;
-      margin-bottom: 6px;
+      color: var(--text-label);
+      margin-bottom: 7px;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.08em;
     }
+
+    .input-wrap { position: relative; }
 
     input {
       width: 100%;
-      padding: 9px 12px;
-      background: #2d2d30;
-      border: 1px solid #3c3c3c;
-      border-radius: 6px;
-      color: #e4e4e4;
+      padding: 11px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
       font-size: 14px;
       font-family: inherit;
       outline: none;
-      transition: border-color 150ms ease;
+      transition: border-color 200ms ease, box-shadow 200ms ease;
+      -webkit-appearance: none;
     }
 
     input:focus {
-      border-color: #4fc3f7;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(80,240,187,0.08);
     }
 
-    input::placeholder {
-      color: #6e6e6e;
+    input::placeholder { color: var(--text-muted); }
+
+    .toggle-pass {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      transition: color 150ms ease;
+      line-height: 0;
     }
 
+    .toggle-pass:hover { color: var(--text); }
+    .toggle-pass svg { width: 16px; height: 16px; }
+
+    input[type="password"],
+    input[type="text"].pass-field { padding-right: 42px; }
+
+    /* ── Botón ── */
     .btn-login {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       margin-top: 8px;
-      background: #1a3a5c;
-      border: 1px solid #4285f4;
-      border-radius: 6px;
-      color: #8ab4f8;
+      background: var(--primary);
+      border: none;
+      border-radius: 8px;
+      color: #003828;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: background 150ms ease;
+      transition: background 150ms ease, transform 100ms ease, box-shadow 200ms ease;
+      letter-spacing: 0.01em;
     }
 
     .btn-login:hover {
-      background: #1e4a78;
+      background: var(--primary-dim);
+      box-shadow: 0 0 20px rgba(80,240,187,0.2);
     }
+
+    .btn-login:active { transform: scale(0.99); }
 
     .btn-login:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
 
+    /* ── Error ── */
     .error-msg {
       display: none;
       margin-top: 14px;
-      padding: 9px 12px;
-      background: #3d1f1f;
-      border: 1px solid #ea4335;
-      border-radius: 6px;
-      color: #f28b82;
+      padding: 10px 14px;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      border-radius: 8px;
+      color: var(--error-text);
       font-size: 13px;
     }
 
-    .error-msg.visible {
-      display: block;
+    .error-msg.visible { display: block; }
+
+    /* ── Footer ── */
+    .login-footer {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .login-footer a {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 150ms ease;
+    }
+
+    .login-footer a:hover { color: var(--primary); }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; }
+      .brand-panel { display: none; }
+      .form-panel {
+        padding: 32px 24px;
+        align-items: flex-start;
+        padding-top: 64px;
+        position: relative;
+      }
+      .login-box { max-width: 100%; }
+      .mobile-logo {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.25em;
+        color: var(--text);
+      }
+      .mobile-logo span { color: var(--primary); }
+    }
+
+    @media (min-width: 769px) {
+      .mobile-logo { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="login-card">
-    <div class="login-logo">CERO</div>
-    <div class="login-subtitle">Panel de Administración</div>
 
-    <form id="form-login" novalidate>
-      <div class="field">
-        <label for="email">Correo electrónico</label>
-        <input type="email" id="email" name="email" placeholder="usuario@cero.com" autocomplete="email" required>
+  <!-- Panel izquierdo — marca -->
+  <div class="brand-panel">
+    <div class="brand-logo">CER<span>O</span></div>
+
+    <div class="brand-center">
+      <div class="brand-tagline">
+        Cero papel.<br>
+        <strong>Cero accidentes.</strong>
       </div>
-      <div class="field">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+      <p class="brand-desc">
+        Inspecciones preoperacionales, control de flota y alertas de documentos — todo vía WhatsApp, sin instalar nada.
+      </p>
+    </div>
+
+    <div class="brand-stats">
+      <div class="stat">
+        <span class="stat-value">&lt; 2 min</span>
+        <span class="stat-label">Por inspección</span>
       </div>
-      <button type="submit" class="btn-login" id="btn-submit">Iniciar sesión</button>
-      <div class="error-msg" id="error-msg">Credenciales inválidas</div>
-    </form>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value">100%</span>
+        <span class="stat-label">Vía WhatsApp</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value">PESV</span>
+        <span class="stat-label">Cumplimiento</span>
+      </div>
+    </div>
   </div>
 
-  <script>
-    // Si ya hay token activo, ir directo al panel
-    if (sessionStorage.getItem('cero_token')) {
-      window.location.replace('/panel#dashboard');
-    }
+  <!-- Panel derecho — formulario -->
+  <div class="form-panel">
+    <div class="mobile-logo">CER<span>O</span></div>
 
-    var form = document.getElementById('form-login');
-    var btn = document.getElementById('btn-submit');
+    <div class="login-box">
+      <div class="login-header">
+        <div class="login-title">Iniciar sesión</div>
+        <div class="login-sub">Panel de administración CERO</div>
+      </div>
+
+      <form id="form-login" novalidate>
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="usuario@empresa.com"
+            autocomplete="email"
+            required
+          >
+        </div>
+
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <div class="input-wrap">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="pass-field"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              required
+            >
+            <button type="button" class="toggle-pass" id="toggle-pass" aria-label="Mostrar contraseña">
+              <svg id="icon-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+              <svg id="icon-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-login" id="btn-submit">Iniciar sesión</button>
+        <div class="error-msg" id="error-msg">Correo o contraseña incorrectos</div>
+      </form>
+
+      <div class="login-footer">
+        <a href="/">← Volver al inicio</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transiciones entre páginas -->
+  <script src="/js/transitions.js"></script>
+
+  <script>
+    // Toggle mostrar/ocultar contraseña
+    var toggleBtn = document.getElementById('toggle-pass');
+    var passInput = document.getElementById('password');
+    var iconHide  = document.getElementById('icon-hide');
+    var iconShow  = document.getElementById('icon-show');
+
+    toggleBtn.addEventListener('click', function () {
+      var visible = passInput.type === 'text';
+      passInput.type         = visible ? 'password' : 'text';
+      iconHide.style.display = visible ? '' : 'none';
+      iconShow.style.display = visible ? 'none' : '';
+      toggleBtn.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+    });
+
+    // Login
+    var form     = document.getElementById('form-login');
+    var btn      = document.getElementById('btn-submit');
     var errorMsg = document.getElementById('error-msg');
 
     form.addEventListener('submit', async function (e) {
@@ -156,21 +434,21 @@
       btn.disabled = true;
       btn.textContent = 'Ingresando…';
 
-      var email = document.getElementById('email').value.trim();
+      var email    = document.getElementById('email').value.trim();
       var password = document.getElementById('password').value;
 
       try {
-        var res = await fetch('/auth/login', {
+        var res  = await fetch('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email, password: password })
         });
-
         var data = await res.json();
 
         if (res.ok && data.token) {
           sessionStorage.setItem('cero_token', data.token);
-          window.location.replace('/panel#dashboard');
+          // Transición animada hacia el panel
+          CeroTransitions.ir('/panel#dashboard');
         } else {
           errorMsg.classList.add('visible');
           btn.disabled = false;
