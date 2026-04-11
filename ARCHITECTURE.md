@@ -309,6 +309,7 @@ If a session file contradicts this document, the session file wins — it is mor
 | `axios` | ^1.7.9 |
 | `bcryptjs` | ^3.0.3 |
 | `express` | ^4.21.2 |
+| `helmet` | ^8.1.0 |
 | `jsonwebtoken` | ^9.0.3 |
 | `node-cron` | ^3.0.3 |
 | `pdfkit` | ^0.15.1 |
