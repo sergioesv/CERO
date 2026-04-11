@@ -41,15 +41,6 @@ app.get('/panel', function (req, res) {
 
 app.use(express.static('public'));
 
-// Middleware global de errores
-app.use((err, req, res, next) => {
-  console.error('❌ Error:', err);
-  res.status(500).json({
-    error: 'Error interno',
-    timestamp: new Date().toISOString()
-  });
-});
-
 // ═══════════════════════════════════════════════════════════
 // RUTAS DE AUTENTICACIÓN
 // ═══════════════════════════════════════════════════════════
@@ -94,7 +85,7 @@ app.get('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'), 
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error listando vehículos:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -111,7 +102,7 @@ app.get('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error obteniendo vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -141,7 +132,7 @@ app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'),
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error creando vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -190,7 +181,7 @@ app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error actualizando vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -218,7 +209,7 @@ app.post('/api/vehiculos/:placa/bloquear', verificarToken, verificarPermiso('veh
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error bloqueando vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -246,7 +237,7 @@ app.post('/api/vehiculos/:placa/desbloquear', verificarToken, verificarPermiso('
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error desbloqueando vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -292,7 +283,7 @@ app.delete('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos'
     res.json({ ok: true, message: 'Vehículo eliminado' });
   } catch (error) {
     console.error('Error eliminando vehículo:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -312,7 +303,7 @@ app.get('/api/conductores', verificarToken, verificarPermiso('conductores', 'ver
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error listando conductores:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -329,7 +320,7 @@ app.get('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error obteniendo conductor:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -357,7 +348,7 @@ app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 've
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error creando conductor:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -385,7 +376,7 @@ app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error actualizando conductor:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -433,7 +424,7 @@ app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperaciona
     var resultado = await query;
 
     if (resultado.error) {
-      return res.status(500).json({ error: resultado.error.message });
+      return res.status(500).json({ ok: false, error: 'Error interno del servidor' });
     }
 
     // Post-procesamiento: clasificar estado por novedades
@@ -610,7 +601,7 @@ app.get('/api/alertas/resumen', verificarToken, verificarPermiso('alertas', 'ver
     });
   } catch (error) {
     console.error('Error obteniendo resumen de alertas:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -656,7 +647,7 @@ app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 
     });
   } catch (error) {
     console.error('Error obteniendo resumen dashboard:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -672,7 +663,7 @@ app.get('/api/alertas/documentos', verificarToken, verificarPermiso('alertas', '
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/alertas/documentos:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -683,7 +674,7 @@ app.get('/api/autorizaciones/pendientes', verificarToken, verificarPermiso('auto
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/autorizaciones/pendientes:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -694,7 +685,7 @@ app.get('/api/autorizaciones/resueltas', verificarToken, verificarPermiso('autor
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/autorizaciones/resueltas:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -723,7 +714,7 @@ app.put('/api/autorizaciones/:id/decidir', verificarToken, verificarPermiso('aut
     res.json({ ok: true, mensaje: 'Decisión registrada' });
   } catch (error) {
     console.error('Error en PUT /api/autorizaciones/:id/decidir:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -734,8 +725,21 @@ app.get('/api/vehiculos/:placa/historial', verificarToken, verificarPermiso('veh
     res.json({ ok: true, vehiculo: resultado.vehiculo, historial: resultado.historial });
   } catch (error) {
     console.error('Error en /api/vehiculos/:placa/historial:', error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
+});
+
+// ═══════════════════════════════════════════════════════════
+// MIDDLEWARE GLOBAL DE ERRORES — debe ir al final del stack
+// ═══════════════════════════════════════════════════════════
+app.use(function (err, req, res, next) {
+  // Registrar error completo solo en servidor, nunca exponer al cliente
+  console.error('❌ Error no controlado:', err);
+  res.status(500).json({
+    ok: false,
+    error: 'Error interno del servidor',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // ═══════════════════════════════════════════════════════════
