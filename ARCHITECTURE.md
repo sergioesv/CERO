@@ -80,72 +80,7 @@ Three workflows run in parallel on every push to `desarrollo`:
 
 ## Folder structure
 
-```
-/
-├── index.js                              # Express entry — helmet, routes, cron
-├── canales/
-│   ├── whatsapp.js                       # Twilio webhook handler
-│   └── dashboard.js                      # Dashboard channel
-├── config/
-│   └── config.js                         # Centralized config
-├── middlewares/
-│   └── auth.js                           # JWT verify + verificarPermiso
-├── data/                                 # Supabase access — one function per operation
-│   ├── activos.js
-│   ├── alertas.js
-│   ├── autorizaciones.js
-│   ├── dashboard.js
-│   ├── inspecciones.js
-│   ├── posoperacionales.js
-│   ├── tanqueos.js
-│   └── vehiculos.js
-├── modulos/
-│   ├── alertas/
-│   │   ├── notificador.js                # Cron + WhatsApp notifications
-│   │   └── reglas.js                     # Alert rules
-│   ├── vehiculos/
-│   │   ├── compartido/                   # Shared flow utilities
-│   │   ├── inscripcion/                  # Driver auto-registration
-│   │   ├── preoperacional/               # flujo estado mensajes validaciones cierre
-│   │   ├── posoperacional/               # flujo estado mensajes validaciones cierre
-│   │   └── tanqueo/                      # flujo validaciones
-│   └── seguridad-campo/                  # Phase 3 — structure ready, not active
-│       ├── ats/
-│       ├── revision-equipos/
-│       └── riesgos-locativos/
-├── servicios/
-│   └── pdf/
-│       ├── base.js                       # Shared PDF engine — never duplicate
-│       ├── preoperacional.js
-│       └── posoperacional.js
-├── public/                               # Static admin panel
-│   ├── css/                              # variables.css theme-*.css components.css layout.css
-│   ├── js/                               # app.js api.js router.js theme.js utils.js
-│   ├── components/                       # sidebar table badge card modal toast
-│   ├── modules/
-│   │   ├── dashboard.js
-│   │   ├── posoperacionales.js
-│   │   ├── sedes.js
-│   │   ├── tanqueos.js
-│   │   ├── usuarios.js
-│   │   └── vehiculos/                    # alertas conductores flota preoperacionales
-│   ├── index.html                        # Admin panel
-│   ├── login.html                        # Auth page
-│   └── landing.html                      # Public landing page
-├── scripts/
-│   └── update-architecture.js            # Auto-generates folder structure in this file
-├── .github/workflows/
-│   ├── backend.yml
-│   ├── frontend.yml
-│   ├── security.yml
-│   ├── update-architecture.yml
-│   └── auto-merge-claude.yml
-├── .cursor/
-│   └── rules.md                          # Cursor coding rules (versioned)
-├── eslint.config.cjs                     # ESLint — CommonJS compatible
-├── .env.example                          # Environment variable template
-└── ARCHITECTURE.md                       # This file — source of truth
-```
+> Generada automáticamente en la sección al final de este archivo. No editar manualmente.
 
 ---
 
@@ -249,73 +184,73 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 ```
 ├── canales
-│   ├── dashboard.js
-│   └── whatsapp.js
+│   ├── dashboard.js  # Canal del dashboard operativo
+│   └── whatsapp.js  # Webhook Twilio — enrutador principal de flujos WhatsApp
 ├── config
-│   └── config.js
+│   └── config.js  # Configuracion centralizada — Supabase, Twilio, Gemini, variables de entorno
 ├── data
-│   ├── activos.js
-│   ├── alertas.js
-│   ├── ats.js
-│   ├── autorizaciones.js
-│   ├── dashboard.js
-│   ├── inspecciones.js
-│   ├── permisos.js
-│   ├── posoperacionales.js
-│   ├── revisionesEquipos.js
-│   ├── riesgosLocativos.js
-│   ├── tanqueos.js
-│   └── vehiculos.js
+│   ├── activos.js  # Activos — tabla activos + registrarCambioEstado + historial
+│   ├── alertas.js  # Alertas — vencimientos de documentos y licencias
+│   ├── ats.js  # ATS — Analisis de Trabajo Seguro (Fase 3)
+│   ├── autorizaciones.js  # Autorizaciones de novedades — pendientes, resueltas, decidir
+│   ├── dashboard.js  # Dashboard — consultas agregadas para el panel ejecutivo
+│   ├── inspecciones.js  # Inspecciones — consultas compartidas entre modulos
+│   ├── permisos.js  # Permisos — roles canonicos, seed de permisos base, classifyRoleName
+│   ├── posoperacionales.js  # Posoperacionales — registro de cierre de turno
+│   ├── revisionesEquipos.js  # Revision de equipos — arneses, escaleras, EPP (Fase 3)
+│   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
+│   ├── tanqueos.js  # Tanqueos — registro de combustible
+│   └── vehiculos.js  # Vehiculos — flota, buscar por telefono, bloqueos
 ├── middlewares
-│   └── auth.js
+│   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
 ├── modulos
 │   ├── alertas
-│   │   ├── notificador.js
-│   │   └── reglas.js
+│   │   ├── notificador.js  # Cron 6:00 AM — envia alertas de documentos por WhatsApp
+│   │   └── reglas.js  # Reglas de alerta — umbrales 30/15/7/0 dias, clasificacion
 │   ├── seguridad-campo
 │   │   ├── ats
-│   │   │   ├── flujo.js
-│   │   │   └── validaciones.js
+│   │   │   ├── flujo.js  # Flujo ATS (Fase 3)
+│   │   │   └── validaciones.js  # Validaciones ATS (Fase 3)
 │   │   ├── revision-equipos
-│   │   │   ├── flujo.js
-│   │   │   └── validaciones.js
+│   │   │   ├── flujo.js  # Flujo revision de equipos (Fase 3)
+│   │   │   └── validaciones.js  # Validaciones revision de equipos (Fase 3)
 │   │   └── riesgos-locativos
-│   │       ├── flujo.js
-│   │       └── validaciones.js
+│   │       ├── flujo.js  # Flujo riesgos locativos (Fase 3)
+│   │       └── validaciones.js  # Validaciones riesgos locativos (Fase 3)
 │   └── vehiculos
 │       ├── compartido
-│       │   ├── baseFlujo.js
-│       │   ├── kilometraje.js
-│       │   ├── navegacion.js
-│       │   └── validacionVisual.js
+│       │   ├── baseFlujo.js  # Base compartida para maquinas de estado de flujos WhatsApp
+│       │   ├── kilometraje.js  # Validacion y logica de kilometraje entre turnos
+│       │   ├── navegacion.js  # Textos de navegacion — menu principal, 0=atras, 9=menu
+│       │   └── validacionVisual.js  # Validacion de fotos via Gemini OCR
 │       ├── inscripcion
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
+│       │   ├── estado.js  # Estados del flujo de auto-registro de conductores
+│       │   ├── flujo.js  # Flujo de inscripcion automatica de conductor nuevo
+│       │   ├── mensajes.js  # Mensajes del flujo de inscripcion
+│       │   └── validaciones.js  # Validaciones de inscripcion — cedula, telefono, nombre
 │       ├── posoperacional
-│       │   ├── cierre.js
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
+│       │   ├── cierre.js  # Cierre posoperacional — PDF y notificaciones
+│       │   ├── estado.js  # Estados del flujo posoperacional
+│       │   ├── flujo.js  # Maquina de estados del posoperacional WhatsApp
+│       │   ├── mensajes.js  # Mensajes del posoperacional
+│       │   └── validaciones.js  # Validaciones del posoperacional
 │       ├── preoperacional
-│       │   ├── cierre.js
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
+│       │   ├── cierre.js  # Cierre preoperacional — PDF, novedades, autorizaciones
+│       │   ├── estado.js  # Estados del flujo preoperacional
+│       │   ├── flujo.js  # Maquina de estados del preoperacional WhatsApp
+│       │   ├── mensajes.js  # Mensajes y preguntas del preoperacional
+│       │   └── validaciones.js  # Validaciones de respuestas del preoperacional
 │       └── tanqueo
-│           ├── flujo.js
-│           └── validaciones.js
+│           ├── flujo.js  # Flujo de registro de combustible WhatsApp
+│           └── validaciones.js  # Validaciones del tanqueo
 ├── public
 │   ├── components
-│   │   ├── badge.js
-│   │   ├── card.js
-│   │   ├── modal.js
-│   │   ├── sidebar.js
-│   │   ├── table.js
-│   │   └── toast.js
+│   │   ├── badge.js  # Componente Badge — estados y alertas
+│   │   ├── card.js  # Componente Card — stat cards del panel
+│   │   ├── modal.js  # Componente Modal — detalle y formularios
+│   │   ├── sidebar.js  # Sidebar dinamico con filtro por rol
+│   │   ├── table.js  # Tabla reutilizable con ordenamiento y paginacion
+│   │   └── toast.js  # Notificaciones toast
 │   ├── css
 │   │   ├── components.css
 │   │   ├── layout.css
@@ -323,46 +258,43 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── theme-light.css
 │   │   └── variables.css
 │   ├── js
-│   │   ├── api.js
-│   │   ├── app.js
-│   │   ├── router.js
-│   │   ├── theme.js
-│   │   └── utils.js
+│   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
+│   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
+│   │   ├── router.js  # Router SPA — navegacion sin recarga
+│   │   ├── theme.js  # Toggle tema claro/oscuro
+│   │   └── utils.js  # Helpers compartidos del frontend
 │   ├── modules
 │   │   ├── vehiculos
-│   │   │   ├── alertas.js
-│   │   │   ├── conductores.js
-│   │   │   ├── flota.js
-│   │   │   └── preoperacionales.js
-│   │   ├── dashboard.js
-│   │   ├── posoperacionales.js
-│   │   ├── sedes.js
-│   │   ├── tanqueos.js
-│   │   └── usuarios.js
-│   ├── index.html
-│   ├── landing.html
-│   └── login.html
+│   │   │   ├── alertas.js  # Modulo Alertas — documentos y autorizaciones pendientes
+│   │   │   ├── conductores.js  # Modulo Conductores del panel
+│   │   │   ├── flota.js  # Modulo Flota — gestion de vehiculos con drawer de detalle
+│   │   │   └── preoperacionales.js  # Modulo Preoperacionales — lista, filtros, drawer con autorizacion
+│   │   ├── dashboard.js  # Modulo Dashboard — 4 pestanas, Indice de Seguridad Operativa
+│   │   ├── posoperacionales.js  # Modulo Posoperacionales del panel
+│   │   ├── sedes.js  # Modulo Sedes — gestion multi-sede
+│   │   ├── tanqueos.js  # Modulo Tanqueos del panel
+│   │   └── usuarios.js  # Modulo Usuarios y roles del panel
+│   ├── index.html  # Panel de administracion
+│   ├── landing.html  # Landing page publica
+│   └── login.html  # Pagina de autenticacion
 ├── rutas
-│   ├── auth.js
-│   └── dashboard.js
+│   ├── auth.js  # Rutas de autenticacion — /auth/login, /auth/me, /auth/logout
+│   └── dashboard.js  # Rutas del dashboard operativo
 ├── scripts
-│   └── update-architecture.js
+│   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
 ├── servicios
 │   ├── pdf
-│   │   ├── base.js
-│   │   ├── posoperacional.js
-│   │   └── preoperacional.js
-│   ├── logo.js
-│   ├── ocr.js
-│   ├── sesiones.js
-│   └── storage.js
-├── ARCHITECTURE.md
-├── cero_dashboard_mockup_v16.html
-├── eslint.config.cjs
-├── index.js
-├── package-lock.json
-├── package.json
-└── README.md
+│   │   ├── base.js  # Motor PDF compartido — nunca duplicar logica aqui
+│   │   ├── posoperacional.js  # Generador PDF posoperacional
+│   │   └── preoperacional.js  # Generador PDF preoperacional
+│   ├── logo.js  # Logo CERO en base64 para PDFs
+│   ├── ocr.js  # OCR via Gemini — lectura de placas y odometros
+│   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
+│   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
+├── eslint.config.cjs  # ESLint — compatible con CommonJS
+├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
+└── package.json
 ```
 
 ## Dependencies
