@@ -9,11 +9,8 @@ Field operations management SaaS via WhatsApp + AI.
 
 ## How to start a session with Claude Chat
 
-Paste this at the start of every session:
-1. This file (ARCHITECTURE.md)
-2. Output of: `git log --oneline -15`
-
-That is all the context needed. No history, no repetition.
+Paste this file at the start of every session. That is all the context needed.
+No history, no repetition.
 
 ---
 
@@ -238,3 +235,21 @@ Decisions are documented in versioned design sessions:
 
 Before writing any code, read the latest session file.
 If a session file contradicts this document, the session file wins — it is more recent.
+
+---
+
+## Decision log
+
+| Date | Decision | Reason |
+|---|---|---|
+| 10/04/2026 | Pipeline CI/CD — 3 workflows | Validación automática antes de merge |
+| 10/04/2026 | Helmet instalado | Headers de seguridad HTTP obligatorios |
+| 10/04/2026 | ARCHITECTURE.md como fuente de verdad | Reemplaza archivos de sesión de diseño |
+| 10/04/2026 | Cursor como ejecutor, Claude Chat como orquestador | Separación de roles clara |
+| 10/04/2026 | Migrar a WhatsApp Business API | Sandbox no apto para producción real |
+| 27/03/2026 | Dashboard 4 pestañas — General, Activos, Seguridad, Reportes | Vista gerencial + operativa separadas |
+| 27/03/2026 | Índice de Seguridad Operativa (score 0-100) | KPI hero del dashboard |
+| 27/03/2026 | Tendencias y análisis profundo van a Power BI | Evita scope creep en JS |
+| 27/03/2026 | Camino B — tablas separadas por tipo de inspección | Fase 1 intacta, sin riesgo |
+| 27/03/2026 | KPIs financieros como "susurro" en dashboard | Ejecutivos leen dinero primero |
+| 27/03/2026 | Seguridad personal visible en demo, oculta en prod | Estrategia comercial |
