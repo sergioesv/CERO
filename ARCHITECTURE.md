@@ -9,8 +9,11 @@ Field operations management SaaS via WhatsApp + AI.
 
 ## How to start a session with Claude Chat
 
-Paste this file at the start of every session. That is all the context needed.
-No history, no repetition.
+Paste this at the start of every session:
+1. This file (ARCHITECTURE.md)
+2. Output of: `git log --oneline -15`
+
+That is all the context needed. No history, no repetition.
 
 ---
 
