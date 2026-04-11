@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════
 
 const express = require('express');
+const helmet = require('helmet');
 const { registrarCanalWhatsapp } = require('./canales/whatsapp');
 const { registrarDashboard } = require('./canales/dashboard');
 const { registrarCronAlertas, ejecutarAlertasDiarias } = require('./modulos/alertas/notificador');
@@ -12,6 +13,7 @@ const { verificarToken, verificarPermiso } = require('./middlewares/auth');
 const { seedPermisosBase } = require('./data/permisos');
 
 const app = express();
+app.use(helmet());
 const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', true);
