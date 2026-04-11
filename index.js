@@ -428,8 +428,16 @@ app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperaciona
       query = query.eq('conductor_id', conductor);
     }
 
-    // Limitar a 100 registros máximo
-    query = query.limit(100);
+    // Filtro por clasificacion — resuelto en base de datos
+    if (estado && estado !== 'todos') {
+      query = query.eq('clasificacion', estado);
+    }
+
+    // Sin filtro: limitar vista general a 100 registros
+    // Con filtro de estado: traer todos los que cumplan la condición
+    if (!estado || estado === 'todos') {
+      query = query.limit(100);
+    }
 
     var resultado = await query;
 
@@ -442,13 +450,6 @@ app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperaciona
       var novedades = registro.novedades || [];
       var totalNovedades = novedades.length;
       var novedadesCriticas = novedades.filter(function (n) { return n.critico === true; }).length;
-
-      var clasificacion = 'sin_novedades';
-      if (novedadesCriticas > 0) {
-        clasificacion = 'critico';
-      } else if (totalNovedades > 0) {
-        clasificacion = 'con_novedades';
-      }
 
       return {
         id: registro.id,
@@ -466,7 +467,7 @@ app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperaciona
         novedades: novedades,
         total_novedades: totalNovedades,
         novedades_criticas: novedadesCriticas,
-        clasificacion: clasificacion,
+        clasificacion: registro.clasificacion || 'sin_novedades',
         observaciones: registro.observaciones,
         motor_niveles: registro.motor_niveles,
         electrico_luces: registro.electrico_luces,
@@ -478,11 +479,6 @@ app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperaciona
         pdf_url: registro.pdf_url || null
       };
     });
-
-    // Filtro por clasificación de novedades
-    if (estado && estado !== 'todos') {
-      data = data.filter(function (r) { return r.clasificacion === estado; });
-    }
 
     // Stats para las tarjetas
     var hoy = new Date().toISOString().split('T')[0];
