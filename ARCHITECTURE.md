@@ -175,7 +175,7 @@ Before writing any code, read the latest session file.
 If a session file contradicts this document, the session file wins — it is more recent.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-10 -->
+<!-- Última actualización: 2026-04-11 -->
 
 ## Folder structure
 
