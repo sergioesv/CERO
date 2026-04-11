@@ -137,10 +137,6 @@ function responderMenu(res) {
   return responderTwiml(res, nav.textoMenuPrincipal());
 }
 
-function responderRaiz(req, res) {
-  res.send('CERO modular - Canal WhatsApp activo');
-}
-
 function responderError(res) {
   return responderTwiml(res, '❌ Ocurrió un error.\n\nEscribe *9* o *MENU* para reiniciar.');
 }
@@ -163,13 +159,11 @@ function escaparXml(texto) {
 }
 
 function registrarCanalWhatsapp(app) {
-  app.get('/', responderRaiz);
   app.post('/webhook', webhookWhatsApp);
   console.log('✓ Canal WhatsApp registrado con menú principal');
 }
 
 module.exports = {
   registrarCanalWhatsapp,
-  webhookWhatsApp,
-  responderRaiz
+  webhookWhatsApp
 };
