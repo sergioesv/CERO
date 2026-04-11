@@ -253,3 +253,151 @@ If a session file contradicts this document, the session file wins — it is mor
 | 27/03/2026 | Camino B — tablas separadas por tipo de inspección | Fase 1 intacta, sin riesgo |
 | 27/03/2026 | KPIs financieros como "susurro" en dashboard | Ejecutivos leen dinero primero |
 | 27/03/2026 | Seguridad personal visible en demo, oculta en prod | Estrategia comercial |
+
+<!-- AUTO-GENERATED START — no editar manualmente -->
+<!-- Última actualización: 2026-04-11 -->
+
+## Folder structure
+
+```
+├── canales
+│   ├── dashboard.js
+│   └── whatsapp.js
+├── config
+│   └── config.js
+├── data
+│   ├── activos.js
+│   ├── alertas.js
+│   ├── ats.js
+│   ├── autorizaciones.js
+│   ├── dashboard.js
+│   ├── inspecciones.js
+│   ├── permisos.js
+│   ├── posoperacionales.js
+│   ├── revisionesEquipos.js
+│   ├── riesgosLocativos.js
+│   ├── tanqueos.js
+│   └── vehiculos.js
+├── middlewares
+│   └── auth.js
+├── modulos
+│   ├── alertas
+│   │   ├── notificador.js
+│   │   └── reglas.js
+│   ├── seguridad-campo
+│   │   ├── ats
+│   │   │   ├── flujo.js
+│   │   │   └── validaciones.js
+│   │   ├── revision-equipos
+│   │   │   ├── flujo.js
+│   │   │   └── validaciones.js
+│   │   └── riesgos-locativos
+│   │       ├── flujo.js
+│   │       └── validaciones.js
+│   └── vehiculos
+│       ├── compartido
+│       │   ├── baseFlujo.js
+│       │   ├── kilometraje.js
+│       │   ├── navegacion.js
+│       │   └── validacionVisual.js
+│       ├── inscripcion
+│       │   ├── estado.js
+│       │   ├── flujo.js
+│       │   ├── mensajes.js
+│       │   └── validaciones.js
+│       ├── posoperacional
+│       │   ├── cierre.js
+│       │   ├── estado.js
+│       │   ├── flujo.js
+│       │   ├── mensajes.js
+│       │   └── validaciones.js
+│       ├── preoperacional
+│       │   ├── cierre.js
+│       │   ├── estado.js
+│       │   ├── flujo.js
+│       │   ├── mensajes.js
+│       │   └── validaciones.js
+│       └── tanqueo
+│           ├── flujo.js
+│           └── validaciones.js
+├── public
+│   ├── components
+│   │   ├── badge.js
+│   │   ├── card.js
+│   │   ├── modal.js
+│   │   ├── sidebar.js
+│   │   ├── table.js
+│   │   └── toast.js
+│   ├── css
+│   │   ├── components.css
+│   │   ├── layout.css
+│   │   ├── theme-dark.css
+│   │   ├── theme-light.css
+│   │   └── variables.css
+│   ├── js
+│   │   ├── api.js
+│   │   ├── app.js
+│   │   ├── router.js
+│   │   ├── theme.js
+│   │   └── utils.js
+│   ├── modules
+│   │   ├── vehiculos
+│   │   │   ├── alertas.js
+│   │   │   ├── conductores.js
+│   │   │   ├── flota.js
+│   │   │   └── preoperacionales.js
+│   │   ├── dashboard.js
+│   │   ├── posoperacionales.js
+│   │   ├── sedes.js
+│   │   ├── tanqueos.js
+│   │   └── usuarios.js
+│   ├── index.html
+│   ├── landing.html
+│   └── login.html
+├── rutas
+│   ├── auth.js
+│   └── dashboard.js
+├── scripts
+│   └── update-architecture.js
+├── servicios
+│   ├── pdf
+│   │   ├── base.js
+│   │   ├── posoperacional.js
+│   │   └── preoperacional.js
+│   ├── logo.js
+│   ├── ocr.js
+│   ├── sesiones.js
+│   └── storage.js
+├── ARCHITECTURE.md
+├── cero_dashboard_mockup_v16.html
+├── eslint.config.cjs
+├── index.js
+├── package-lock.json
+├── package.json
+└── README.md
+```
+
+## Dependencies
+
+| Package | Version |
+|---|---|
+| `@google/generative-ai` | ^0.21.0 |
+| `@supabase/supabase-js` | ^2.48.0 |
+| `axios` | ^1.7.9 |
+| `bcryptjs` | ^3.0.3 |
+| `express` | ^4.21.2 |
+| `helmet` | ^8.1.0 |
+| `jsonwebtoken` | ^9.0.3 |
+| `node-cron` | ^3.0.3 |
+| `pdfkit` | ^0.15.1 |
+| `twilio` | ^5.3.5 |
+
+### Dev dependencies
+
+| Package | Version |
+|---|---|
+| `@eslint/js` | ^10.0.1 |
+| `eslint` | ^10.2.0 |
+| `globals` | ^17.4.0 |
+
+<!-- AUTO-GENERATED END -->
