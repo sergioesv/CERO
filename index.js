@@ -570,7 +570,7 @@ app.get('/api/alertas/resumen', verificarToken, verificarPermiso('alertas', 'ver
     let urgentes = 0;
     let informativas = 0;
     
-    vehiculos.forEach(v => {
+    (vehiculos || []).forEach(v => {
       [v.soat_vencimiento, v.tecnomecanica_vencimiento].forEach(fecha => {
         if (fecha) {
           const dias = Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
@@ -582,7 +582,7 @@ app.get('/api/alertas/resumen', verificarToken, verificarPermiso('alertas', 'ver
       });
     });
     
-    conductores.forEach(c => {
+    (conductores || []).forEach(c => {
       if (c.licencia_vencimiento) {
         const dias = Math.ceil((new Date(c.licencia_vencimiento) - new Date()) / (1000 * 60 * 60 * 24));
         if (dias <= 0) criticas++;
