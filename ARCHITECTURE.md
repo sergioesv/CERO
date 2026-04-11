@@ -177,6 +177,16 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | 27/03/2026 | KPIs financieros como "susurro" en dashboard | Ejecutivos leen dinero primero |
 | 27/03/2026 | Seguridad personal visible en demo, oculta en prod | Estrategia comercial |
 
+## Cursor — cómo usar las reglas especializadas
+
+`rules.md` siempre activo. Para tareas específicas agregar al inicio de la instrucción:
+
+| Tipo de tarea | Archivo adicional |
+|---|---|
+| Rutas API, data/, middlewares/, servicios/, index.js | `Contexto adicional: leer .cursor/rules-backend.md` |
+| Panel web, public/, módulos, CSS, HTML | `Contexto adicional: leer .cursor/rules-frontend.md` |
+| Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
+
 <!-- AUTO-GENERATED START — no editar manualmente -->
 <!-- Última actualización: 2026-04-11 -->
 
