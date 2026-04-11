@@ -110,6 +110,7 @@ const DESCRIPCIONES = {
   'public/js/app.js':                                          'Inicializacion del panel — tema, sidebar, ruta inicial',
   'public/js/router.js':                                       'Router SPA — navegacion sin recarga',
   'public/js/theme.js':                                        'Toggle tema claro/oscuro',
+  'public/js/transitions.js':                                  'Transiciones suaves entre páginas — fade-out/fade-in, intercepta links internos',
   'public/js/utils.js':                                        'Helpers compartidos del frontend',
 
   // Frontend — modulos del panel

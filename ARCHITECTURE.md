@@ -272,7 +272,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
 │   │   ├── router.js  # Router SPA — navegacion sin recarga
 │   │   ├── theme.js  # Toggle tema claro/oscuro
-│   │   ├── transitions.js
+│   │   ├── transitions.js  # Transiciones suaves entre páginas — fade-out/fade-in, intercepta links internos
 │   │   └── utils.js  # Helpers compartidos del frontend
 │   ├── modules
 │   │   ├── vehiculos
