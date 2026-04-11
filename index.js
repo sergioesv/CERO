@@ -8,7 +8,7 @@ const express = require('express');
 const helmet = require('helmet');
 const { registrarCanalWhatsapp } = require('./canales/whatsapp');
 const { registrarDashboard } = require('./canales/dashboard');
-const { registrarCronAlertas, ejecutarAlertasDiarias } = require('./modulos/alertas/notificador');
+const { registrarCronAlertas } = require('./modulos/alertas/notificador');
 const { verificarToken, verificarPermiso } = require('./middlewares/auth');
 const { seedPermisosBase } = require('./data/permisos');
 
@@ -71,28 +71,6 @@ registrarDashboard(app);
 registrarCronAlertas();
 
 // ═══════════════════════════════════════════════════════════
-// ENDPOINT DE PRUEBA — ejecutar alertas manualmente
-// GET /alertas/ejecutar
-// Usar para pruebas: curl https://cero-production.up.railway.app/alertas/ejecutar
-// ═══════════════════════════════════════════════════════════
-app.get('/alertas/ejecutar', async function (req, res) {
-  try {
-    var resultado = await ejecutarAlertasDiarias();
-    res.json({
-      ok: true,
-      resultado: resultado,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// ═══════════════════════════════════════════════════════════
 // API — ENDPOINTS PARA EL PANEL DE ADMINISTRACIÓN
 // ═══════════════════════════════════════════════════════════
 
@@ -121,7 +99,7 @@ app.get('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'), 
 });
 
 // GET /api/vehiculos/:placa — obtiene un vehículo
-app.get('/api/vehiculos/:placa', async function (req, res) {
+app.get('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('vehiculos')
@@ -217,7 +195,7 @@ app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
 });
 
 // POST /api/vehiculos/:placa/bloquear — bloquea un vehículo
-app.post('/api/vehiculos/:placa/bloquear', async function (req, res) {
+app.post('/api/vehiculos/:placa/bloquear', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('vehiculos')
@@ -245,7 +223,7 @@ app.post('/api/vehiculos/:placa/bloquear', async function (req, res) {
 });
 
 // POST /api/vehiculos/:placa/desbloquear — desbloquea un vehículo
-app.post('/api/vehiculos/:placa/desbloquear', async function (req, res) {
+app.post('/api/vehiculos/:placa/desbloquear', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('vehiculos')
@@ -273,7 +251,7 @@ app.post('/api/vehiculos/:placa/desbloquear', async function (req, res) {
 });
 
 // DELETE /api/vehiculos/:placa — elimina un vehículo (solo si no tiene historial)
-app.delete('/api/vehiculos/:placa', async function (req, res) {
+app.delete('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'eliminar'), async function (req, res) {
   try {
     const placa = req.params.placa.toUpperCase();
     
@@ -339,7 +317,7 @@ app.get('/api/conductores', verificarToken, verificarPermiso('conductores', 'ver
 });
 
 // GET /api/conductores/:id — obtiene un conductor
-app.get('/api/conductores/:id', async function (req, res) {
+app.get('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('conductores')
@@ -416,7 +394,7 @@ app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
 // ═══════════════════════════════════════════════════════════
 
 // GET /api/preoperacionales — Lista inspecciones con filtros
-app.get('/api/preoperacionales', async function (req, res) {
+app.get('/api/preoperacionales', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function (req, res) {
   try {
     var desde = req.query.desde || null;
     var hasta = req.query.hasta || null;
@@ -529,7 +507,7 @@ app.get('/api/preoperacionales', async function (req, res) {
 });
 
 // GET /api/preoperacionales/:id — Detalle de una inspección
-app.get('/api/preoperacionales/:id', async function (req, res) {
+app.get('/api/preoperacionales/:id', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function (req, res) {
   try {
     var id = req.params.id;
 
@@ -575,7 +553,7 @@ app.get('/api/preoperacionales/:id', async function (req, res) {
 // ───────────────────────────────────────────────────────────
 
 // GET /api/alertas/resumen — resumen de alertas activas
-app.get('/api/alertas/resumen', async function (req, res) {
+app.get('/api/alertas/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async function (req, res) {
   try {
     const hoy = new Date().toISOString().split('T')[0];
     const en30dias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -641,7 +619,7 @@ app.get('/api/alertas/resumen', async function (req, res) {
 // ───────────────────────────────────────────────────────────
 
 // GET /api/dashboard/resumen — resumen general
-app.get('/api/dashboard/resumen', async function (req, res) {
+app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 'ver'), async function (req, res) {
   try {
     // Contar vehículos
     const { count: totalVehiculos } = await supabase
@@ -688,7 +666,7 @@ app.get('/api/dashboard/resumen', async function (req, res) {
 // ═══════════════════════════════════════════════════════════
 
 // GET /api/alertas/documentos — estado de documentos por vehículo
-app.get('/api/alertas/documentos', async function(req, res) {
+app.get('/api/alertas/documentos', verificarToken, verificarPermiso('alertas', 'ver'), async function(req, res) {
   try {
     var datos = await autorizacionesData.obtenerDocumentosVehiculos();
     res.json({ ok: true, datos: datos });
@@ -699,7 +677,7 @@ app.get('/api/alertas/documentos', async function(req, res) {
 });
 
 // GET /api/autorizaciones/pendientes — autorizaciones sin decisión
-app.get('/api/autorizaciones/pendientes', async function(req, res) {
+app.get('/api/autorizaciones/pendientes', verificarToken, verificarPermiso('autorizaciones', 'ver'), async function(req, res) {
   try {
     var datos = await autorizacionesData.obtenerAutorizacionesPendientes();
     res.json({ ok: true, datos: datos });
@@ -710,7 +688,7 @@ app.get('/api/autorizaciones/pendientes', async function(req, res) {
 });
 
 // GET /api/autorizaciones/resueltas — autorizaciones con decisión
-app.get('/api/autorizaciones/resueltas', async function(req, res) {
+app.get('/api/autorizaciones/resueltas', verificarToken, verificarPermiso('autorizaciones', 'ver'), async function(req, res) {
   try {
     var datos = await autorizacionesData.obtenerAutorizacionesResueltas();
     res.json({ ok: true, datos: datos });
@@ -721,7 +699,7 @@ app.get('/api/autorizaciones/resueltas', async function(req, res) {
 });
 
 // PUT /api/autorizaciones/:id/decidir — registrar decisión del supervisor
-app.put('/api/autorizaciones/:id/decidir', async function(req, res) {
+app.put('/api/autorizaciones/:id/decidir', verificarToken, verificarPermiso('autorizaciones', 'editar'), async function(req, res) {
   try {
     var id = req.params.id;
     var decision = req.body.decision;
@@ -750,7 +728,7 @@ app.put('/api/autorizaciones/:id/decidir', async function(req, res) {
 });
 
 // GET /api/vehiculos/:placa/historial — timeline completo del vehículo
-app.get('/api/vehiculos/:placa/historial', async function(req, res) {
+app.get('/api/vehiculos/:placa/historial', verificarToken, verificarPermiso('vehiculos', 'ver'), async function(req, res) {
   try {
     var resultado = await autorizacionesData.obtenerHistorialVehiculo(req.params.placa);
     res.json({ ok: true, vehiculo: resultado.vehiculo, historial: resultado.historial });
