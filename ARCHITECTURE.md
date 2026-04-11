@@ -226,18 +226,6 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 ---
 
-## Design sessions
-
-Decisions are documented in versioned design sessions:
-`CERO_Sesion_Diseno_vNN_DDMMYYYY.txt`
-
-**Current version: v19 (10/04/2026)**
-
-Before writing any code, read the latest session file.
-If a session file contradicts this document, the session file wins — it is more recent.
-
----
-
 ## Decision log
 
 | Date | Decision | Reason |
