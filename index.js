@@ -619,32 +619,28 @@ app.get('/api/alertas/resumen', verificarToken, verificarPermiso('alertas', 'ver
 // DASHBOARD
 // ───────────────────────────────────────────────────────────
 
-// GET /api/dashboard/resumen — resumen general
+// GET /api/dashboard/resumen — resumen general (consultas en paralelo)
 app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 'ver'), async function (req, res) {
   try {
-    // Contar vehículos
-    const { count: totalVehiculos } = await supabase
-      .from('vehiculos')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: bloqueados } = await supabase
-      .from('vehiculos')
-      .select('*', { count: 'exact', head: true })
-      .eq('bloqueado', true);
-    
-    // Contar conductores activos
-    const { count: conductoresActivos } = await supabase
-      .from('conductores')
-      .select('*', { count: 'exact', head: true })
-      .eq('activo', true);
-    
-    // Inspecciones de hoy
     const hoy = new Date().toISOString().split('T')[0];
-    const { count: inspeccionesHoy } = await supabase
-      .from('preoperacionales')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', hoy);
-    
+
+    // Ejecutar las 4 consultas independientes en paralelo
+    const [
+      { count: totalVehiculos, error: e1 },
+      { count: bloqueados,     error: e2 },
+      { count: conductoresActivos, error: e3 },
+      { count: inspeccionesHoy,    error: e4 }
+    ] = await Promise.all([
+      supabase.from('vehiculos').select('*', { count: 'exact', head: true }),
+      supabase.from('vehiculos').select('*', { count: 'exact', head: true }).eq('bloqueado', true),
+      supabase.from('conductores').select('*', { count: 'exact', head: true }).eq('activo', true),
+      supabase.from('preoperacionales').select('*', { count: 'exact', head: true }).gte('created_at', hoy)
+    ]);
+
+    // Si alguna consulta falló, lanzar error
+    const errorDb = e1 || e2 || e3 || e4;
+    if (errorDb) throw errorDb;
+
     res.json({
       ok: true,
       vehiculos: {
