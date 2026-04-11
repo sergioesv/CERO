@@ -107,7 +107,7 @@ app.get('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', '
 });
 
 // POST /api/vehiculos — crea un vehículo
-app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
+app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'crear'), async function (req, res) {
   try {
     const vehiculo = {
       placa: req.body.placa.toUpperCase(),
@@ -137,7 +137,7 @@ app.post('/api/vehiculos', verificarToken, verificarPermiso('vehiculos', 'ver'),
 });
 
 // PUT /api/vehiculos/:placa — actualiza un vehículo
-app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
+app.put('/api/vehiculos/:placa', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
   try {
     const placa = req.params.placa.toUpperCase();
     const campos = {};
@@ -325,7 +325,7 @@ app.get('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 
 });
 
 // POST /api/conductores — crea un conductor
-app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
+app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 'crear'), async function (req, res) {
   try {
     const conductor = {
       nombre: req.body.nombre,
@@ -353,7 +353,7 @@ app.post('/api/conductores', verificarToken, verificarPermiso('conductores', 've
 });
 
 // PUT /api/conductores/:id — actualiza un conductor
-app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
+app.put('/api/conductores/:id', verificarToken, verificarPermiso('conductores', 'editar'), async function (req, res) {
   try {
     const campos = {};
     if (req.body.nombre !== undefined) campos.nombre = req.body.nombre;
