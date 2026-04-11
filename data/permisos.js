@@ -2,7 +2,7 @@ const { supabase } = require('../config/config');
 
 const CANONICAL_ROLE_PERMISSIONS = {
   superadmin_plataforma: {
-    vehiculos: ['ver', 'crear', 'editar', 'autorizar'],
+    vehiculos: ['ver', 'crear', 'editar', 'autorizar', 'eliminar'],
     conductores: ['ver', 'crear', 'editar'],
     sedes: ['ver', 'crear', 'editar'],
     usuarios: ['ver', 'crear', 'editar'],
@@ -10,10 +10,12 @@ const CANONICAL_ROLE_PERMISSIONS = {
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
     tanqueos: ['ver'],
-    alertas: ['ver']
+    alertas: ['ver'],
+    dashboard: ['ver'],
+    autorizaciones: ['ver', 'editar']
   },
   superadmin_emp: {
-    vehiculos: ['ver', 'crear', 'editar'],
+    vehiculos: ['ver', 'crear', 'editar', 'eliminar'],
     conductores: ['ver', 'crear', 'editar'],
     sedes: ['ver', 'crear', 'editar'],
     usuarios: ['ver', 'crear', 'editar'],
@@ -21,7 +23,9 @@ const CANONICAL_ROLE_PERMISSIONS = {
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
     tanqueos: ['ver'],
-    alertas: ['ver']
+    alertas: ['ver'],
+    dashboard: ['ver'],
+    autorizaciones: ['ver', 'editar']
   },
   administrador: {
     vehiculos: ['ver', 'crear', 'editar'],
@@ -33,12 +37,50 @@ const CANONICAL_ROLE_PERMISSIONS = {
     alertas: ['ver']
   },
   supervisor: {
-    vehiculos: ['ver', 'autorizar'],
+    vehiculos: ['ver', 'editar', 'autorizar'],
     flota: ['ver'],
     preoperacionales: ['ver', 'autorizar'],
     posoperacionales: ['ver', 'autorizar'],
     tanqueos: ['ver', 'autorizar'],
-    alertas: ['ver', 'autorizar']
+    alertas: ['ver', 'autorizar'],
+    dashboard: ['ver'],
+    autorizaciones: ['ver']
+  },
+  operador: {
+    vehiculos: ['ver'],
+    flota: ['ver'],
+    preoperacionales: ['ver'],
+    posoperacionales: ['ver'],
+    tanqueos: ['ver'],
+    alertas: ['ver']
+  },
+  sst: {
+    preoperacionales: ['ver'],
+    posoperacionales: ['ver'],
+    alertas: ['ver'],
+    dashboard: ['ver']
+  },
+  auditor: {
+    vehiculos: ['ver'],
+    conductores: ['ver'],
+    flota: ['ver'],
+    preoperacionales: ['ver'],
+    posoperacionales: ['ver'],
+    tanqueos: ['ver'],
+    alertas: ['ver'],
+    dashboard: ['ver'],
+    autorizaciones: ['ver']
+  },
+  reportes: {
+    vehiculos: ['ver'],
+    conductores: ['ver'],
+    flota: ['ver'],
+    preoperacionales: ['ver'],
+    posoperacionales: ['ver'],
+    tanqueos: ['ver'],
+    alertas: ['ver'],
+    dashboard: ['ver'],
+    autorizaciones: ['ver']
   }
 };
 
@@ -53,19 +95,21 @@ function normalizeRoleName(role) {
 
 function classifyRoleName(role) {
   const normalized = normalizeRoleName(role);
-
   if (!normalized) return null;
   if (normalized === 'superadmin_plataforma') return 'superadmin_plataforma';
   if (normalized === 'superadmin_emp' || normalized === 'superadmin_empresa') return 'superadmin_emp';
   if (normalized === 'administrador') return 'administrador';
-  if (normalized === 'supervisor') return 'supervisor';
-
+  if (normalized === 'supervisor' || normalized === 'mantenimiento') return 'supervisor';
+  if (normalized === 'operador' || normalized.startsWith('operador_')) return 'operador';
+  if (normalized === 'conductor') return null;
+  if (normalized === 'sst') return 'sst';
+  if (normalized === 'auditor_interno' || normalized === 'auditor_externo') return 'auditor';
+  if (normalized === 'reportes') return 'reportes';
   if (normalized.includes('superadmin')) {
     return normalized.includes('emp') || normalized.includes('empresa')
       ? 'superadmin_emp'
       : 'superadmin_plataforma';
   }
-
   if (normalized.includes('administrador')) return 'administrador';
   if (normalized.includes('supervisor')) return 'supervisor';
   return null;
