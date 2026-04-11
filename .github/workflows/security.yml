@@ -1,0 +1,77 @@
+name: Security — validación
+
+on:
+  push:
+    branches: [desarrollo]
+  pull_request:
+    branches: [desarrollo]
+
+jobs:
+  security-check:
+    name: Secrets + dependencias + headers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: Buscar secrets en el diff
+        run: |
+          echo "Escaneando commits por credenciales..."
+          # patrones de secrets reales
+          if git diff origin/desarrollo...HEAD -- . \
+            ':(exclude)package-lock.json' \
+            ':(exclude)*.md' | grep -E \
+            'password\s*[:=]\s*["\x27][^"\x27]{6,}|
+            secret\s*[:=]\s*["\x27][^"\x27]{6,}|
+            api.?key\s*[:=]\s*["\x27][^"\x27]{6,}|
+            eyJhbGciOi[A-Za-z0-9_-]+|
+            service_role[A-Za-z0-9_-]+|
+            EAAB[A-Za-z0-9]+|
+            AC[a-z0-9]{32}|
+            SK[a-z0-9]{32}' 2>/dev/null; then
+            echo "❌ Posibles secrets detectados en el diff"
+            exit 1
+          fi
+          echo "✅ Sin secrets en el diff"
+
+      - name: npm audit — vulnerabilidades altas y críticas
+        run: npm audit --audit-level=high
+
+      - name: Verificar .gitignore protege archivos sensibles
+        run: |
+          archivos=(".env" ".env.local" ".env.production" "*.pem" "*.key")
+          for archivo in "${archivos[@]}"; do
+            if ! grep -q "$archivo" .gitignore 2>/dev/null; then
+              echo "❌ $archivo no está en .gitignore"
+              exit 1
+            fi
+          done
+          echo "✅ .gitignore protege archivos sensibles"
+
+      - name: Verificar que no hay archivos .env en el repo
+        run: |
+          if git ls-files | grep -qE "^\.env(\.|$)"; then
+            echo "❌ Archivo .env trackeado por git — remover con git rm --cached .env"
+            exit 1
+          fi
+          echo "✅ Sin archivos .env en el repo"
+
+      - name: Verificar helmet en index.js
+        run: |
+          if ! grep -q "helmet" index.js 2>/dev/null; then
+            echo "⚠️  helmet no detectado en index.js — agregar headers de seguridad HTTP"
+            exit 1
+          fi
+          echo "✅ helmet presente"
