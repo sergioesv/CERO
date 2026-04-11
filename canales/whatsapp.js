@@ -7,6 +7,9 @@
 
 'use strict';
 
+const twilio = require('twilio');
+const { TWILIO_AUTH_TOKEN, TWILIO_WEBHOOK_URL } = require('../config/config');
+
 const { obtenerSesion, eliminarSesion, guardarCambios } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
 const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
@@ -19,13 +22,29 @@ const vehiculosData       = require('../data/vehiculos');
 // WEBHOOK PRINCIPAL
 // ============================================================================
 
+// Valida que el request proviene realmente de Twilio
+// En desarrollo local se omite — la URL es dinámica (ngrok, etc.)
+function validarFirmaTwilio(req) {
+  if (process.env.NODE_ENV !== 'production') return true;
+  const firma = req.headers['x-twilio-signature'] || '';
+  const url = (TWILIO_WEBHOOK_URL || '').replace(/\/$/, '') + '/webhook';
+  const params = req.body || {};
+  return twilio.validateRequest(TWILIO_AUTH_TOKEN, firma, url, params);
+}
+
 async function webhookWhatsApp(req, res) {
   const telefono = req.body.From;
   const mensaje  = (req.body.Body || '').trim();
   const msgUpper = mensaje.toUpperCase();
 
-  try {
-    let sesion = await obtenerSesion(telefono);
+  try {
+    // Rechazar requests que no provienen de Twilio
+    if (!validarFirmaTwilio(req)) {
+      console.warn('⚠️ Firma Twilio inválida — request rechazado:', req.ip);
+      return res.status(403).send('Forbidden');
+    }
+
+    let sesion = await obtenerSesion(telefono);
 
     // ── 9 / MENU / INICIO / CANCELAR → menú directo, sin mensaje intermedio ──
     if (
