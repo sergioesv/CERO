@@ -1,0 +1,87 @@
+name: Frontend — validación
+
+on:
+  push:
+    branches: [desarrollo]
+    paths:
+      - 'public/**'
+  pull_request:
+    branches: [desarrollo]
+    paths:
+      - 'public/**'
+
+jobs:
+  frontend-check:
+    name: Lint + credenciales + estructura
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: ESLint — frontend
+        run: |
+          npx eslint public/js/ public/components/ public/modules/ \
+            --env browser \
+            --rule '{"no-console": "warn"}' \
+            --max-warnings=10
+
+      - name: Detectar credenciales en JS cliente
+        run: |
+          echo "Verificando que no hay credenciales en código cliente..."
+          if grep -rn \
+            -e "supabase\.co" \
+            -e "eyJhbGciOi" \
+            -e "TWILIO" \
+            -e "GEMINI" \
+            -e "sk-" \
+            -e "service_role" \
+            --include="*.js" \
+            --include="*.html" \
+            public/; then
+            echo "❌ Posibles credenciales encontradas en public/"
+            exit 1
+          fi
+          echo "✅ Sin credenciales en código cliente"
+
+      - name: Verificar estructura obligatoria
+        run: |
+          echo "Verificando estructura de public/..."
+          dirs=("public/css" "public/js" "public/components" "public/modules")
+          files=("public/index.html" "public/login.html")
+
+          for dir in "${dirs[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "❌ Carpeta requerida no encontrada: $dir"
+              exit 1
+            fi
+          done
+
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Archivo requerido no encontrado: $file"
+              exit 1
+            fi
+          done
+
+          echo "✅ Estructura de public/ correcta"
+
+      - name: Detectar console.log en producción
+        run: |
+          echo "Buscando console.log en JS cliente..."
+          count=$(grep -rn "console\.log" --include="*.js" public/ | wc -l)
+          if [ "$count" -gt 5 ]; then
+            echo "⚠️  $count console.log encontrados en public/ — limpiar antes de producción"
+            grep -rn "console\.log" --include="*.js" public/
+            exit 1
+          fi
+          echo "✅ console.log bajo el límite ($count encontrados)"
