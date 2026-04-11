@@ -7,19 +7,27 @@ Field operations management SaaS via WhatsApp + AI.
 
 ---
 
+## How to start a session with Claude Chat
+
+Paste this file at the start of every session. That is all the context needed.
+No history, no repetition.
+
+---
+
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js — CommonJS (`require`) |
-| Database | Supabase — PostgreSQL + Storage (São Paulo) |
-| Deploy | Railway — auto-deploy from `desarrollo` branch |
-| WhatsApp | Twilio — webhook in/out |
-| AI | Google Gemini API — OCR + interpretation (invoke only when it adds value) |
-| PDF | PDFKit |
-| Auth | JWT + bcrypt — 8h expiration |
-| Frontend | HTML + CSS + JS — no frameworks, served by Express |
-| Charts | Chart.js |
+| Layer | Technology | Version |
+|---|---|---|
+| Runtime | Node.js — CommonJS (`require`) | 20 |
+| Database | Supabase — PostgreSQL + Storage (São Paulo) | ^2.48.0 |
+| Deploy | Railway — auto-deploy from `desarrollo` | — |
+| WhatsApp | Twilio | ^5.3.5 |
+| AI | Google Gemini API — OCR + interpretation | ^0.21.0 |
+| PDF | PDFKit | ^0.15.1 |
+| Auth | JWT + bcrypt — 8h expiration | ^9.0.3 / ^3.0.3 |
+| HTTP security | Helmet | ^8.1.0 |
+| Frontend | HTML + CSS + JS — no frameworks, served by Express | — |
+| Scheduler | node-cron — daily document alerts | ^3.0.3 |
 
 **Rule:** never swap a technology without a documented technical reason.
 
@@ -34,6 +42,21 @@ Field operations management SaaS via WhatsApp + AI.
 
 ---
 
+## CI/CD pipeline
+
+Three workflows run in parallel on every push to `desarrollo`:
+
+| Workflow | Triggers when | Validates |
+|---|---|---|
+| `backend.yml` | `routes/` `data/` `modulos/` `servicios/` `index.js` | ESLint, npm audit, hardcoded secrets, .env in repo |
+| `frontend.yml` | `public/` | ESLint, credentials in client JS, folder structure |
+| `security.yml` | Always | Secrets in diff, npm audit high, .gitignore, helmet present |
+| `update-architecture.yml` | Always | Regenerates folder structure + deps in this file |
+
+**Rule:** if any workflow fails, merge is blocked.
+
+---
+
 ## Project phases
 
 ### Phase 1 — Vehicle control ✅ COMPLETE
@@ -45,13 +68,13 @@ Field operations management SaaS via WhatsApp + AI.
 - Authorization system v12 (INFORMATIVO / ALERTA / BLOQUEO)
 
 ### Phase 2 — Dashboard & admin panel 🔄 IN PROGRESS
-- 2.1 Web admin panel — Flota, Preoperacionales, Alertas complete; Conductores, Posoperacionales, Tanqueos pending
+- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores complete; Posoperacionales, Tanqueos pending
 - 2.2 Operational dashboard — complete
 - 2.3 History and reports — pending
 - 2.4 Power BI integration — future
 
 ### Phase 3 — Personnel safety ⏳ FUTURE
-- Harness inspection, ladder inspection, ATS
+- Harness inspection, ladder inspection, ATS (structure exists in `modulos/seguridad-campo/`)
 
 ---
 
@@ -59,29 +82,69 @@ Field operations management SaaS via WhatsApp + AI.
 
 ```
 /
-├── index.js                        # Express entry point
-├── routes/                         # API routes + webhook
-├── data/                           # Supabase access (one function per operation)
+├── index.js                              # Express entry — helmet, routes, cron
+├── canales/
+│   ├── whatsapp.js                       # Twilio webhook handler
+│   └── dashboard.js                      # Dashboard channel
+├── config/
+│   └── config.js                         # Centralized config
+├── middlewares/
+│   └── auth.js                           # JWT verify + verificarPermiso
+├── data/                                 # Supabase access — one function per operation
+│   ├── activos.js
+│   ├── alertas.js
+│   ├── autorizaciones.js
+│   ├── dashboard.js
+│   ├── inspecciones.js
+│   ├── posoperacionales.js
+│   ├── tanqueos.js
+│   └── vehiculos.js
 ├── modulos/
-│   └── vehiculos/
-│       ├── preoperacional/         # flujo.js estado.js mensajes.js validaciones.js cierre.js
-│       ├── posoperacional/
-│       └── tanqueo/
+│   ├── alertas/
+│   │   ├── notificador.js                # Cron + WhatsApp notifications
+│   │   └── reglas.js                     # Alert rules
+│   ├── vehiculos/
+│   │   ├── compartido/                   # Shared flow utilities
+│   │   ├── inscripcion/                  # Driver auto-registration
+│   │   ├── preoperacional/               # flujo estado mensajes validaciones cierre
+│   │   ├── posoperacional/               # flujo estado mensajes validaciones cierre
+│   │   └── tanqueo/                      # flujo validaciones
+│   └── seguridad-campo/                  # Phase 3 — structure ready, not active
+│       ├── ats/
+│       ├── revision-equipos/
+│       └── riesgos-locativos/
 ├── servicios/
-│   ├── pdf/
-│   │   ├── base.js                 # Shared PDF engine — never duplicate
-│   │   ├── preoperacional.js
-│   │   └── posoperacional.js
-│   └── twilio.js
-├── compartido/                     # Cross-cutting utilities
-├── public/                         # Static admin panel
-│   ├── css/                        # variables.css theme-*.css components.css layout.css
-│   ├── js/                         # app.js api.js router.js theme.js utils.js
-│   ├── components/                 # sidebar.js table.js badge.js card.js modal.js toast.js
-│   └── modules/                    # One subdirectory per panel module
+│   └── pdf/
+│       ├── base.js                       # Shared PDF engine — never duplicate
+│       ├── preoperacional.js
+│       └── posoperacional.js
+├── public/                               # Static admin panel
+│   ├── css/                              # variables.css theme-*.css components.css layout.css
+│   ├── js/                               # app.js api.js router.js theme.js utils.js
+│   ├── components/                       # sidebar table badge card modal toast
+│   ├── modules/
+│   │   ├── dashboard.js
+│   │   ├── posoperacionales.js
+│   │   ├── sedes.js
+│   │   ├── tanqueos.js
+│   │   ├── usuarios.js
+│   │   └── vehiculos/                    # alertas conductores flota preoperacionales
+│   ├── index.html                        # Admin panel
+│   ├── login.html                        # Auth page
+│   └── landing.html                      # Public landing page
+├── scripts/
+│   └── update-architecture.js            # Auto-generates folder structure in this file
+├── .github/workflows/
+│   ├── backend.yml
+│   ├── frontend.yml
+│   ├── security.yml
+│   ├── update-architecture.yml
+│   └── auto-merge-claude.yml
 ├── .cursor/
-│   └── rules.md                    # Cursor coding rules
-└── ARCHITECTURE.md                 # This file
+│   └── rules.md                          # Cursor coding rules (versioned)
+├── eslint.config.cjs                     # ESLint — CommonJS compatible
+├── .env.example                          # Environment variable template
+└── ARCHITECTURE.md                       # This file — source of truth
 ```
 
 ---
@@ -122,7 +185,7 @@ Each module is strictly modular:
 
 ```
 modulos/vehiculos/<module>/
-├── flujo.js         # State machine — handles incoming messages
+├── flujo.js         # State machine
 ├── estado.js        # State definitions
 ├── mensajes.js      # Message templates
 ├── validaciones.js  # Input validation
@@ -139,16 +202,14 @@ Each panel module exports a global object:
 
 ```js
 const ModuleName = {
-  render()       // Mount HTML into main container
-  cargarDatos()  // Fetch from API and populate
-  renderStats()  // Update stat cards
-  renderTabla()  // Render reusable Table component
+  render()        // Mount HTML into main container
+  cargarDatos()   // Fetch from API and populate
+  renderStats()   // Update stat cards
+  renderTabla()   // Render reusable Table component
 }
 ```
 
-Reusable components: `Table`, `Badge`, `Card`, `Modal`, `Toast`, `Sidebar`
-Detail view: lateral drawer (not centered modal)
-Themes: light/dark via CSS variables — no JS for colors
+Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 ---
 
@@ -159,8 +220,9 @@ Themes: light/dark via CSS variables — no JS for colors
 - [ ] Custom domain purchased and configured
 - [ ] All routes behind `verificarPermiso` middleware
 - [ ] No credentials in source code
-- [ ] `.env` in `.gitignore`
+- [ ] `.env` in `.gitignore` ✅
 - [ ] Signed URL regeneration at query time (Supabase Storage)
+- [ ] Helmet installed and active ✅
 
 ---
 
@@ -173,154 +235,3 @@ Decisions are documented in versioned design sessions:
 
 Before writing any code, read the latest session file.
 If a session file contradicts this document, the session file wins — it is more recent.
-
-<!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-11 -->
-
-## Folder structure
-
-```
-├── canales
-│   ├── dashboard.js
-│   └── whatsapp.js
-├── config
-│   └── config.js
-├── data
-│   ├── activos.js
-│   ├── alertas.js
-│   ├── ats.js
-│   ├── autorizaciones.js
-│   ├── dashboard.js
-│   ├── inspecciones.js
-│   ├── permisos.js
-│   ├── posoperacionales.js
-│   ├── revisionesEquipos.js
-│   ├── riesgosLocativos.js
-│   ├── tanqueos.js
-│   └── vehiculos.js
-├── middlewares
-│   └── auth.js
-├── modulos
-│   ├── alertas
-│   │   ├── notificador.js
-│   │   └── reglas.js
-│   ├── seguridad-campo
-│   │   ├── ats
-│   │   │   ├── flujo.js
-│   │   │   └── validaciones.js
-│   │   ├── revision-equipos
-│   │   │   ├── flujo.js
-│   │   │   └── validaciones.js
-│   │   └── riesgos-locativos
-│   │       ├── flujo.js
-│   │       └── validaciones.js
-│   └── vehiculos
-│       ├── compartido
-│       │   ├── baseFlujo.js
-│       │   ├── kilometraje.js
-│       │   ├── navegacion.js
-│       │   └── validacionVisual.js
-│       ├── inscripcion
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
-│       ├── posoperacional
-│       │   ├── cierre.js
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
-│       ├── preoperacional
-│       │   ├── cierre.js
-│       │   ├── estado.js
-│       │   ├── flujo.js
-│       │   ├── mensajes.js
-│       │   └── validaciones.js
-│       └── tanqueo
-│           ├── flujo.js
-│           └── validaciones.js
-├── public
-│   ├── components
-│   │   ├── badge.js
-│   │   ├── card.js
-│   │   ├── modal.js
-│   │   ├── sidebar.js
-│   │   ├── table.js
-│   │   └── toast.js
-│   ├── css
-│   │   ├── components.css
-│   │   ├── layout.css
-│   │   ├── theme-dark.css
-│   │   ├── theme-light.css
-│   │   └── variables.css
-│   ├── js
-│   │   ├── api.js
-│   │   ├── app.js
-│   │   ├── router.js
-│   │   ├── theme.js
-│   │   └── utils.js
-│   ├── modules
-│   │   ├── vehiculos
-│   │   │   ├── alertas.js
-│   │   │   ├── conductores.js
-│   │   │   ├── flota.js
-│   │   │   └── preoperacionales.js
-│   │   ├── dashboard.js
-│   │   ├── posoperacionales.js
-│   │   ├── sedes.js
-│   │   ├── tanqueos.js
-│   │   └── usuarios.js
-│   ├── index.html
-│   ├── landing.html
-│   └── login.html
-├── rutas
-│   ├── auth.js
-│   └── dashboard.js
-├── scripts
-│   └── update-architecture.js
-├── servicios
-│   ├── pdf
-│   │   ├── base.js
-│   │   ├── posoperacional.js
-│   │   └── preoperacional.js
-│   ├── logo.js
-│   ├── ocr.js
-│   ├── sesiones.js
-│   └── storage.js
-├── ARCHITECTURE.md
-├── cero_dashboard_mockup_v16.html
-├── CERO_Sesion_Diseno_v15_23032026.txt
-├── CERO_Sesion_Diseno_v16_27032026.txt
-├── CERO_Sesion_Diseno_v17_27032026.txt
-├── eslint.config.cjs
-├── index.js
-├── package-lock.json
-├── package.json
-└── README.md
-```
-
-## Dependencies
-
-| Package | Version |
-|---|---|
-| `@google/generative-ai` | ^0.21.0 |
-| `@supabase/supabase-js` | ^2.48.0 |
-| `axios` | ^1.7.9 |
-| `bcryptjs` | ^3.0.3 |
-| `express` | ^4.21.2 |
-| `helmet` | ^8.1.0 |
-| `jsonwebtoken` | ^9.0.3 |
-| `node-cron` | ^3.0.3 |
-| `pdfkit` | ^0.15.1 |
-| `twilio` | ^5.3.5 |
-
-### Dev dependencies
-
-| Package | Version |
-|---|---|
-| `@eslint/js` | ^10.0.1 |
-| `eslint` | ^10.2.0 |
-| `globals` | ^17.4.0 |
-
-<!-- AUTO-GENERATED END -->
