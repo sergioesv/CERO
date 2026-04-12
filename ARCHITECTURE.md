@@ -165,6 +165,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 12/04/2026 | Plan tanqueo v21 — OCR, validación cruzada 4 campos, antifraude rendimiento | 4 semanas, semana 1 en curso |
 | 10/04/2026 | Pipeline CI/CD — 3 workflows | Validación automática antes de merge |
 | 10/04/2026 | Helmet instalado | Headers de seguridad HTTP obligatorios |
 | 10/04/2026 | ARCHITECTURE.md como fuente de verdad | Reemplaza archivos de sesión de diseño |
