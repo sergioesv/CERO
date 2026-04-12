@@ -27,7 +27,7 @@ const vehiculosData       = require('../data/vehiculos');
 function validarFirmaTwilio(req) {
   if (process.env.NODE_ENV !== 'production') return true;
   const firma = req.headers['x-twilio-signature'] || '';
-  const url = (TWILIO_WEBHOOK_URL || '').replace(/\/$/, '') + '/webhook';
+  const url = (TWILIO_WEBHOOK_URL || '').replace(/\/$/, '');
   const params = req.body || {};
   return twilio.validateRequest(TWILIO_AUTH_TOKEN, firma, url, params);
 }
