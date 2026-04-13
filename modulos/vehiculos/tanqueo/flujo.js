@@ -1,382 +1,230 @@
+/**
+ * flujo.js — Máquina de estados del módulo de tanqueo v2
+ * Con OCR de factura, foto de placa, validación cruzada y rendimiento.
+ * CERO — Gestión de Operaciones de Campo
+ */
+
+'use strict';
+
 var config = require('../../../config/config');
-var visual = require('../compartido/validacionVisual');
+var ocr = require('../../../servicios/ocr');
 var storage = require('../../../servicios/storage');
-var vehiculosData = require('../../../data/vehiculos');
-var tanqueosData = require('../../../data/tanqueos');
-var validaciones = require('./validaciones');
-var nav = require('../compartido/navegacion');
-
 var sesiones = require('../../../servicios/sesiones');
-
-var ESTADOS = {
-  INICIO: 'TANQUEO_INICIO',
-  ESPERANDO_PLACA: 'TANQUEO_ESPERANDO_PLACA',
-  ESPERANDO_FOTO_FACTURA: 'TANQUEO_ESPERANDO_FOTO_FACTURA',
-  ESPERANDO_FOTO_ODOMETRO: 'TANQUEO_ESPERANDO_FOTO_ODOMETRO',
-  CONFIRMACION_KM: 'TANQUEO_CONFIRMACION_KM',
-  ESPERANDO_KM_MANUAL: 'TANQUEO_ESPERANDO_KM_MANUAL',
-  ESPERANDO_COMBUSTIBLE: 'TANQUEO_ESPERANDO_COMBUSTIBLE',
-  ESPERANDO_CANTIDAD: 'TANQUEO_ESPERANDO_CANTIDAD',
-  ESPERANDO_VALOR: 'TANQUEO_ESPERANDO_VALOR',
-  ESPERANDO_ESTACION: 'TANQUEO_ESPERANDO_ESTACION',
-  ESPERANDO_OBSERVACIONES: 'TANQUEO_ESPERANDO_OBSERVACIONES',
-  CONFIRMACION_FINAL: 'TANQUEO_CONFIRMACION_FINAL'
-};
+var tanqueosData = require('../../../data/tanqueos');
+var nav = require('../compartido/navegacion');
+var visual = require('../compartido/validacionVisual');
+var validaciones = require('./validaciones');
+var estadoMod = require('./estado');
+var ESTADOS = estadoMod.ESTADOS;
+var mensajes = require('./mensajes');
+var cierre = require('./cierre');
 
 function reiniciarSesionTanqueo(sesion) {
   sesion.tipo = 'tanqueo';
   sesion.estado = ESTADOS.INICIO;
+
   sesion.placa = null;
   sesion.vehiculo = null;
   sesion.conductor = null;
+
   sesion.kilometraje = null;
   sesion.kmDetectado = null;
+  sesion.kmOcrOdometro = null;
+  sesion.kmOcrFactura = null;
   sesion.kmLecturaFueraRango = false;
   sesion.kmReferenciaMeta = null;
   sesion.kmReferencia = null;
   sesion.diferenciaKm = null;
   sesion.inconsistenciaKm = false;
   sesion.alertasKm = [];
-  sesion.tipoCombustible = null;
-  sesion.cantidadCombustible = null;
+
+  sesion.datosOcrFactura = null;
+  sesion.facturaNumeroOcr = null;
+  sesion.facturaNumeroManual = null;
+  sesion.placaOcrFactura = null;
+  sesion.placaOcrFoto = null;
+  sesion.cantidadOcr = null;
+  sesion.cantidadManual = null;
   sesion.unidadMedida = 'litros';
+  sesion.tipoCombustible = null;
   sesion.valorTotal = null;
   sesion.estacionServicio = null;
-  sesion.observacionesTanqueo = null;
+  sesion.precioUnitario = null;
+
   sesion.fotoFacturaTemporal = null;
+  sesion.fotoPlacaTemporal = null;
   sesion.fotoOdometroTemporal = null;
   sesion.fotos = [];
 }
 
-// ── Pie de navegación estándar ────────────────────────────────────────────────
-var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+function aplicarTipoCombustibleDesdeOcr(sesion, datosOcr) {
+  if (!datosOcr.producto || !datosOcr.producto.leido) return;
+  var raw = String(datosOcr.producto.valor || '').trim();
+  if (!raw) return;
+  var lower = raw.toLowerCase();
+  var opt = null;
+  if (/diesel|acpm|diésel/.test(lower)) opt = '1';
+  else if (/adblue|urea/.test(lower)) opt = '4';
+  else if (/gnv|gas\s+natural/.test(lower)) opt = '3';
+  else if (/\bgas\b/.test(lower) && !/gasolina/.test(lower)) opt = '3';
+  else if (/gasolina|corriente|extra|magna/.test(lower)) opt = '2';
 
-function mensajeInicio() {
-  return (
-    '⛽ *Registro de tanqueo*\n\n' +
-    'Escribe la placa del vehículo.' +
-    PIE_NAV
-  );
-}
-
-function mensajeSolicitudFactura() {
-  return (
-    '📸 Envía la *foto del recibo* o factura del tanqueo.' +
-    PIE_NAV
-  );
-}
-
-function mensajeSolicitudOdometro(kmReferenciaMeta) {
-  var msg = '📸 Envía la *foto del odómetro*.';
-  if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
-    msg += '\n\nÚltimo registrado: *' + kmReferenciaMeta.kilometraje + ' km*';
-  }
-  msg += PIE_NAV;
-  return msg;
-}
-
-function mensajeSolicitudKilometrajeManual(kmReferenciaMeta) {
-  var msg = '⌨️ Escribe el kilometraje que aparece en el odómetro.';
-  if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
-    msg += '\n\nReferencia: *' + kmReferenciaMeta.kilometraje + ' km*';
-  }
-  msg += PIE_NAV;
-  return msg;
-}
-
-function mensajeConfirmacionKilometraje(sesion) {
-  var msg =
-    '🔎 *Lectura del odómetro*\n' +
-    'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
-
-  if (typeof sesion.kmReferencia === 'number') {
-    msg += '\nÚltimo registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*';
-    if (typeof sesion.diferenciaKm === 'number') {
-      msg += '\nDiferencia: *' + (sesion.diferenciaKm >= 0 ? '+' : '') + sesion.diferenciaKm.toLocaleString('es-CO') + ' km*';
-    }
-  }
-
-  msg +=
-    '\n\n1️⃣ Confirmar\n' +
-    '2️⃣ Corregir el kilometraje\n' +
-    '3️⃣ Enviar otra foto';
-  msg += PIE_NAV;
-  return msg;
-}
-
-function mensajeAlertaKilometraje(sesion) {
-  var alerta = (sesion.alertasKm || [])[0];
-  var msg = '⚠️ *Lectura del odómetro fuera de rango*\n';
-  if (alerta) msg += (alerta.mensaje || alerta) + '\n';
-
-  if (typeof sesion.kmReferencia === 'number') {
-    msg += 'Último registrado: *' + sesion.kmReferencia.toLocaleString('es-CO') + ' km*\n';
-  }
-
-  msg += 'Detecté: *' + (sesion.kmDetectado || 0).toLocaleString('es-CO') + ' km*';
-  if (typeof sesion.diferenciaKm === 'number') {
-    msg += '\nDiferencia: *' + (sesion.diferenciaKm >= 0 ? '+' : '') + sesion.diferenciaKm.toLocaleString('es-CO') + ' km*';
-  }
-
-  msg +=
-    '\n\n1️⃣ Escribir el kilometraje correcto\n' +
-    '2️⃣ Enviar otra foto';
-  msg += PIE_NAV;
-  return msg;
-}
-
-function mensajeTipoCombustible() {
-  return (
-    '⛽ *Tipo de combustible*\n\n' +
-    '1️⃣ Diésel\n' +
-    '2️⃣ Gasolina\n' +
-    '3️⃣ Gas\n' +
-    '4️⃣ AdBlue\n' +
-    '5️⃣ Otro' +
-    PIE_NAV
-  );
-}
-
-function mensajeCantidad() {
-  return (
-    '🔢 *Cantidad de combustible*\n\n' +
-    'Escribe la cantidad en litros o galones.\n' +
-    'Ejemplos: *45* · *45.5* · *12 gal*' +
-    PIE_NAV
-  );
-}
-
-function mensajeValor() {
-  return (
-    '💰 *Valor total del tanqueo*\n\n' +
-    'Escribe solo el número en pesos.\n' +
-    'Ejemplo: *218400*' +
-    PIE_NAV
-  );
-}
-
-function mensajeEstacion() {
-  return (
-    '🏪 *Estación de servicio*\n\n' +
-    'Escribe el nombre de la estación\no *no* si no aplica.' +
-    PIE_NAV
-  );
-}
-
-function mensajeObservaciones() {
-  return (
-    '💬 *Observaciones del tanqueo*\n\n' +
-    'Escribe una observación\no *no* si no aplica.' +
-    PIE_NAV
-  );
-}
-
-function construirResumen(sesion, telefono) {
-  var lineas = [];
-  lineas.push('───────────────');
-  lineas.push('⛽ *RESUMEN DEL TANQUEO*');
-  lineas.push('───────────────');
-  lineas.push('🚗 Placa: *' + sesion.placa + '*');
-  lineas.push('🧾 Recibo: *OK*');
-  lineas.push('📸 Odómetro: *OK*');
-  lineas.push('🛣️ Kilometraje: *' + sesion.kilometraje + ' km*');
-
-  if (typeof sesion.kmReferencia === 'number') {
-    lineas.push('📍 Referencia km: *' + sesion.kmReferencia + ' km*');
-    lineas.push('↕️ Diferencia: *' + (sesion.diferenciaKm || 0) + ' km*');
-  }
-
-  if (sesion.alertasKm && sesion.alertasKm.length) {
-    lineas.push('⚠️ Alertas km: *' + sesion.alertasKm.join(' | ') + '*');
-  }
-
-  lineas.push('⛽ Combustible: *' + sesion.tipoCombustible + '*');
-  lineas.push('🔢 Cantidad: *' + sesion.cantidadCombustible + ' ' + sesion.unidadMedida + '*');
-  lineas.push('💰 Valor: *' + validaciones.formatearValorMoneda(sesion.valorTotal) + '*');
-
-  if (sesion.estacionServicio) {
-    lineas.push('🏪 Estación: *' + sesion.estacionServicio + '*');
-  }
-
-  if (sesion.observacionesTanqueo) {
-    lineas.push('📝 Observaciones: *' + sesion.observacionesTanqueo + '*');
-  }
-
-  lineas.push('');
-  lineas.push('✍️ Escribe *SI* para guardar');
-  lineas.push('◀️ *ATRAS* para corregir  •  ✖️ *CANCELAR* para anular');
-
-  return lineas.join('\n');
-}
-
-async function manejarAtras(res, sesion) {
-  switch (sesion.estado) {
-    case ESTADOS.ESPERANDO_PLACA:
-      sesion.estado = ESTADOS.INICIO;
-      return validaciones.responderTwiml(res, mensajeInicio());
-
-    case ESTADOS.ESPERANDO_FOTO_FACTURA:
-      sesion.estado = ESTADOS.ESPERANDO_PLACA;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la placa.\n\n' + mensajeInicio());
-
-    case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
-      sesion.fotoFacturaTemporal = null;
-      storage.limpiarFotosPorTipo(sesion, ['factura']);
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la foto del recibo.\n\n' + mensajeSolicitudFactura());
-
-    case ESTADOS.CONFIRMACION_KM:
-    case ESTADOS.ESPERANDO_KM_MANUAL:
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-      sesion.fotoOdometroTemporal = null;
-      sesion.kmDetectado = null;
-      sesion.kmLecturaFueraRango = false;
-      storage.limpiarFotosPorTipo(sesion, ['odometro']);
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la foto del odómetro.\n\n' + mensajeSolicitudOdometro(sesion.kmReferenciaMeta));
-
-    case ESTADOS.ESPERANDO_COMBUSTIBLE:
-      sesion.estado = ESTADOS.CONFIRMACION_KM;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + (sesion.kmLecturaFueraRango ? mensajeAlertaKilometraje(sesion) : mensajeConfirmacionKilometraje(sesion)));
-
-    case ESTADOS.ESPERANDO_CANTIDAD:
-      sesion.estado = ESTADOS.ESPERANDO_COMBUSTIBLE;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al combustible.\n\n' + mensajeTipoCombustible());
-
-    case ESTADOS.ESPERANDO_VALOR:
-      sesion.estado = ESTADOS.ESPERANDO_CANTIDAD;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la cantidad.\n\n' + mensajeCantidad());
-
-    case ESTADOS.ESPERANDO_ESTACION:
-      sesion.estado = ESTADOS.ESPERANDO_VALOR;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al valor.\n\n' + mensajeValor());
-
-    case ESTADOS.ESPERANDO_OBSERVACIONES:
-      sesion.estado = ESTADOS.ESPERANDO_ESTACION;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a la estación.\n\n' + mensajeEstacion());
-
-    case ESTADOS.CONFIRMACION_FINAL:
-      sesion.estado = ESTADOS.ESPERANDO_OBSERVACIONES;
-      return validaciones.responderTwiml(res, '◀️ Volvemos a observaciones.\n\n' + mensajeObservaciones());
-
-    default:
-      return validaciones.responderTwiml(res, 'No hay paso anterior desde aquí.\n\nEscribe *CANCELAR* para salir.');
+  var v = opt ? validaciones.validarTipoCombustible(opt) : validaciones.validarTipoCombustible(lower);
+  if (v.ok) {
+    sesion.tipoCombustible = v.valor;
   }
 }
 
-async function iniciarConPlaca(sesion, telefono, mensaje) {
-  var placa = validaciones.normalizarPlaca(mensaje);
-  if (!placa || placa.length < 5 || placa.length > 10) {
-    return '❌ Placa inválida.\n\nEjemplo: *TKJ933*' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+function aplicarCamposOcrFacturaASesion(sesion, datosOcr) {
+  if (datosOcr.factura_numero && datosOcr.factura_numero.leido) {
+    sesion.facturaNumeroOcr = String(datosOcr.factura_numero.valor || '').trim();
   }
-
-  var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
-  if (carga.error || !carga.vehiculo) {
-    return '❌ El vehículo *' + placa + '* no existe en el sistema.\n\nVerifica la placa.' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+  if (datosOcr.placa && datosOcr.placa.leido) {
+    sesion.placaOcrFactura = validaciones.normalizarPlaca(datosOcr.placa.valor);
   }
-
-  if (carga.vehiculo.bloqueado) {
-    return '🚫 *Vehículo bloqueado*\n' + placa + '\n' + (carga.vehiculo.motivo_bloqueo || 'Contacta al supervisor.') + '\n\n✖️ *CANCELAR*';
+  if (datosOcr.kilometraje && datosOcr.kilometraje.leido) {
+    sesion.kmOcrFactura = String(datosOcr.kilometraje.valor || '').replace(/\D/g, '') || null;
   }
-
-  sesion.placa = placa;
-  sesion.vehiculo = carga.vehiculo;
-  sesion.conductor = carga.conductor || null;
-  sesion.kmReferenciaMeta = await tanqueosData.obtenerReferenciaKilometraje(placa);
-  sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
-
-  return '✅ Vehículo *' + placa + '* listo para el tanqueo.\n\n' + mensajeSolicitudFactura();
-}
-
-function registrarFotoFactura(sesion, mediaUrl) {
-  sesion.fotoFacturaTemporal = mediaUrl;
-  storage.guardarFotoUnica(sesion, {
-    tipo: 'factura',
-    url: mediaUrl,
-    descripcion: 'Foto del recibo de tanqueo',
-    validacion: 'Foto recibo cargada',
-    validada: true
-  });
-}
-
-function registrarFotoOdometro(sesion, mediaUrl) {
-  sesion.fotoOdometroTemporal = mediaUrl;
-  storage.guardarFotoUnica(sesion, {
-    tipo: 'odometro',
-    url: mediaUrl,
-    descripcion: 'Foto del odómetro',
-    validacion: 'Foto odómetro cargada',
-    validada: true
-  });
+  if (datosOcr.cantidad && datosOcr.cantidad.leido) {
+    sesion.cantidadOcr = parseFloat(String(datosOcr.cantidad.valor).replace(',', '.'));
+    if (isNaN(sesion.cantidadOcr)) sesion.cantidadOcr = null;
+  }
+  if (datosOcr.unidad_medida && datosOcr.unidad_medida.leido) {
+    var u = String(datosOcr.unidad_medida.valor || '').toLowerCase();
+    sesion.unidadMedida = /gal/.test(u) ? 'galones' : 'litros';
+  }
+  aplicarTipoCombustibleDesdeOcr(sesion, datosOcr);
+  if (datosOcr.valor_total && datosOcr.valor_total.leido) {
+    var vt = parseFloat(String(datosOcr.valor_total.valor || '').replace(/\D/g, ''));
+    sesion.valorTotal = !isNaN(vt) ? vt : null;
+  }
+  if (datosOcr.estacion && datosOcr.estacion.leido) {
+    sesion.estacionServicio = String(datosOcr.estacion.valor || '').trim() || null;
+  }
 }
 
 function aplicarKilometraje(sesion, kilometraje) {
-  var evaluacion = validaciones.evaluarKilometrajeContraReferencia(kilometraje, sesion.kmReferenciaMeta);
+  var evaluacion = validaciones.evaluarKilometrajeContraReferencia(
+    kilometraje,
+    sesion.kmReferenciaMeta
+  );
   sesion.kilometraje = kilometraje;
+  sesion.kmOcrOdometro = kilometraje;
   sesion.kmReferencia = evaluacion.kmReferencia;
   sesion.diferenciaKm = evaluacion.diferenciaKm;
   sesion.inconsistenciaKm = evaluacion.inconsistenciaKm;
   sesion.alertasKm = evaluacion.alertasKm;
 }
 
-async function guardarTanqueo(sesion, telefono) {
-  var precioUnitario = null;
-  if (sesion.cantidadCombustible) {
-    precioUnitario = Number((sesion.valorTotal / sesion.cantidadCombustible).toFixed(2));
+function siguienteEstadoCompletarCampos(sesion) {
+  if (!sesion.tipoCombustible) {
+    return ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE;
   }
-
-  var datosTanqueo = {
-    vehiculo_placa: sesion.placa,
-    conductor_id: sesion.conductor ? sesion.conductor.id : null,
-    telefono_reporta: validaciones.normalizarTelefono(telefono),
-    tipo_combustible: sesion.tipoCombustible,
-    cantidad: sesion.cantidadCombustible,
-    unidad_medida: sesion.unidadMedida,
-    valor_total: sesion.valorTotal,
-    precio_unitario: precioUnitario,
-    tanque_lleno: false,
-    estacion_servicio: sesion.estacionServicio || null,
-    ciudad: null,
-    factura_numero: null,
-    kilometraje: sesion.kilometraje,
-    km_referencia: sesion.kmReferencia,
-    diferencia_km: sesion.diferenciaKm,
-    inconsistencia_km: !!sesion.inconsistenciaKm,
-    alertas: sesion.alertasKm || [],
-    observaciones: sesion.observacionesTanqueo || null,
-    pdf_url: null
-  };
-
-  var resTanqueo = await tanqueosData.crearTanqueo(datosTanqueo);
-  if (resTanqueo.error) {
-    return { error: resTanqueo.error };
+  if (!sesion.valorTotal) {
+    return ESTADOS.COMPLETAR_VALOR;
   }
-
-  var fotos = (sesion.fotos || []).filter(function(foto) {
-    return foto.tipo === 'factura' || foto.tipo === 'odometro';
-  });
-
-  var resFotos = await tanqueosData.guardarFotosTanqueo(resTanqueo.data.id, fotos);
-  if (resFotos && resFotos.error) {
-    console.error('Error guardando fotos de tanqueo:', resFotos.error.message || resFotos.error);
+  if (!sesion.estacionServicio) {
+    return ESTADOS.COMPLETAR_ESTACION;
   }
-
-  var resVehiculo = await tanqueosData.actualizarKilometrajeVehiculo(sesion.placa, sesion.kilometraje);
-  if (resVehiculo && resVehiculo.error) {
-    console.error('Error actualizando kilometraje de vehículo:', resVehiculo.error.message || resVehiculo.error);
-  }
-
-  return { error: null, tanqueo: resTanqueo.data };
+  return ESTADOS.CONFIRMACION_FINAL;
 }
 
-function mensajeErrorPersistencia(error) {
-  var texto = (error && (error.message || error.details || error.hint)) || String(error || '');
+async function manejarAtras(res, sesion) {
+  switch (sesion.estado) {
+    case ESTADOS.ESPERANDO_FOTO_FACTURA:
+      return validaciones.responderTwiml(res, mensajes.inicio());
 
-  if (/conductor_id/i.test(texto) || /telefono_reporta/i.test(texto)) {
-    return '❌ No pude guardar el tanqueo porque la base todavía no está alineada con el flujo nuevo.\n\n' +
-      'Primero aplica la migración corta de tanqueo (conductor opcional + teléfono que reporta) y vuelve a probar.';
+    case ESTADOS.ESPERANDO_FOTO_PLACA:
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+      sesion.datosOcrFactura = null;
+      sesion.facturaNumeroOcr = null;
+      sesion.placaOcrFactura = null;
+      sesion.cantidadOcr = null;
+      sesion.kmOcrFactura = null;
+      storage.limpiarFotosPorTipo(sesion, ['factura']);
+      return validaciones.responderTwiml(res, '◀️ Volvemos al recibo.\n\n' + mensajes.inicio());
+
+    case ESTADOS.CONFIRMACION_PLACA:
+    case ESTADOS.PLACA_MANUAL:
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      sesion.placaOcrFoto = null;
+      sesion.placa = null;
+      sesion.vehiculo = null;
+      sesion.conductor = null;
+      storage.limpiarFotosPorTipo(sesion, ['placa']);
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos a la foto de la placa.\n\n' +
+        mensajes.solicitarFotoPlaca(sesion.placaOcrFactura)
+      );
+
+    case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos a la foto de la placa.\n\n' +
+        mensajes.solicitarFotoPlaca(sesion.placaOcrFactura)
+      );
+
+    case ESTADOS.CONFIRMACION_KM:
+    case ESTADOS.KM_MANUAL:
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+      sesion.kmDetectado = null;
+      sesion.kmLecturaFueraRango = false;
+      sesion.kmOcrOdometro = null;
+      storage.limpiarFotosPorTipo(sesion, ['odometro']);
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos al odómetro.\n\n' +
+        mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta)
+      );
+
+    case ESTADOS.ESPERANDO_FACTURA_MANUAL:
+      sesion.estado = ESTADOS.CONFIRMACION_KM;
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos al kilometraje.\n\n' +
+        (sesion.kmLecturaFueraRango
+          ? mensajes.alertaKmFueraRango(sesion)
+          : mensajes.confirmarKmOcr(sesion))
+      );
+
+    case ESTADOS.ESPERANDO_LITROS_MANUAL:
+      sesion.estado = ESTADOS.ESPERANDO_FACTURA_MANUAL;
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos al número de factura.\n\n' +
+        mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr)
+      );
+
+    case ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE:
+    case ESTADOS.COMPLETAR_VALOR:
+    case ESTADOS.COMPLETAR_ESTACION:
+      sesion.estado = ESTADOS.ESPERANDO_LITROS_MANUAL;
+      return validaciones.responderTwiml(
+        res,
+        '◀️ Volvemos a la cantidad.\n\n' +
+        mensajes.solicitarLitrosManual(sesion.cantidadOcr, sesion.unidadMedida)
+      );
+
+    case ESTADOS.CONFIRMACION_FINAL:
+      if (!sesion.estacionServicio) {
+        sesion.estado = ESTADOS.COMPLETAR_ESTACION;
+        return validaciones.responderTwiml(res, mensajes.solicitarEstacion());
+      }
+      if (!sesion.valorTotal) {
+        sesion.estado = ESTADOS.COMPLETAR_VALOR;
+        return validaciones.responderTwiml(res, mensajes.solicitarValorTotal());
+      }
+      sesion.estado = ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE;
+      return validaciones.responderTwiml(res, mensajes.solicitarTipoCombustible());
+
+    default:
+      return validaciones.responderTwiml(
+        res,
+        'No hay paso anterior desde aquí.\n\nEscribe *9* para ir al menú.'
+      );
   }
-
-  return '❌ No pude guardar el tanqueo.\n\nRevisa el log del servidor y vuelve a intentar.';
 }
 
 async function manejarTanqueo(req, res) {
@@ -387,87 +235,198 @@ async function manejarTanqueo(req, res) {
   var mediaUrl = mediaUrls[0] || null;
   var sesion = await sesiones.obtenerSesion(telefono);
 
-  // 9 / CANCELAR / MENU / INICIO → menú directo
   if (mensaje === '9' || mensajeMayus === 'CANCELAR' || mensajeMayus === 'MENU' || mensajeMayus === 'INICIO') {
     sesiones.eliminarSesion(telefono);
     await sesiones.guardarCambios();
     return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
   }
 
-  // REINICIAR → reiniciar el flujo de tanqueo
-  if (mensajeMayus === 'REINICIAR') {
-    reiniciarSesionTanqueo(sesion);
-    sesion.estado = ESTADOS.ESPERANDO_PLACA;
-    await sesiones.guardarCambios();
-    return validaciones.responderTwiml(res, mensajeInicio());
-  }
-
-  // 0 / ATRAS → retroceder un paso
   if (mensaje === '0' || mensajeMayus === 'ATRAS') {
     await sesiones.guardarCambios();
     return manejarAtras(res, sesion);
   }
 
-  if (sesion.tipo !== 'tanqueo' || !sesion.estado || sesion.estado === 'INICIO') {
+  if (sesion.tipo !== 'tanqueo' || !sesion.estado || sesion.estado === ESTADOS.INICIO) {
     reiniciarSesionTanqueo(sesion);
-    sesion.estado = ESTADOS.ESPERANDO_PLACA;
+    sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
     await sesiones.guardarCambios();
-    return validaciones.responderTwiml(res, mensajeInicio());
+    return validaciones.responderTwiml(res, mensajes.inicio());
   }
 
   var respuesta = null;
 
   switch (sesion.estado) {
-    case ESTADOS.ESPERANDO_PLACA:
-      respuesta = await iniciarConPlaca(sesion, telefono, mensaje);
-      break;
-
     case ESTADOS.ESPERANDO_FOTO_FACTURA:
       if (!mediaUrl) {
-        respuesta = '📸 Envía la foto del recibo para continuar.' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+        respuesta = mensajes.faltaFotoRecibo();
         break;
       }
-      registrarFotoFactura(sesion, mediaUrl);
+
+      sesion.fotoFacturaTemporal = mediaUrl;
+      storage.guardarFotoUnica(sesion, {
+        tipo: 'factura',
+        url: mediaUrl,
+        descripcion: 'Foto del recibo de tanqueo',
+        validacion: 'Foto recibo cargada',
+        validada: true
+      });
+
+      var msgLeyendo = mensajes.leyendoRecibo();
+      await sesiones.guardarCambios();
+      validaciones.responderTwiml(res, msgLeyendo);
+
+      try {
+        var datosOcr = await ocr.extraerDatosFacturaCombustible(mediaUrl);
+        sesion.datosOcrFactura = datosOcr;
+        aplicarCamposOcrFacturaASesion(sesion, datosOcr);
+        sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      } catch (eOcr) {
+        console.error('[Tanqueo] Error OCR factura:', eOcr.message || eOcr);
+        sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      }
+
+      await sesiones.guardarCambios();
+      return;
+
+    case ESTADOS.ESPERANDO_FOTO_PLACA:
+      if (!mediaUrl) {
+        respuesta = mensajes.solicitarFotoPlaca(sesion.placaOcrFactura);
+        break;
+      }
+
+      sesion.fotoPlacaTemporal = mediaUrl;
+      storage.guardarFotoUnica(sesion, {
+        tipo: 'placa',
+        url: mediaUrl,
+        descripcion: 'Foto de la placa del vehículo',
+        validacion: 'Foto placa cargada',
+        validada: true
+      });
+
+      var resultadoPlaca = await visual.resolverPlacaFotoOperativa(mediaUrl, telefono);
+      sesion.placaOcrFoto = resultadoPlaca.placaDetectada || null;
+
+      if (resultadoPlaca.tipo === 'exacta' || resultadoPlaca.tipo === 'sugerida') {
+        var placaDetectada = resultadoPlaca.tipo === 'exacta'
+          ? resultadoPlaca.placaDetectada
+          : resultadoPlaca.placaSugerida;
+
+        if (resultadoPlaca.carga && resultadoPlaca.carga.vehiculo && resultadoPlaca.carga.vehiculo.bloqueado) {
+          respuesta = mensajes.vehiculoBloqueado(placaDetectada, resultadoPlaca.carga.vehiculo.motivo_bloqueo);
+          break;
+        }
+
+        sesion.placa = placaDetectada;
+        sesion.vehiculo = resultadoPlaca.carga.vehiculo;
+        sesion.conductor = resultadoPlaca.carga.conductor || null;
+        sesion.kmReferenciaMeta = await tanqueosData.obtenerReferenciaKilometraje(placaDetectada);
+
+        sesion.estado = ESTADOS.CONFIRMACION_PLACA;
+        respuesta = mensajes.confirmarPlacaOcr(placaDetectada);
+      } else {
+        sesion.estado = ESTADOS.PLACA_MANUAL;
+        respuesta = mensajes.solicitarPlacaManual();
+      }
+      break;
+
+    case ESTADOS.CONFIRMACION_PLACA:
+      if (mensaje === '1') {
+        sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+        respuesta = mensajes.placaConfirmadaPrefijo(sesion.placa) +
+          mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta);
+      } else if (mensaje === '2') {
+        sesion.placa = null;
+        sesion.vehiculo = null;
+        sesion.conductor = null;
+        sesion.kmReferenciaMeta = null;
+        sesion.estado = ESTADOS.PLACA_MANUAL;
+        respuesta = mensajes.solicitarPlacaManual();
+      } else {
+        respuesta = mensajes.promptConfirmacionPlacaInvalida();
+      }
+      break;
+
+    case ESTADOS.PLACA_MANUAL:
+      var resultadoPlacaManual = await visual.resolverPlacaManualOperativa(mensaje, telefono);
+
+      if (resultadoPlacaManual.tipo === 'formato_invalido') {
+        respuesta = mensajes.placaManualInvalida();
+        break;
+      }
+      if (resultadoPlacaManual.tipo === 'no_encontrado') {
+        respuesta = mensajes.vehiculoNoEncontrado(resultadoPlacaManual.placaDetectada);
+        break;
+      }
+
+      if (resultadoPlacaManual.carga.vehiculo.bloqueado) {
+        respuesta = mensajes.vehiculoBloqueado(
+          resultadoPlacaManual.placaDetectada,
+          resultadoPlacaManual.carga.vehiculo.motivo_bloqueo
+        );
+        break;
+      }
+
+      sesion.placa = resultadoPlacaManual.placaDetectada;
+      sesion.vehiculo = resultadoPlacaManual.carga.vehiculo;
+      sesion.conductor = resultadoPlacaManual.carga.conductor || null;
+      sesion.kmReferenciaMeta = await tanqueosData.obtenerReferenciaKilometraje(sesion.placa);
       sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-      respuesta = '✅ Recibo cargado.\n\n' + mensajeSolicitudOdometro(sesion.kmReferenciaMeta);
+      respuesta = mensajes.placaRegistradaPrefijo(sesion.placa) +
+        mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta);
       break;
 
     case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
       if (!mediaUrl) {
-        respuesta = '📸 Envía la foto del odómetro para continuar.' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+        respuesta = mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta);
         break;
       }
-      registrarFotoOdometro(sesion, mediaUrl);
-      var resultadoVisualKm = await visual.resolverFotoOdometroOperativa(
+
+      sesion.fotoOdometroTemporal = mediaUrl;
+      storage.guardarFotoUnica(sesion, {
+        tipo: 'odometro',
+        url: mediaUrl,
+        descripcion: 'Foto del odómetro',
+        validacion: 'Foto odómetro cargada',
+        validada: true
+      });
+
+      var resultadoOdometro = await visual.resolverFotoOdometroOperativa(
         mediaUrl,
         sesion.kmReferenciaMeta,
         config.MAX_KM_SALTO
       );
-      if (resultadoVisualKm.tipo === 'manual') {
-        sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
-        respuesta = '⚠️ No pude leer el odómetro con seguridad.\n\n' + mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta);
+
+      if (resultadoOdometro.tipo === 'manual') {
+        sesion.estado = ESTADOS.KM_MANUAL;
+        respuesta = '⚠️ No pude leer el odómetro con seguridad.\n\n' +
+          mensajes.solicitarKmManual(sesion.kmReferenciaMeta);
         break;
       }
-      sesion.kmDetectado = resultadoVisualKm.kilometraje;
-      sesion.kmReferencia = resultadoVisualKm.evaluacion.kmReferencia;
-      sesion.diferenciaKm = resultadoVisualKm.evaluacion.diferenciaKm;
-      sesion.inconsistenciaKm = resultadoVisualKm.evaluacion.inconsistenciaKm;
-      sesion.alertasKm = resultadoVisualKm.evaluacion.alertasKm;
-      sesion.kmLecturaFueraRango = resultadoVisualKm.tipo === 'fuera_rango';
+
+      sesion.kmDetectado = resultadoOdometro.kilometraje;
+      sesion.kmReferencia = resultadoOdometro.evaluacion.kmReferencia;
+      sesion.diferenciaKm = resultadoOdometro.evaluacion.diferenciaKm;
+      sesion.inconsistenciaKm = resultadoOdometro.evaluacion.inconsistenciaKm;
+      sesion.alertasKm = resultadoOdometro.evaluacion.alertasKm;
+      sesion.kmLecturaFueraRango = resultadoOdometro.tipo === 'fuera_rango';
       sesion.estado = ESTADOS.CONFIRMACION_KM;
-      respuesta = sesion.kmLecturaFueraRango ? mensajeAlertaKilometraje(sesion) : mensajeConfirmacionKilometraje(sesion);
+
+      respuesta = sesion.kmLecturaFueraRango
+        ? mensajes.alertaKmFueraRango(sesion)
+        : mensajes.confirmarKmOcr(sesion);
       break;
 
     case ESTADOS.CONFIRMACION_KM:
       if (mensaje === '1' && !sesion.kmLecturaFueraRango && typeof sesion.kmDetectado === 'number') {
         aplicarKilometraje(sesion, sesion.kmDetectado);
-        sesion.estado = ESTADOS.ESPERANDO_COMBUSTIBLE;
-        respuesta = '✅ Kilometraje confirmado: *' + sesion.kilometraje + ' km*\n\n' + mensajeTipoCombustible();
+        sesion.estado = ESTADOS.ESPERANDO_FACTURA_MANUAL;
+        respuesta = mensajes.kilometrajeConfirmadoPrefijo(sesion.kilometraje) +
+          mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr);
         break;
       }
       if (mensaje === '2') {
-        sesion.estado = ESTADOS.ESPERANDO_KM_MANUAL;
-        respuesta = mensajeSolicitudKilometrajeManual(sesion.kmReferenciaMeta);
+        sesion.estado = ESTADOS.KM_MANUAL;
+        respuesta = mensajes.solicitarKmManual(sesion.kmReferenciaMeta);
         break;
       }
       if (mensaje === '3') {
@@ -475,101 +434,121 @@ async function manejarTanqueo(req, res) {
         sesion.kmDetectado = null;
         sesion.kmLecturaFueraRango = false;
         storage.limpiarFotosPorTipo(sesion, ['odometro']);
-        respuesta = mensajeSolicitudOdometro(sesion.kmReferenciaMeta);
+        respuesta = mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta);
         break;
       }
-      respuesta = sesion.kmLecturaFueraRango
-        ? 'Escribe el kilometraje correcto o envía otra foto.' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
-        : 'Responde con *1*, *2* o *3*.' + '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+      respuesta = mensajes.promptConfirmacionKmInvalida();
       break;
 
-    case ESTADOS.ESPERANDO_KM_MANUAL:
-      var kilometraje = visual.parsearKilometraje(mensaje);
-      if (kilometraje === null) {
-        respuesta = '❌ Kilometraje inválido.\n\nEscribe solo números. Ejemplo: *47889*';
+    case ESTADOS.KM_MANUAL:
+      var kmManual = visual.parsearKilometraje(mensaje);
+      if (kmManual === null) {
+        respuesta = mensajes.kmManualInvalido();
         break;
       }
-      aplicarKilometraje(sesion, kilometraje);
-      sesion.estado = ESTADOS.ESPERANDO_COMBUSTIBLE;
-      respuesta = '✅ Kilometraje registrado: *' + kilometraje + ' km*';
+      aplicarKilometraje(sesion, kmManual);
+      sesion.estado = ESTADOS.ESPERANDO_FACTURA_MANUAL;
+      respuesta = mensajes.kilometrajeRegistradoPrefijo(sesion.kilometraje);
       if (sesion.alertasKm && sesion.alertasKm.length) {
-        respuesta += '\n⚠️ ' + sesion.alertasKm.join(' | ');
+        respuesta += '\n⚠️ ' + sesion.alertasKm.map(function(a) { return a.mensaje || a; }).join(' | ');
       }
-      respuesta += '\n\n' + mensajeTipoCombustible();
+      respuesta += '\n\n' + mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr);
       break;
 
-    case ESTADOS.ESPERANDO_COMBUSTIBLE:
-      var validacionCombustible = validaciones.validarTipoCombustible(mensaje);
-      if (!validacionCombustible.ok) {
-        respuesta = validacionCombustible.mensaje;
+    case ESTADOS.ESPERANDO_FACTURA_MANUAL:
+      if (!mensaje) {
+        respuesta = mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr);
         break;
       }
-      sesion.tipoCombustible = validacionCombustible.valor;
-      sesion.estado = ESTADOS.ESPERANDO_CANTIDAD;
-      respuesta = '✅ Combustible registrado: *' + sesion.tipoCombustible + '*\n\n' + mensajeCantidad();
+      sesion.facturaNumeroManual = mensaje.trim();
+      sesion.estado = ESTADOS.ESPERANDO_LITROS_MANUAL;
+      respuesta = mensajes.facturaRegistradaPrefijo(sesion.facturaNumeroManual) +
+        mensajes.solicitarLitrosManual(sesion.cantidadOcr, sesion.unidadMedida);
       break;
 
-    case ESTADOS.ESPERANDO_CANTIDAD:
-      var cantidad = validaciones.parsearCantidad(mensaje);
-      if (!cantidad.ok) {
-        respuesta = cantidad.mensaje;
+    case ESTADOS.ESPERANDO_LITROS_MANUAL:
+      var parsedCantidad = validaciones.parsearCantidad(mensaje);
+      if (!parsedCantidad.ok) {
+        respuesta = parsedCantidad.mensaje;
         break;
       }
-      sesion.cantidadCombustible = cantidad.cantidad;
-      sesion.unidadMedida = cantidad.unidadMedida;
-      sesion.estado = ESTADOS.ESPERANDO_VALOR;
-      respuesta = '✅ Cantidad registrada: *' + sesion.cantidadCombustible + ' ' + sesion.unidadMedida + '*\n\n' + mensajeValor();
+      sesion.cantidadManual = parsedCantidad.cantidad;
+      sesion.unidadMedida = parsedCantidad.unidadMedida;
+      sesion.estado = siguienteEstadoCompletarCampos(sesion);
+
+      if (sesion.estado === ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE) {
+        respuesta = mensajes.solicitarTipoCombustible();
+      } else if (sesion.estado === ESTADOS.COMPLETAR_VALOR) {
+        respuesta = mensajes.solicitarValorTotal();
+      } else if (sesion.estado === ESTADOS.COMPLETAR_ESTACION) {
+        respuesta = mensajes.solicitarEstacion();
+      } else {
+        respuesta = mensajes.resumenFinal(sesion);
+      }
       break;
 
-    case ESTADOS.ESPERANDO_VALOR:
-      var valor = validaciones.parsearValor(mensaje);
-      if (valor === null) {
-        respuesta = '❌ Valor inválido.\n\nEscribe solo el número. Ejemplo: *218400*';
+    case ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE:
+      var validCombustible = validaciones.validarTipoCombustible(mensaje);
+      if (!validCombustible.ok) {
+        respuesta = validCombustible.mensaje;
         break;
       }
-      sesion.valorTotal = valor;
-      sesion.estado = ESTADOS.ESPERANDO_ESTACION;
-      respuesta = '✅ Valor registrado: *' + validaciones.formatearValorMoneda(sesion.valorTotal) + '*\n\n' + mensajeEstacion();
+      sesion.tipoCombustible = validCombustible.valor;
+      sesion.estado = sesion.valorTotal
+        ? (sesion.estacionServicio ? ESTADOS.CONFIRMACION_FINAL : ESTADOS.COMPLETAR_ESTACION)
+        : ESTADOS.COMPLETAR_VALOR;
+      respuesta = sesion.estado === ESTADOS.COMPLETAR_VALOR
+        ? mensajes.solicitarValorTotal()
+        : sesion.estado === ESTADOS.COMPLETAR_ESTACION
+          ? mensajes.solicitarEstacion()
+          : mensajes.resumenFinal(sesion);
       break;
 
-    case ESTADOS.ESPERANDO_ESTACION:
-      sesion.estacionServicio = /^no$/i.test(mensaje) ? null : mensaje;
-      sesion.estado = ESTADOS.ESPERANDO_OBSERVACIONES;
-      respuesta = mensajeObservaciones();
+    case ESTADOS.COMPLETAR_VALOR:
+      var valorParsed = validaciones.parsearValor(mensaje);
+      if (valorParsed === null) {
+        respuesta = mensajes.valorInvalido();
+        break;
+      }
+      sesion.valorTotal = valorParsed;
+      sesion.estado = sesion.estacionServicio ? ESTADOS.CONFIRMACION_FINAL : ESTADOS.COMPLETAR_ESTACION;
+      respuesta = sesion.estado === ESTADOS.COMPLETAR_ESTACION
+        ? mensajes.solicitarEstacion()
+        : mensajes.resumenFinal(sesion);
       break;
 
-    case ESTADOS.ESPERANDO_OBSERVACIONES:
-      sesion.observacionesTanqueo = /^no$/i.test(mensaje) ? null : mensaje;
+    case ESTADOS.COMPLETAR_ESTACION:
+      sesion.estacionServicio = (mensaje === '0' || /^no$/i.test(mensaje)) ? null : mensaje.trim();
       sesion.estado = ESTADOS.CONFIRMACION_FINAL;
-      respuesta = construirResumen(sesion, telefono);
+      respuesta = mensajes.resumenFinal(sesion);
       break;
 
     case ESTADOS.CONFIRMACION_FINAL:
-      if (mensaje.toUpperCase() === 'SI') {
-        var guardado = await guardarTanqueo(sesion, telefono);
+      if (mensaje === '1') {
+        var guardado = await cierre.guardarTanqueo(sesion, telefono);
         if (guardado.error) {
-          respuesta = mensajeErrorPersistencia(guardado.error);
+          respuesta = mensajes.errorGuardado();
           break;
         }
         sesiones.eliminarSesion(telefono);
+        await sesiones.guardarCambios();
         return validaciones.responderTwiml(
           res,
-          '───────────────\n' +
-          '✅ *TANQUEO GUARDADO*\n' +
-          '───────────────\n' +
-          '🚗 *' + guardado.tanqueo.vehiculo_placa + '*\n' +
-          '🛣️ Kilometraje: *' + guardado.tanqueo.kilometraje + ' km*\n\n' +
-          'Escribe *9* para volver al menú.'
+          mensajes.tanqueoGuardado(guardado.tanqueo, guardado.estadoValidacion)
         );
       }
-
-      respuesta = 'Escribe *SI* para guardar\no *ATRAS* para corregir\no *CANCELAR* para anular.';
+      if (mensaje === '2') {
+        sesiones.eliminarSesion(telefono);
+        await sesiones.guardarCambios();
+        return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
+      }
+      respuesta = mensajes.promptFinalGuardarCancelar();
       break;
 
     default:
       reiniciarSesionTanqueo(sesion);
-      sesion.estado = ESTADOS.ESPERANDO_PLACA;
-      respuesta = mensajeInicio();
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+      respuesta = mensajes.inicio();
       break;
   }
 
@@ -582,4 +561,3 @@ module.exports = {
   ESTADOS: ESTADOS,
   reiniciarSesionTanqueo: reiniciarSesionTanqueo
 };
-

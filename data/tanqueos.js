@@ -44,13 +44,41 @@ async function actualizarKilometrajeVehiculo(placa, kilometraje) {
     .eq('placa', placa);
 }
 
+/**
+ * Obtiene el promedio histórico de rendimiento km/L de un vehículo.
+ * Solo considera tanqueos con rendimiento_calculado válido (> 0).
+ *
+ * @param {string} placa
+ * @returns {{ promedio: number|null }}
+ */
+async function obtenerRendimientoHistorico(placa) {
+  var resultado = await config.supabase
+    .from(TABLA_TANQUEOS)
+    .select('rendimiento_calculado')
+    .eq('vehiculo_placa', placa)
+    .gt('rendimiento_calculado', 0)
+    .not('rendimiento_calculado', 'is', null)
+    .limit(20);
+
+  if (resultado.error || !resultado.data || resultado.data.length === 0) {
+    return { promedio: null };
+  }
+
+  var suma = resultado.data.reduce(function(acc, row) {
+    return acc + parseFloat(row.rendimiento_calculado);
+  }, 0);
+
+  return { promedio: parseFloat((suma / resultado.data.length).toFixed(2)) };
+}
+
 module.exports = {
   TABLA_TANQUEOS: TABLA_TANQUEOS,
   TABLA_FOTOS: TABLA_FOTOS,
   obtenerReferenciaKilometraje: obtenerReferenciaKilometraje,
   crearTanqueo: crearTanqueo,
   guardarFotosTanqueo: guardarFotosTanqueo,
-  actualizarKilometrajeVehiculo: actualizarKilometrajeVehiculo
+  actualizarKilometrajeVehiculo: actualizarKilometrajeVehiculo,
+  obtenerRendimientoHistorico: obtenerRendimientoHistorico
 };
 
 
