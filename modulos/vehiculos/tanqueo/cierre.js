@@ -17,8 +17,8 @@ function ejecutarValidacionCruzada(sesion) {
   var discrepancias = [];
   var coincidencias = 0;
 
-  var placaRecibo = (sesion.placaOcrFactura || '').toUpperCase().trim();
-  var placaFoto = (sesion.placaOcrFoto || sesion.placa || '').toUpperCase().trim();
+  var placaRecibo = (sesion.placaOcrFactura || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
+  var placaFoto = (sesion.placaOcrFoto || sesion.placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
   if (placaRecibo && placaFoto) {
     if (placaRecibo === placaFoto) {
       coincidencias++;
