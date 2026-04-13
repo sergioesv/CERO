@@ -165,6 +165,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 12/04/2026 | Tanqueo v2 — flujo reconstruido sobre patrón preoperacional | OCR síncrono, reutiliza kmCompartido, foto placa → odómetro → recibo |
+| 12/04/2026 | Validación cruzada 4 campos — placa, km, cantidad, factura | Antifraude, auto_validado vs pendiente_revision |
 | 12/04/2026 | Plan tanqueo v21 — OCR, validación cruzada 4 campos, antifraude rendimiento | 4 semanas, semana 1 en curso |
 | 10/04/2026 | Pipeline CI/CD — 3 workflows | Validación automática antes de merge |
 | 10/04/2026 | Helmet instalado | Headers de seguridad HTTP obligatorios |
