@@ -9,7 +9,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     flota: ['ver'],
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
-    tanqueos: ['ver'],
+    tanqueos: ['ver', 'editar'],
     alertas: ['ver'],
     dashboard: ['ver'],
     autorizaciones: ['ver', 'editar']
@@ -22,7 +22,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     flota: ['ver'],
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
-    tanqueos: ['ver'],
+    tanqueos: ['ver', 'editar'],
     alertas: ['ver'],
     dashboard: ['ver'],
     autorizaciones: ['ver', 'editar']
@@ -33,7 +33,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     flota: ['ver'],
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
-    tanqueos: ['ver'],
+    tanqueos: ['ver', 'editar'],
     alertas: ['ver']
   },
   supervisor: {
@@ -41,7 +41,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     flota: ['ver'],
     preoperacionales: ['ver', 'autorizar'],
     posoperacionales: ['ver', 'autorizar'],
-    tanqueos: ['ver', 'autorizar'],
+    tanqueos: ['ver', 'autorizar', 'editar'],
     alertas: ['ver', 'autorizar'],
     dashboard: ['ver'],
     autorizaciones: ['ver']
