@@ -40,6 +40,7 @@ function textoIncluye(normalizado, terminos) {
 function descargarImagen(url) {
   return (async function() {
     try {
+      console.log('[OCR] Descargando URL:', url.substring(0, 80));
       var urlObj = new URL(url);
       var permitido = DOMINIOS_PERMITIDOS.some(function(dom) {
         return urlObj.hostname.endsWith(dom);
