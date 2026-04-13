@@ -504,6 +504,47 @@ function marcarTodoOK() {
 }
 
 /**
+ * Normaliza y valida el resultado del OCR de factura.
+ * Garantiza que todos los campos tengan la estructura correcta.
+ * Si un campo viene mal formado, lo marca como no leido.
+ *
+ * @param {Object} datos — respuesta cruda de Gemini
+ * @param {Object} resultadoVacio — objeto por defecto con campos vacios
+ * @returns {Object} — resultado validado con 10 campos
+ */
+function normalizarResultadoOCR(datos, resultadoVacio) {
+  var camposRequeridos = [
+    'factura_numero', 'placa', 'kilometraje', 'producto',
+    'cantidad', 'unidad_medida', 'precio_unitario',
+    'valor_total', 'estacion', 'fecha'
+  ];
+
+  if (!datos || typeof datos !== 'object') {
+    return resultadoVacio;
+  }
+
+  var resultado = {};
+  for (var i = 0; i < camposRequeridos.length; i++) {
+    var campo = camposRequeridos[i];
+    var c = datos[campo];
+    if (c && typeof c.leido === 'boolean') {
+      var valorStr = String(c.valor || '').trim();
+      resultado[campo] = {
+        valor: valorStr,
+        leido: c.leido && valorStr !== ''
+      };
+    } else {
+      resultado[campo] = { valor: '', leido: false };
+    }
+  }
+
+  var leidos = camposRequeridos.filter(function(c) { return resultado[c].leido; }).length;
+  console.log('[OCR Factura] ' + leidos + '/10 campos leídos exitosamente');
+
+  return resultado;
+}
+
+/**
  * Extrae datos de una factura/recibo de estación de combustible usando Gemini OCR.
  * Analiza la foto y retorna 10 campos con indicador de lectura exitosa.
  * Si un campo no es legible o no aparece, marca leido como false.
@@ -597,23 +638,7 @@ async function extraerDatosFacturaCombustible(urlFoto) {
       modelo: MODELO_VISION
     });
 
-    var resultadoFinal = {};
-    for (var i = 0; i < camposRequeridos.length; i++) {
-      var nombreCampo = camposRequeridos[i];
-      if (datos && datos[nombreCampo] && typeof datos[nombreCampo].leido === 'boolean') {
-        resultadoFinal[nombreCampo] = {
-          valor: String(datos[nombreCampo].valor || '').trim(),
-          leido: datos[nombreCampo].leido && String(datos[nombreCampo].valor || '').trim() !== ''
-        };
-      } else {
-        resultadoFinal[nombreCampo] = { valor: '', leido: false };
-      }
-    }
-
-    var leidos = camposRequeridos.filter(function(c) { return resultadoFinal[c].leido; }).length;
-    console.log('[OCR Factura] ' + leidos + '/10 campos leídos exitosamente');
-
-    return resultadoFinal;
+    return normalizarResultadoOCR(datos, resultadoVacio);
   } catch (error) {
     console.error('[OCR Factura] Error general:', error.message);
     return resultadoVacio;
