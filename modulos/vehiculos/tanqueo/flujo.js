@@ -97,6 +97,7 @@ function mensajeKilometrajeFueraRangoTanqueo(sesion, evaluacion, maxKmSalto) {
 
 function reiniciarSesionTanqueo(sesion) {
   sesion.tipo = 'tanqueo';
+  sesion.tipoTanqueo = null; // 'convenio' o 'emergencia'
   sesion.estado = ESTADOS.INICIO;
 
   sesion.placa = null;
@@ -233,8 +234,9 @@ function manejarAtras(res, sesion) {
       sesion.placaDetectada = null;
       sesion.placaSugerida = null;
       sesion.fotoPlacaTemporal = null;
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al inicio.\n\n' + mensajes.inicio());
+      sesion.tipoTanqueo = null;
+      sesion.estado = ESTADOS.TIPO_TANQUEO;
+      return validaciones.responderTwiml(res, '◀️ Volvemos al inicio.\n\n' + mensajes.preguntarTipoTanqueo());
 
     case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
     case ESTADOS.CONFIRMACION_KM:
@@ -331,11 +333,26 @@ async function manejarTanqueo(req, res) {
 
     if (sesion.tipo !== 'tanqueo' || !sesion.estado || sesion.estado === ESTADOS.INICIO) {
       reiniciarSesionTanqueo(sesion);
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
-      return validaciones.responderTwiml(res, mensajes.inicio());
+      sesion.estado = ESTADOS.TIPO_TANQUEO;
+      return validaciones.responderTwiml(res, mensajes.preguntarTipoTanqueo());
     }
 
     switch (sesion.estado) {
+      case ESTADOS.TIPO_TANQUEO:
+        // Respuesta 1 = convenio, 2 = emergencia
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          sesion.tipoTanqueo = 'convenio';
+          sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+          return validaciones.responderTwiml(res, mensajes.tipoTanqueoRegistrado('convenio'));
+        }
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.tipoTanqueo = 'emergencia';
+          sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+          return validaciones.responderTwiml(res, mensajes.tipoTanqueoRegistrado('emergencia'));
+        }
+        // Respuesta inválida — repetir pregunta
+        return validaciones.responderTwiml(res, mensajes.preguntarTipoTanqueo());
+
       case ESTADOS.ESPERANDO_FOTO_PLACA:
         if (numMedia === 0) return validaciones.responderTwiml(res, mensajes.inicio());
         return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);

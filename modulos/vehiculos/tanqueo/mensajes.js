@@ -24,6 +24,31 @@ function inicio() {
   );
 }
 
+/**
+ * Pregunta el tipo de tanqueo al conductor.
+ * Convenio = red TERPEL con iButton. Emergencia = otra estación.
+ */
+function preguntarTipoTanqueo() {
+  return (
+    '⛽ *Registro de tanqueo*\n\n' +
+    '¿Qué tipo de tanqueo vas a registrar?\n\n' +
+    '1️⃣ Convenio (iButton / TERPEL)\n' +
+    '2️⃣ Emergencia (otra estación)\n' +
+    PIE
+  );
+}
+
+/**
+ * Confirma el tipo registrado y solicita la foto de la placa.
+ * @param {string} tipo — 'convenio' o 'emergencia'
+ */
+function tipoTanqueoRegistrado(tipo) {
+  var etiqueta = tipo === 'emergencia'
+    ? '⚠️ Tanqueo de emergencia registrado.'
+    : '✅ Tanqueo convenio registrado.';
+  return etiqueta + '\n\n📸 *Paso 1 — Foto de la placa*\nEnvía una foto frontal donde la placa sea claramente visible.\n_Buena luz, sin reflejos._' + PIE;
+}
+
 function solicitarFotoPlaca(placaOcrRecibo) {
   var msg = '📸 *Foto de la placa*\n' +
     'Envía una foto frontal donde la placa sea claramente visible.';
@@ -159,6 +184,10 @@ function resumenFinal(sesion) {
   lineas.push('⛽ *RESUMEN DEL TANQUEO*');
   lineas.push('───────────────');
   lineas.push('🚗 Placa: *' + sesion.placa + '*');
+  if (sesion.tipoTanqueo) {
+    var etiquetaTipo = sesion.tipoTanqueo === 'emergencia' ? '⚠️ Emergencia' : '✅ Convenio';
+    lineas.push('🔖 Tipo: *' + etiquetaTipo + '*');
+  }
   lineas.push('🧾 Factura: *' + (sesion.facturaNumeroManual || sesion.facturaNumeroOcr || 'N/A') + '*');
   lineas.push('🛣️ Kilometraje: *' + (sesion.kilometraje || 0).toLocaleString('es-CO') + ' km*');
 
@@ -184,6 +213,9 @@ function resumenFinal(sesion) {
 function tanqueoGuardado(tanqueo, estadoValidacion) {
   var msg = '───────────────\n✅ *TANQUEO GUARDADO*\n───────────────\n';
   msg += '🚗 *' + tanqueo.vehiculo_placa + '*\n';
+  if (tanqueo.tipo_tanqueo === 'emergencia') {
+    msg += '🔖 Tipo: *⚠️ Emergencia*\n';
+  }
   msg += '🛣️ Kilometraje: *' + (tanqueo.kilometraje || 0).toLocaleString('es-CO') + ' km*\n';
   msg += '🔢 Cantidad: *' + tanqueo.cantidad + ' ' + tanqueo.unidad_medida + '*\n';
   msg += '💰 Valor: *' + validaciones.formatearValorMoneda(tanqueo.valor_total) + '*';
@@ -308,6 +340,8 @@ function kilometrajeConfirmadoSolicitudRecibo(km) {
 module.exports = {
   faltaFotoRecibo: faltaFotoRecibo,
   inicio: inicio,
+  preguntarTipoTanqueo: preguntarTipoTanqueo,
+  tipoTanqueoRegistrado: tipoTanqueoRegistrado,
   solicitarFotoPlaca: solicitarFotoPlaca,
   confirmarPlacaOcr: confirmarPlacaOcr,
   solicitarPlacaManual: solicitarPlacaManual,
