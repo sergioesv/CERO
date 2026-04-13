@@ -503,10 +503,128 @@ function marcarTodoOK() {
   return { estado: 'OK', items: [], observacion: null };
 }
 
+/**
+ * Extrae datos de una factura/recibo de estación de combustible usando Gemini OCR.
+ * Analiza la foto y retorna 10 campos con indicador de lectura exitosa.
+ * Si un campo no es legible o no aparece, marca leido como false.
+ * Nunca inventa datos — si no puede leer, no lo intenta.
+ *
+ * @param {string} urlFoto — URL de la imagen (Supabase Storage o Twilio media)
+ * @returns {Object} — 10 campos con {valor: string, leido: boolean}
+ */
+async function extraerDatosFacturaCombustible(urlFoto) {
+  var resultadoVacio = {
+    factura_numero: { valor: '', leido: false },
+    placa: { valor: '', leido: false },
+    kilometraje: { valor: '', leido: false },
+    producto: { valor: '', leido: false },
+    cantidad: { valor: '', leido: false },
+    unidad_medida: { valor: '', leido: false },
+    precio_unitario: { valor: '', leido: false },
+    valor_total: { valor: '', leido: false },
+    estacion: { valor: '', leido: false },
+    fecha: { valor: '', leido: false }
+  };
+
+  var camposRequeridos = [
+    'factura_numero', 'placa', 'kilometraje', 'producto',
+    'cantidad', 'unidad_medida', 'precio_unitario',
+    'valor_total', 'estacion', 'fecha'
+  ];
+
+  function campoFacturaSchema() {
+    return {
+      type: 'OBJECT',
+      required: ['valor', 'leido'],
+      properties: {
+        valor: { type: 'STRING' },
+        leido: { type: 'BOOLEAN' }
+      }
+    };
+  }
+
+  var schemaFactura = {
+    type: 'OBJECT',
+    required: camposRequeridos.slice(),
+    properties: {
+      factura_numero: campoFacturaSchema(),
+      placa: campoFacturaSchema(),
+      kilometraje: campoFacturaSchema(),
+      producto: campoFacturaSchema(),
+      cantidad: campoFacturaSchema(),
+      unidad_medida: campoFacturaSchema(),
+      precio_unitario: campoFacturaSchema(),
+      valor_total: campoFacturaSchema(),
+      estacion: campoFacturaSchema(),
+      fecha: campoFacturaSchema()
+    }
+  };
+
+  try {
+    var imagen = await descargarImagen(urlFoto);
+
+    var prompt = [
+      'Analiza esta foto de un recibo o factura de estación de combustible colombiana.',
+      'Extrae los siguientes campos si son legibles en la imagen.',
+      'Si un campo no es legible, no aparece en la imagen, o no estás seguro, marca leido como false y valor como cadena vacía.',
+      'NO inventes datos. Solo extrae lo que puedes leer claramente.',
+      '',
+      'Campos a extraer:',
+      '- factura_numero: número de remisión, factura o recibo (ej: 01817613)',
+      '- placa: placa del vehículo (ej: SHT057, ABC123)',
+      '- kilometraje: lectura del odómetro/kilometraje (solo números, ej: 266063)',
+      '- producto: tipo de combustible (ej: Gasolina corriente, ACPM, Diesel)',
+      '- cantidad: cantidad despachada (solo números con decimales, ej: 9.759)',
+      '- unidad_medida: unidad de la cantidad (galones o litros)',
+      '- precio_unitario: precio por unidad (solo números, ej: 15500)',
+      '- valor_total: total pagado (solo números, ej: 151264)',
+      '- estacion: nombre de la estación de servicio (ej: EDS Centro Carros)',
+      '- fecha: fecha del tanqueo en formato YYYY-MM-DD (ej: 2026-03-05)',
+      '',
+      'IMPORTANTE:',
+      '- En Colombia la etiqueta puede decir REMISION NRO en vez de factura.',
+      '- La placa puede aparecer como PLACA, N. INTERNO, o similar.',
+      '- El kilometraje puede aparecer como KILOMETRAJE, KM, ODOMETRO.',
+      '- Si dice GALONES, la unidad_medida es "galones". Si dice LITROS, es "litros".',
+      '- Valores monetarios sin signos de peso ($) ni puntos de miles — solo dígitos.',
+      '- Fechas convertir siempre a YYYY-MM-DD.'
+    ].join('\n');
+
+    var datos = await llamarGeminiJson({
+      prompt: prompt,
+      imageData: imagen,
+      schema: schemaFactura,
+      modelo: MODELO_VISION
+    });
+
+    var resultadoFinal = {};
+    for (var i = 0; i < camposRequeridos.length; i++) {
+      var nombreCampo = camposRequeridos[i];
+      if (datos && datos[nombreCampo] && typeof datos[nombreCampo].leido === 'boolean') {
+        resultadoFinal[nombreCampo] = {
+          valor: String(datos[nombreCampo].valor || '').trim(),
+          leido: datos[nombreCampo].leido && String(datos[nombreCampo].valor || '').trim() !== ''
+        };
+      } else {
+        resultadoFinal[nombreCampo] = { valor: '', leido: false };
+      }
+    }
+
+    var leidos = camposRequeridos.filter(function(c) { return resultadoFinal[c].leido; }).length;
+    console.log('[OCR Factura] ' + leidos + '/10 campos leídos exitosamente');
+
+    return resultadoFinal;
+  } catch (error) {
+    console.error('[OCR Factura] Error general:', error.message);
+    return resultadoVacio;
+  }
+}
+
 module.exports = {
   marcarTodoOK,
   interpretarNovedad,
   extraerPlacaFoto,
   extraerKilometrajeFoto,
+  extraerDatosFacturaCombustible,
   descargarImagen
 };
