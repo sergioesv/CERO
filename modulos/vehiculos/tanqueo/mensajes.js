@@ -17,14 +17,15 @@ function faltaFotoRecibo() {
 function inicio() {
   return (
     '⛽ *Registro de tanqueo*\n\n' +
-    '📸 *Paso 1 de 3 — Foto del recibo*\n' +
-    'Envía la foto del recibo o factura de la estación de servicio.' +
+    '📸 *Paso 1 — Foto de la placa*\n' +
+    'Envía una foto frontal donde la placa sea claramente visible.\n' +
+    '_Buena luz, sin reflejos._' +
     PIE
   );
 }
 
 function solicitarFotoPlaca(placaOcrRecibo) {
-  var msg = '📸 *Paso 2 de 3 — Foto de la placa*\n' +
+  var msg = '📸 *Foto de la placa*\n' +
     'Envía una foto frontal donde la placa sea claramente visible.';
   if (placaOcrRecibo) {
     msg += '\n\n_El recibo indica placa: *' + placaOcrRecibo + '*_';
@@ -52,7 +53,7 @@ function solicitarPlacaManual() {
 }
 
 function solicitarFotoOdometro(kmReferenciaMeta) {
-  var msg = '📸 *Paso 3 de 3 — Foto del odómetro*\n' +
+  var msg = '📸 *Paso 2 — Foto del odómetro*\n' +
     'Envía la foto del tablero donde se vea el kilometraje.';
   if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
     msg += '\n\n_Último registrado: *' + kmReferenciaMeta.kilometraje.toLocaleString('es-CO') + ' km*_';
@@ -257,6 +258,53 @@ function promptFinalGuardarCancelar() {
   return 'Responde *1* para guardar o *2* para cancelar.' + PIE;
 }
 
+function solicitarFotoFactura() {
+  return (
+    '📸 *Foto del recibo*\n' +
+    'Envía la foto del recibo o factura de la estación de servicio.\n' +
+    '_Acércate bien, buena luz, sin reflejos._' +
+    '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+  );
+}
+
+function confirmarPlacaSugerida(sesion) {
+  var msg = '🔎 ¿Es esta la placa?\n*' + sesion.placaSugerida + '*';
+  if (sesion.placaDetectada) {
+    msg += '\n_Lectura inicial: ' + sesion.placaDetectada + '_';
+  }
+  msg += '\n\n1️⃣ Sí, confirmar\n2️⃣ Enviar otra foto\n3️⃣ Escribir la placa';
+  msg += '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+  return msg;
+}
+
+function fallbackPlaca(sesion, motivo) {
+  var msg = '📸 No pude leer la placa con seguridad.';
+  if (motivo) msg += '\n_' + motivo + '_';
+  msg += '\n\n1️⃣ Enviar otra foto\n2️⃣ Escribir la placa manualmente';
+  msg += '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+  return msg;
+}
+
+function escribePlacaSinEspacios() {
+  return '⌨️ Escribe la placa sin espacios.\nEjemplo: *TKJ933*' + PIE;
+}
+
+function formatoPlacaEstandarInvalido() {
+  return 'Formato inválido. La placa debe ser 3 letras + 3 números (ej: ABC123).' + PIE;
+}
+
+function errorGenericoTanqueo() {
+  return 'Ocurrió un error. Escribe *9* para volver al menú.';
+}
+
+function reciboProcesadoSolicitudFactura(facturaOcr) {
+  return '✅ Recibo procesado.\n\n' + solicitarFacturaManual(facturaOcr);
+}
+
+function kilometrajeConfirmadoSolicitudRecibo(km) {
+  return '✅ Kilometraje *' + km.toLocaleString('es-CO') + ' km* confirmado.\n\n' + solicitarFotoFactura();
+}
+
 module.exports = {
   faltaFotoRecibo: faltaFotoRecibo,
   inicio: inicio,
@@ -288,5 +336,13 @@ module.exports = {
   placaManualInvalida: placaManualInvalida,
   kmManualInvalido: kmManualInvalido,
   valorInvalido: valorInvalido,
-  promptFinalGuardarCancelar: promptFinalGuardarCancelar
+  promptFinalGuardarCancelar: promptFinalGuardarCancelar,
+  solicitarFotoFactura: solicitarFotoFactura,
+  confirmarPlacaSugerida: confirmarPlacaSugerida,
+  fallbackPlaca: fallbackPlaca,
+  escribePlacaSinEspacios: escribePlacaSinEspacios,
+  formatoPlacaEstandarInvalido: formatoPlacaEstandarInvalido,
+  errorGenericoTanqueo: errorGenericoTanqueo,
+  reciboProcesadoSolicitudFactura: reciboProcesadoSolicitudFactura,
+  kilometrajeConfirmadoSolicitudRecibo: kilometrajeConfirmadoSolicitudRecibo
 };
