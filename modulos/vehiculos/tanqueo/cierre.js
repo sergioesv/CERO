@@ -165,11 +165,18 @@ async function guardarTanqueo(sesion, telefono) {
 
   var rendimiento = await calcularRendimiento(sesion);
 
-  var estadoValidacionFinal = rendimiento.rendimientoAlerta
-    ? 'pendiente_revision'
-    : validacion.estadoValidacion;
+  // Emergencia siempre pendiente_revision, sin importar validación cruzada
+  var estadoValidacionFinal;
+  if (sesion.tipoTanqueo === 'emergencia') {
+    estadoValidacionFinal = 'pendiente_revision';
+    console.log('[Cierre] Tipo emergencia — forzando pendiente_revision.');
+  } else if (rendimiento.rendimientoAlerta) {
+    estadoValidacionFinal = 'pendiente_revision';
+  } else {
+    estadoValidacionFinal = validacion.estadoValidacion;
+  }
 
-  if (rendimiento.rendimientoAlerta && validacion.estadoValidacion === 'auto_validado') {
+  if (rendimiento.rendimientoAlerta && validacion.estadoValidacion === 'auto_validado' && sesion.tipoTanqueo !== 'emergencia') {
     console.log('[Cierre] Validación cruzada OK pero rendimiento anómalo — forzando pendiente_revision.');
   }
 
@@ -186,6 +193,7 @@ async function guardarTanqueo(sesion, telefono) {
     vehiculo_placa: sesion.placa,
     conductor_id: sesion.conductor ? sesion.conductor.id : null,
     telefono_reporta: validaciones.normalizarTelefono(telefono),
+    tipo_tanqueo: sesion.tipoTanqueo || 'convenio',
     tipo_combustible: sesion.tipoCombustible,
     cantidad: cantidadFinal,
     unidad_medida: sesion.unidadMedida || 'litros',
