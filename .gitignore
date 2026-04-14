@@ -4,3 +4,6 @@ node_modules/
 .cursor/*
 !.cursor/rules.md
 .env.production
+# Certificados y claves privadas
+*.pem
+*.key
