@@ -254,6 +254,19 @@ async function validarLote(ids, usuarioId) {
     return { ok: false, error: 'IDs requeridos' };
   }
 
+  // Contar cuántos están realmente en estado operable antes de actualizar
+  var resConteo = await config.supabase
+    .from(TABLA_TANQUEOS)
+    .select('id', { count: 'exact', head: true })
+    .in('id', ids)
+    .eq('estado_validacion', 'auto_validado');
+
+  var procesados = resConteo.count || 0;
+
+  if (procesados === 0) {
+    return { ok: true, procesados: 0 };
+  }
+
   var res = await config.supabase
     .from(TABLA_TANQUEOS)
     .update({
@@ -265,7 +278,7 @@ async function validarLote(ids, usuarioId) {
     .eq('estado_validacion', 'auto_validado');
 
   if (res.error) return { ok: false, error: res.error.message, procesados: 0 };
-  return { ok: true, procesados: ids.length };
+  return { ok: true, procesados: procesados };
 }
 
 /**
