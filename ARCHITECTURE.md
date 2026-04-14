@@ -162,6 +162,34 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 ---
 
+## Estado de salud del código
+
+### Crítico — antes de producción real
+- [ ] RLS en Supabase
+- [ ] Twilio webhook signature validation
+- [ ] Migrar onclick inline a addEventListener (CSP scriptSrcAttr → 'none')
+- [ ] Dominio propio configurado
+
+### Importante — antes de segundo cliente
+- [ ] Tests integración flujos WhatsApp críticos
+- [ ] Separar lógica de negocio de data/ (queries puras vs lógica)
+- [ ] Manejo de errores consistente en todas las rutas API
+- [ ] Zona horaria UTC-5 en queries de "hoy"
+- [ ] Foto recibo en drawer tanqueos — URLs firmadas Supabase Storage
+- [ ] Mover /api/dashboard/resumen de index.js a rutas/dashboard.js
+
+### Deuda aceptada conscientemente
+- unsafe-inline en CSP — temporal para demo, revertir antes de producción
+- Sin tests — prioridad demo sobre cobertura
+- Frontend módulos mezclan lógica + render — refactor post-demo
+
+### Resuelto hoy
+- [x] index.js refactorizado — 925 líneas → ~190, 6 archivos de rutas ✅
+- [x] Bug rendimiento primer tanqueo — es_primer_tanqueo flag ✅
+- [x] CSP Helmet — 3 directivas configuradas, panel completamente funcional ✅
+
+---
+
 ## Decision log
 
 | Date | Decision | Reason |
