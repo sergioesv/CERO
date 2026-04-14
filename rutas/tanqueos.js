@@ -31,6 +31,7 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
     };
     var resultado = await tanqueosData.listarTanqueos(filtros);
     if (resultado.error) throw resultado.error;
+    console.log('[DEBUG tanqueos] stats:', JSON.stringify(resultado.stats)); // temporal
     res.json({ ok: true, data: resultado.data, stats: resultado.stats });
   } catch (error) {
     console.error('Error en GET /api/tanqueos:', error);
