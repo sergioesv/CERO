@@ -169,6 +169,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] Twilio webhook signature validation
 - [ ] Migrar onclick inline a addEventListener (CSP scriptSrcAttr → 'none')
 - [ ] Dominio propio configurado
+- [ ] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio
 
 ### Importante — antes de segundo cliente
 - [ ] Tests integración flujos WhatsApp críticos
@@ -177,6 +178,12 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] Zona horaria UTC-5 en queries de "hoy"
 - [ ] Foto recibo en drawer tanqueos — URLs firmadas Supabase Storage
 - [ ] Mover /api/dashboard/resumen de index.js a rutas/dashboard.js
+- [ ] Flujo de creación de usuarios del panel — admin crea desde UI, no inserción manual en BD
+- [ ] Servicio de email (SendGrid o similar) — envío de contraseña temporal al crear usuario
+- [ ] Campo `debe_cambiar_password` en `usuarios_panel` — forzar cambio en primer login
+- [ ] Endpoint `POST /auth/cambiar-password` — verificar contraseña actual antes de cambiar
+- [ ] UI cambio de contraseña — accesible desde perfil del usuario en el panel
+- [ ] Endpoint `POST /auth/reset-password` — admin puede resetear contraseña de cualquier usuario
 
 ### Deuda aceptada conscientemente
 - unsafe-inline en CSP — temporal para demo, revertir antes de producción
