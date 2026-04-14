@@ -191,7 +191,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-13 -->
+<!-- Última actualización: 2026-04-14 -->
 
 ## Folder structure
 
@@ -254,7 +254,10 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │       │   ├── mensajes.js  # Mensajes y preguntas del preoperacional
 │       │   └── validaciones.js  # Validaciones de respuestas del preoperacional
 │       └── tanqueo
+│           ├── cierre.js
+│           ├── estado.js
 │           ├── flujo.js  # Flujo de registro de combustible WhatsApp
+│           ├── mensajes.js
 │           └── validaciones.js  # Validaciones del tanqueo
 ├── public
 │   ├── components
@@ -273,6 +276,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── js
 │   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
 │   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
+│   │   ├── login-init.js
+│   │   ├── login.js
 │   │   ├── router.js  # Router SPA — navegacion sin recarga
 │   │   ├── theme.js  # Toggle tema claro/oscuro
 │   │   ├── transitions.js  # Transiciones suaves entre páginas — fade-out/fade-in, intercepta links internos
