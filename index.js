@@ -13,7 +13,21 @@ const { verificarToken, verificarPermiso } = require('./middlewares/auth');
 const { seedPermisosBase } = require('./data/permisos');
 
 const app = express();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', true);
