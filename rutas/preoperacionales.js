@@ -1,0 +1,150 @@
+// ═══════════════════════════════════════════════════════════
+// API — PREOPERACIONALES
+// ═══════════════════════════════════════════════════════════
+
+const express = require('express');
+const router = express.Router();
+const { supabase } = require('../config/config');
+const { verificarToken, verificarPermiso } = require('../middlewares/auth');
+
+// GET / — Lista inspecciones con filtros
+router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function (req, res) {
+  try {
+    var desde = req.query.desde || null;
+    var hasta = req.query.hasta || null;
+    var placa = req.query.placa || null;
+    var conductor = req.query.conductor || null;
+    var estado = req.query.estado || null;
+
+    var query = supabase
+      .from('preoperacionales')
+      .select('*, vehiculos:vehiculo_placa(placa, marca, modelo), conductores:conductor_id(id, nombre, cedula)')
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: false });
+
+    if (desde) {
+      query = query.gte('fecha', desde);
+    }
+    if (hasta) {
+      query = query.lte('fecha', hasta);
+    }
+
+    if (placa) {
+      query = query.eq('vehiculo_placa', placa.toUpperCase());
+    }
+
+    if (conductor) {
+      query = query.eq('conductor_id', conductor);
+    }
+
+    if (estado && estado !== 'todos') {
+      query = query.eq('clasificacion', estado);
+    }
+
+    if (!estado || estado === 'todos') {
+      query = query.limit(100);
+    }
+
+    var resultado = await query;
+
+    if (resultado.error) {
+      return res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+    }
+
+    var data = (resultado.data || []).map(function (registro) {
+      var novedades = registro.novedades || [];
+      var totalNovedades = novedades.length;
+      var novedadesCriticas = novedades.filter(function (n) { return n.critico === true; }).length;
+
+      return {
+        id: registro.id,
+        fecha: registro.fecha,
+        hora: registro.hora,
+        vehiculo_placa: registro.vehiculo_placa,
+        vehiculo_marca: registro.vehiculos ? registro.vehiculos.marca : null,
+        vehiculo_modelo: registro.vehiculos ? registro.vehiculos.modelo : null,
+        conductor_id: registro.conductor_id,
+        conductor_nombre: registro.conductores ? registro.conductores.nombre : null,
+        conductor_cedula: registro.conductores ? registro.conductores.cedula : null,
+        kilometraje: registro.kilometraje,
+        km_referencia: registro.km_referencia,
+        diferencia_km: registro.diferencia_km,
+        novedades: novedades,
+        total_novedades: totalNovedades,
+        novedades_criticas: novedadesCriticas,
+        clasificacion: registro.clasificacion || 'sin_novedades',
+        observaciones: registro.observaciones,
+        motor_niveles: registro.motor_niveles,
+        electrico_luces: registro.electrico_luces,
+        frenos_direccion_llantas: registro.frenos_direccion_llantas,
+        cabina_equipo: registro.cabina_equipo,
+        firma_operario: registro.firma_operario,
+        firma_timestamp: registro.firma_timestamp,
+        estado: registro.estado,
+        pdf_url: registro.pdf_url || null
+      };
+    });
+
+    var hoy = new Date().toISOString().split('T')[0];
+    var todosHoy = (resultado.data || []).filter(function (r) { return r.fecha === hoy; });
+    var stats = {
+      total: data.length,
+      hoy: todosHoy.length,
+      con_novedades_hoy: todosHoy.filter(function (r) {
+        var nov = r.novedades || [];
+        return nov.length > 0;
+      }).length,
+      criticas_hoy: todosHoy.filter(function (r) {
+        var nov = r.novedades || [];
+        return nov.some(function (n) { return n.critico === true; });
+      }).length
+    };
+
+    res.json({ data: data, stats: stats });
+  } catch (error) {
+    console.error('Error en GET /api/preoperacionales:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// GET /:id — Detalle de una inspección
+router.get('/:id', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function (req, res) {
+  try {
+    var id = req.params.id;
+
+    var resultado = await supabase
+      .from('preoperacionales')
+      .select('*, vehiculos:vehiculo_placa(placa, marca, modelo, soat_vencimiento, tecnomecanica_vencimiento), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
+      .eq('id', id)
+      .single();
+
+    if (resultado.error) {
+      return res.status(404).json({ error: 'Preoperacional no encontrado' });
+    }
+
+    var fotos = await supabase
+      .from('fotos_evidencia')
+      .select('*')
+      .eq('preoperacional_id', id);
+
+    var registro = resultado.data;
+    registro.fotos = fotos.data || [];
+
+    var resAut = await supabase
+      .from('autorizaciones_novedad')
+      .select('id, decision, justificacion, novedades_bloqueo, timestamp_alerta, timestamp_decision, supervisor_id')
+      .eq('preoperacional_id', id)
+      .limit(1);
+
+    registro.autorizacion = (!resAut.error && resAut.data && resAut.data.length > 0)
+      ? resAut.data[0]
+      : null;
+
+    res.json(registro);
+  } catch (error) {
+    console.error('Error en GET /api/preoperacionales/:id:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+module.exports = router;
