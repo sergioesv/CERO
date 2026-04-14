@@ -375,6 +375,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | `axios` | ^1.7.9 |
 | `bcryptjs` | ^3.0.3 |
 | `express` | ^4.21.2 |
+| `express-rate-limit` | ^8.3.2 |
 | `helmet` | ^8.1.0 |
 | `jsonwebtoken` | ^9.0.3 |
 | `node-cron` | ^3.0.3 |
