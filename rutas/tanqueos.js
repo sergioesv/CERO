@@ -20,9 +20,19 @@ function bearerDesdeQueryParaMedia(req, res, next) {
 
 // GET /version — endpoint temporal de diagnóstico
 router.get('/version', async function (req, res) {
-  var tanqueosData = require('../data/tanqueos');
-  var fnStr = tanqueosData.listarTanqueos.toString().substring(0, 800);
-  res.json({ version: '2026-04-14', fn: fnStr });
+  try {
+    var resultado = await tanqueosData.listarTanqueos({});
+    res.json({
+      version: '2026-04-14',
+      tieneStats: resultado.stats !== undefined,
+      tieneError: resultado.error !== undefined,
+      stats: resultado.stats,
+      dataLength: resultado.data ? resultado.data.length : null,
+      keys: Object.keys(resultado)
+    });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
 });
 
 // GET / — lista con filtros y stats
