@@ -4,8 +4,6 @@ const bcrypt = require('bcryptjs');
 const { supabase } = require('../config/config');
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 
-const TABLA_FOTOS_TANQUEO = process.env.DB_TABLE_FOTOS_TANQUEO || 'fotos_tanqueo';
-
 function responderHealth(req, res) {
   res.json({
     ok: true,
@@ -61,54 +59,6 @@ async function listarPosoperacionales(req, res) {
     res.json({ ok: true, data: data || [] });
   } catch (err) {
     console.error('Error listando posoperacionales:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-}
-
-async function listarTanqueos(req, res) {
-  try {
-    const { fecha_inicio, fecha_fin, placa } = req.query;
-
-    let query = supabase
-      .from('tanqueos')
-      .select('*, vehiculos:vehiculo_placa(tipo, marca), conductores:conductor_id(nombre)')
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    query = aplicarFiltroFecha(query, 'created_at', fecha_inicio, fecha_fin);
-    if (placa) query = query.eq('vehiculo_placa', placa.toUpperCase());
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const tanqueos = data || [];
-    const ids = tanqueos.map(item => item.id).filter(Boolean);
-    let fotosPorTanqueo = {};
-
-    if (ids.length > 0) {
-      const { data: fotos, error: fotosError } = await supabase
-        .from(TABLA_FOTOS_TANQUEO)
-        .select('tanqueo_id, foto_url, tipo, descripcion')
-        .in('tanqueo_id', ids);
-
-      if (fotosError) throw fotosError;
-
-      fotosPorTanqueo = (fotos || []).reduce((acc, foto) => {
-        if (!acc[foto.tanqueo_id]) acc[foto.tanqueo_id] = [];
-        acc[foto.tanqueo_id].push(foto);
-        return acc;
-      }, {});
-    }
-
-    const dataConFotos = tanqueos.map((item) => ({
-      ...item,
-      fotos: fotosPorTanqueo[item.id] || [],
-      foto_url: (fotosPorTanqueo[item.id] && fotosPorTanqueo[item.id][0] && fotosPorTanqueo[item.id][0].foto_url) || null
-    }));
-
-    res.json({ ok: true, data: dataConFotos });
-  } catch (err) {
-    console.error('Error listando tanqueos:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 }
@@ -372,7 +322,6 @@ function registrarDashboard(app) {
   app.get('/dashboard/health', responderHealth);
   app.get('/dashboard/resumen', responderResumen);
   app.get('/api/posoperacionales',          verificarToken, listarPosoperacionales);
-  app.get('/api/tanqueos',                  verificarToken, listarTanqueos);
 
   // Sedes
   app.get('/api/sedes',              verificarToken, listarSedes);
