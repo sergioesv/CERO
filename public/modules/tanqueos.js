@@ -82,7 +82,7 @@ var Tanqueos = {
 
       <!-- Drawer lateral -->
       <div class="drawer-backdrop" id="drawer-backdrop" onclick="Tanqueos.cerrarDrawer()"></div>
-      <div class="drawer" id="drawer-panel" style="width:780px;max-width:95vw;">
+      <div class="drawer" id="drawer-panel" style="width:min(780px,95vw);">
         <div class="drawer-header">
           <h3 class="drawer-title" id="drawer-titulo">Detalle del tanqueo</h3>
           <button class="modal-close" onclick="Tanqueos.cerrarDrawer()">&times;</button>
