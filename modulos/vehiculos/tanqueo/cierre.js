@@ -102,14 +102,20 @@ function ejecutarValidacionCruzada(sesion) {
 async function calcularRendimiento(sesion) {
   var resultado = {
     rendimientoCalculado: null,
-    rendimientoAlerta: false
+    rendimientoAlerta: false,
+    esPrimerTanqueo: false
   };
+
+  // Si no hay km de referencia (primer tanqueo del vehículo), no calcular rendimiento
+  if (sesion.kmReferencia == null || sesion.kmReferencia === 0) {
+    return { rendimientoCalculado: null, rendimientoAlerta: false, esPrimerTanqueo: true };
+  }
 
   var kmActual = sesion.kilometraje;
   var kmAnterior = sesion.kmReferencia;
   var cantidad = sesion.cantidadManual != null ? sesion.cantidadManual : sesion.cantidadOcr;
 
-  if (kmActual == null || kmAnterior == null || !cantidad || cantidad <= 0) {
+  if (kmActual == null || !cantidad || cantidad <= 0) {
     console.log('[Cierre] Rendimiento no calculable — faltan datos.');
     return resultado;
   }
@@ -223,7 +229,8 @@ async function guardarTanqueo(sesion, telefono) {
     estado_validacion: estadoValidacionFinal,
     discrepancias: validacion.discrepancias,
     rendimiento_calculado: rendimiento.rendimientoCalculado,
-    rendimiento_alerta: rendimiento.rendimientoAlerta
+    rendimiento_alerta: rendimiento.rendimientoAlerta,
+    es_primer_tanqueo: rendimiento.esPrimerTanqueo === true ? true : false
   };
 
   if (datosTanqueo.km_ocr_factura != null && isNaN(datosTanqueo.km_ocr_factura)) {
