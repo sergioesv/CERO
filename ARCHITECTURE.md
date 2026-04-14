@@ -68,7 +68,7 @@ Three workflows run in parallel on every push to `desarrollo`:
 - Authorization system v12 (INFORMATIVO / ALERTA / BLOQUEO)
 
 ### Phase 2 — Dashboard & admin panel 🔄 IN PROGRESS
-- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores complete; Posoperacionales, Tanqueos pending
+- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos — todos COMPLETE
 - 2.2 Operational dashboard — complete
 - 2.3 History and reports — pending
 - 2.4 Power BI integration — future
@@ -158,6 +158,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] `.env` in `.gitignore` ✅
 - [ ] Signed URL regeneration at query time (Supabase Storage)
 - [ ] Helmet installed and active ✅
+- [ ] CSP configurado con scriptSrc/scriptSrcElem/scriptSrcAttr ✅
 
 ---
 
@@ -165,6 +166,9 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 14/04/2026 | CSP Helmet — scriptSrc + scriptSrcElem + scriptSrcAttr unsafe-inline | onclick inline bloqueado en panel admin |
+| 14/04/2026 | Refactor index.js — 6 archivos de rutas extraídos | index.js de 925 a ~190 líneas |
+| 14/04/2026 | Fix rendimiento primer tanqueo — es_primer_tanqueo flag | kmReferencia null generaba 11402 km/u |
 | 12/04/2026 | Tanqueo v2 — flujo reconstruido sobre patrón preoperacional | OCR síncrono, reutiliza kmCompartido, foto placa → odómetro → recibo |
 | 12/04/2026 | Validación cruzada 4 campos — placa, km, cantidad, factura | Antifraude, auto_validado vs pendiente_revision |
 | 12/04/2026 | Plan tanqueo v21 — OCR, validación cruzada 4 campos, antifraude rendimiento | 4 semanas, semana 1 en curso |
