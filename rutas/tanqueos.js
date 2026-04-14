@@ -6,7 +6,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('../config/config');
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, supabase } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
 
 // <img> no puede enviar Authorization — aceptar token en query solo en esta ruta
@@ -35,6 +35,50 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
   } catch (error) {
     console.error('Error en GET /api/tanqueos:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+});
+
+// GET /media/:fotoId — proxy seguro para imágenes Twilio Media
+// El backend resuelve la URL desde BD — el cliente nunca controla qué URL se fetcha
+router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+  try {
+    var fotoId = req.params.fotoId;
+
+    if (!/^[0-9a-f-]{36}$/i.test(fotoId)) {
+      return res.status(400).json({ ok: false, error: 'ID inválido' });
+    }
+
+    var resFoto = await supabase
+      .from('fotos_tanqueo')
+      .select('foto_url, tanqueo_id')
+      .eq('id', fotoId)
+      .maybeSingle();
+
+    if (resFoto.error || !resFoto.data) {
+      return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
+    }
+
+    var url = resFoto.data.foto_url;
+
+    if (!url || !url.startsWith('https://api.twilio.com/')) {
+      return res.status(400).json({ ok: false, error: 'Tipo de URL no soportado' });
+    }
+
+    var respuesta = await axios.get(url, {
+      auth: {
+        username: TWILIO_ACCOUNT_SID,
+        password: TWILIO_AUTH_TOKEN
+      },
+      responseType: 'stream',
+      timeout: 10000
+    });
+
+    res.setHeader('Content-Type', respuesta.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    respuesta.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxy media Twilio:', error.message);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener la imagen' });
   }
 });
 
@@ -111,33 +155,6 @@ router.put('/validar-lote', verificarToken, verificarPermiso('tanqueos', 'editar
   } catch (error) {
     console.error('Error en PUT /api/tanqueos/validar-lote:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
-  }
-});
-
-// GET /media — proxy autenticado para imágenes de Twilio Media
-// Recibe la URL de Twilio como query param codificado
-router.get('/media', bearerDesdeQueryParaMedia, verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
-  try {
-    var url = req.query.url;
-    if (!url || !url.startsWith('https://api.twilio.com/')) {
-      return res.status(400).json({ ok: false, error: 'URL inválida' });
-    }
-
-    var respuesta = await axios.get(url, {
-      auth: {
-        username: TWILIO_ACCOUNT_SID,
-        password: TWILIO_AUTH_TOKEN
-      },
-      responseType: 'stream',
-      timeout: 10000
-    });
-
-    res.setHeader('Content-Type', respuesta.headers['content-type'] || 'image/jpeg');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    respuesta.data.pipe(res);
-  } catch (error) {
-    console.error('Error proxy media Twilio:', error.message);
-    res.status(502).json({ ok: false, error: 'No se pudo obtener la imagen' });
   }
 });
 

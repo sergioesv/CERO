@@ -358,20 +358,21 @@ var Tanqueos = {
     var fotoPlaca = fotos.find(function(f) { return f.tipo === 'placa'; });
     var fotoOdom = fotos.find(function(f) { return f.tipo === 'odometro'; });
 
-    // Función helper — si la URL es de Twilio, pasar por proxy autenticado del backend
-    function proxyUrl(url) {
-      if (!url) return null;
-      if (url.startsWith('https://api.twilio.com/')) {
-        var base = '/api/tanqueos/media?url=' + encodeURIComponent(url);
+    // Twilio: proxy seguro por fotoId (el backend resuelve la URL). Otras URLs (p. ej. Storage firmada) directas.
+    function proxyUrl(foto) {
+      if (!foto) return null;
+      var candidata = foto.url_firmada || foto.foto_url || '';
+      if (typeof candidata === 'string' && candidata.startsWith('https://api.twilio.com/') && foto.id) {
+        var base = '/api/tanqueos/media/' + foto.id;
         var tok = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cero_token') : null;
-        return tok ? base + '&token=' + encodeURIComponent(tok) : base;
+        return tok ? base + '?token=' + encodeURIComponent(tok) : base;
       }
-      return url;
+      return candidata || null;
     }
 
-    var urlFact = fotoFact ? proxyUrl(fotoFact.url_firmada || fotoFact.foto_url) : null;
-    var urlPlaca = fotoPlaca ? proxyUrl(fotoPlaca.url_firmada || fotoPlaca.foto_url) : null;
-    var urlOdom = fotoOdom ? proxyUrl(fotoOdom.url_firmada || fotoOdom.foto_url) : null;
+    var urlFact = fotoFact ? proxyUrl(fotoFact) : null;
+    var urlPlaca = fotoPlaca ? proxyUrl(fotoPlaca) : null;
+    var urlOdom = fotoOdom ? proxyUrl(fotoOdom) : null;
 
     // Indicadores de coincidencia
     var disc = t.discrepancias || [];
