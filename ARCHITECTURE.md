@@ -297,8 +297,14 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── landing.html  # Landing page publica
 │   └── login.html  # Pagina de autenticacion
 ├── rutas
+│   ├── alertas.js
 │   ├── auth.js  # Rutas de autenticacion — /auth/login, /auth/me, /auth/logout
-│   └── dashboard.js  # Rutas del dashboard operativo
+│   ├── autorizaciones.js
+│   ├── conductores.js
+│   ├── dashboard.js  # Rutas del dashboard operativo
+│   ├── preoperacionales.js
+│   ├── tanqueos.js
+│   └── vehiculos.js
 ├── scripts
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
 ├── servicios
