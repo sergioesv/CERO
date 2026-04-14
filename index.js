@@ -102,7 +102,8 @@ app.use('/api/alertas', rutasAlertas);
 // GET /api/dashboard/resumen — resumen general (consultas en paralelo)
 app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 'ver'), async function (req, res) {
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    // Fecha de hoy en zona horaria Colombia (UTC-5)
+    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
 
     // Ejecutar las 4 consultas independientes en paralelo
     const [
