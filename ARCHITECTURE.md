@@ -194,6 +194,11 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 14/04/2026 | Eliminar endpoint /api/tanqueos duplicado en canales/dashboard.js | Interceptaba requests antes que rutas/tanqueos.js — stats nunca llegaban al frontend |
+| 14/04/2026 | Proxy seguro imágenes Twilio — GET /api/tanqueos/media/:fotoId | Frontend nunca controla URL — backend resuelve desde BD |
+| 14/04/2026 | Zona horaria Bogotá (UTC-5) en backend y frontend | Stats "hoy" calculaban en UTC — diferencia de 5h causaba 0s en cards |
+| 14/04/2026 | Security workflow corregido — regex .env y agregar *.pem *.key | Workflow bloqueaba deploys de Railway con Wait for CI activo |
+| 14/04/2026 | es_primer_tanqueo corregido en BD — 2 registros existentes | kmReferencia null generaba rendimiento 11402 km/u en datos históricos |
 | 14/04/2026 | CSP Helmet — scriptSrc + scriptSrcElem + scriptSrcAttr unsafe-inline | onclick inline bloqueado en panel admin |
 | 14/04/2026 | Refactor index.js — 6 archivos de rutas extraídos | index.js de 925 a ~190 líneas |
 | 14/04/2026 | Fix rendimiento primer tanqueo — es_primer_tanqueo flag | kmReferencia null generaba 11402 km/u |
