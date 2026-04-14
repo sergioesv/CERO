@@ -21,14 +21,14 @@ function bearerDesdeQueryParaMedia(req, res, next) {
 // GET /version — endpoint temporal de diagnóstico
 router.get('/version', async function (req, res) {
   try {
-    var resultado = await tanqueosData.listarTanqueos({});
+    var sinFiltros = await tanqueosData.listarTanqueos({});
+    var conFiltros = await tanqueosData.listarTanqueos({
+      fecha_inicio: '2026-03-15',
+      fecha_fin: '2026-04-14'
+    });
     res.json({
-      version: '2026-04-14',
-      tieneStats: resultado.stats !== undefined,
-      tieneError: resultado.error !== undefined,
-      stats: resultado.stats,
-      dataLength: resultado.data ? resultado.data.length : null,
-      keys: Object.keys(resultado)
+      sinFiltros: { keys: Object.keys(sinFiltros), stats: sinFiltros.stats, error: sinFiltros.error },
+      conFiltros: { keys: Object.keys(conFiltros), stats: conFiltros.stats, error: conFiltros.error }
     });
   } catch (e) {
     res.json({ error: e.message });
