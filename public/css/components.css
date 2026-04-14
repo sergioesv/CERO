@@ -215,7 +215,7 @@ body {
 .drawer {
   position: fixed;
   top: 0;
-  right: -400px;
+  right: -100vw;
   width: 400px;
   height: 100%;
   background: var(--bg-secondary);
