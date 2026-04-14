@@ -21,7 +21,7 @@ function bearerDesdeQueryParaMedia(req, res, next) {
 // GET /version — endpoint temporal de diagnóstico
 router.get('/version', async function (req, res) {
   var tanqueosData = require('../data/tanqueos');
-  var fnStr = tanqueosData.listarTanqueos.toString().substring(0, 200);
+  var fnStr = tanqueosData.listarTanqueos.toString().substring(0, 800);
   res.json({ version: '2026-04-14', fn: fnStr });
 });
 
