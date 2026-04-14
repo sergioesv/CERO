@@ -18,23 +18,6 @@ function bearerDesdeQueryParaMedia(req, res, next) {
   next();
 }
 
-// GET /version — endpoint temporal de diagnóstico
-router.get('/version', async function (req, res) {
-  try {
-    var sinFiltros = await tanqueosData.listarTanqueos({});
-    var conFiltros = await tanqueosData.listarTanqueos({
-      fecha_inicio: '2026-03-15',
-      fecha_fin: '2026-04-14'
-    });
-    res.json({
-      sinFiltros: { keys: Object.keys(sinFiltros), stats: sinFiltros.stats, error: sinFiltros.error },
-      conFiltros: { keys: Object.keys(conFiltros), stats: conFiltros.stats, error: conFiltros.error }
-    });
-  } catch (e) {
-    res.json({ error: e.message });
-  }
-});
-
 // GET / — lista con filtros y stats
 router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
@@ -48,7 +31,6 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
     };
     var resultado = await tanqueosData.listarTanqueos(filtros);
     if (resultado.error) throw resultado.error;
-    console.log('[DEBUG tanqueos] stats:', JSON.stringify(resultado.stats)); // temporal
     res.json({ ok: true, data: resultado.data, stats: resultado.stats });
   } catch (error) {
     console.error('Error en GET /api/tanqueos:', error);
