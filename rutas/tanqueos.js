@@ -9,6 +9,12 @@ const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, supabase } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
 
+function sanitizarCeldaCsv(valor) {
+  var s = String(valor == null ? '' : valor);
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 // <img> no puede enviar Authorization — aceptar token en query solo en esta ruta
 function bearerDesdeQueryParaMedia(req, res, next) {
   var h = req.headers.authorization;
@@ -113,19 +119,19 @@ router.get('/consolidado/exportar', verificarToken, verificarPermiso('tanqueos',
 
     var filas = detalle.map(function (t) {
       return [
-        (t.created_at || '').substring(0, 10),
-        t.vehiculo_placa || '',
-        t.conductores ? (t.conductores.nombre || '') : '',
-        t.tipo_tanqueo || 'convenio',
-        t.tipo_combustible || '',
-        t.cantidad || '',
-        t.unidad_medida || '',
-        t.valor_total || '',
-        t.precio_unitario || '',
-        t.kilometraje || '',
-        '"' + (t.factura_numero || '') + '"',
-        '"' + (t.estacion_servicio || '') + '"',
-        t.estado_validacion || ''
+        sanitizarCeldaCsv((t.created_at || '').substring(0, 10)),
+        sanitizarCeldaCsv(t.vehiculo_placa),
+        sanitizarCeldaCsv(t.conductores ? t.conductores.nombre : ''),
+        sanitizarCeldaCsv(t.tipo_tanqueo || 'convenio'),
+        sanitizarCeldaCsv(t.tipo_combustible),
+        sanitizarCeldaCsv(t.cantidad),
+        sanitizarCeldaCsv(t.unidad_medida),
+        sanitizarCeldaCsv(t.valor_total),
+        sanitizarCeldaCsv(t.precio_unitario),
+        sanitizarCeldaCsv(t.kilometraje),
+        sanitizarCeldaCsv(t.factura_numero),
+        sanitizarCeldaCsv(t.estacion_servicio),
+        sanitizarCeldaCsv(t.estado_validacion)
       ].join(',');
     });
 
