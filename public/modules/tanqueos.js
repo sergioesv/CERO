@@ -435,8 +435,11 @@ var Tanqueos = {
     izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Rendimiento</div>';
     if (t.rendimiento_calculado) {
       var veh = t.vehiculos || {};
+      var rendTxt = (t.es_primer_tanqueo === true || parseFloat(t.rendimiento_calculado) >= 500)
+        ? 'Primer registro'
+        : (parseFloat(t.rendimiento_calculado).toFixed(2) + ' km/u');
       izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Km recorridos</span><strong>' + (t.diferencia_km != null ? t.diferencia_km.toLocaleString('es-CO') + ' km' : '-') + '</strong></div>';
-      izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Rendimiento</span><strong>' + parseFloat(t.rendimiento_calculado).toFixed(2) + ' km/u</strong>';
+      izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Rendimiento</span><strong>' + rendTxt + '</strong>';
       if (t.rendimiento_alerta) izq += ' <span class="badge badge-warning" style="font-size:0.7rem;">Fuera de rango</span>';
       izq += '</div>';
       if (veh.rendimiento_min && veh.rendimiento_max) {
