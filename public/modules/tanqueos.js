@@ -358,9 +358,20 @@ var Tanqueos = {
     var fotoPlaca = fotos.find(function(f) { return f.tipo === 'placa'; });
     var fotoOdom = fotos.find(function(f) { return f.tipo === 'odometro'; });
 
-    var urlFact = fotoFact ? (fotoFact.url_firmada || fotoFact.foto_url) : null;
-    var urlPlaca = fotoPlaca ? (fotoPlaca.url_firmada || fotoPlaca.foto_url) : null;
-    var urlOdom = fotoOdom ? (fotoOdom.url_firmada || fotoOdom.foto_url) : null;
+    // Función helper — si la URL es de Twilio, pasar por proxy autenticado del backend
+    function proxyUrl(url) {
+      if (!url) return null;
+      if (url.startsWith('https://api.twilio.com/')) {
+        var base = '/api/tanqueos/media?url=' + encodeURIComponent(url);
+        var tok = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cero_token') : null;
+        return tok ? base + '&token=' + encodeURIComponent(tok) : base;
+      }
+      return url;
+    }
+
+    var urlFact = fotoFact ? proxyUrl(fotoFact.url_firmada || fotoFact.foto_url) : null;
+    var urlPlaca = fotoPlaca ? proxyUrl(fotoPlaca.url_firmada || fotoPlaca.foto_url) : null;
+    var urlOdom = fotoOdom ? proxyUrl(fotoOdom.url_firmada || fotoOdom.foto_url) : null;
 
     // Indicadores de coincidencia
     var disc = t.discrepancias || [];

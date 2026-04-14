@@ -3,9 +3,20 @@
 // ═══════════════════════════════════════════════════════════
 
 const express = require('express');
+const axios = require('axios');
 const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
+
+// <img> no puede enviar Authorization — aceptar token en query solo en esta ruta
+function bearerDesdeQueryParaMedia(req, res, next) {
+  var h = req.headers.authorization;
+  if ((!h || !h.startsWith('Bearer ')) && req.query.token) {
+    req.headers.authorization = 'Bearer ' + String(req.query.token);
+  }
+  next();
+}
 
 // GET / — lista con filtros y stats
 router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
@@ -100,6 +111,33 @@ router.put('/validar-lote', verificarToken, verificarPermiso('tanqueos', 'editar
   } catch (error) {
     console.error('Error en PUT /api/tanqueos/validar-lote:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+});
+
+// GET /media — proxy autenticado para imágenes de Twilio Media
+// Recibe la URL de Twilio como query param codificado
+router.get('/media', bearerDesdeQueryParaMedia, verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+  try {
+    var url = req.query.url;
+    if (!url || !url.startsWith('https://api.twilio.com/')) {
+      return res.status(400).json({ ok: false, error: 'URL inválida' });
+    }
+
+    var respuesta = await axios.get(url, {
+      auth: {
+        username: TWILIO_ACCOUNT_SID,
+        password: TWILIO_AUTH_TOKEN
+      },
+      responseType: 'stream',
+      timeout: 10000
+    });
+
+    res.setHeader('Content-Type', respuesta.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    respuesta.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxy media Twilio:', error.message);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener la imagen' });
   }
 });
 
