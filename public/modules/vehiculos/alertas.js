@@ -204,7 +204,7 @@ const AlertasModule = {
       });
     });
 
-    var hoy = new Date().toISOString().split('T')[0];
+    var hoy = fechaHoyBogota();
     var alertasHoy = this.datos.pendientes.filter(function(a) {
       return a.timestamp_alerta && a.timestamp_alerta.startsWith(hoy);
     }).length;

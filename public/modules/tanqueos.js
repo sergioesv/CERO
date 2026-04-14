@@ -26,7 +26,7 @@ var Tanqueos = {
   // ─────────────────────────────────────────────────────────
 
   async render() {
-    var hoy = new Date().toISOString().split('T')[0];
+    var hoy = fechaHoyBogota();
     var hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     this.filtros.fecha_inicio = this.filtros.fecha_inicio || hace30;
     this.filtros.fecha_fin = this.filtros.fecha_fin || hoy;

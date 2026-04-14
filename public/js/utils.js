@@ -56,3 +56,14 @@ const Utils = {
 
 window.Utils = Utils;
 
+/**
+ * Retorna la fecha de hoy en zona horaria Colombia (UTC-5) formato YYYY-MM-DD.
+ * Usar siempre en lugar de new Date().toISOString().split('T')[0]
+ */
+function fechaHoyBogota() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+    .toISOString()
+    .split('T')[0];
+}
+
+window.fechaHoyBogota = fechaHoyBogota;

@@ -11,7 +11,7 @@ window.PosoperacionalesModule = (() => {
   };
 
   function hoyISO() {
-    return new Date().toISOString().split('T')[0];
+    return fechaHoyBogota();
   }
 
   function formatFechaHora(valor) {

@@ -23,7 +23,7 @@ const Preoperacionales = {
 
   async render() {
     // Fecha de hoy como default
-    var hoy = new Date().toISOString().split('T')[0];
+    var hoy = fechaHoyBogota();
     this.filtros.desde = this.filtros.desde || hoy;
     this.filtros.hasta = this.filtros.hasta || hoy;
 
@@ -254,7 +254,7 @@ const Preoperacionales = {
   },
 
   resetFiltros: function () {
-    var hoy = new Date().toISOString().split('T')[0];
+    var hoy = fechaHoyBogota();
     this.filtros = { desde: hoy, hasta: hoy, placa: '', conductor: '', estado: 'todos' };
     this.render();
   },
