@@ -110,11 +110,16 @@ async function listarTanqueos(filtros) {
   if (resultado.error) return { error: resultado.error, data: [], stats: {} };
 
   // Stats calculadas sobre el período filtrado
-  var hoy = new Date().toISOString().split('T')[0];
+  // Fecha de hoy en zona horaria Colombia (UTC-5)
+  var ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  var hoy = ahora.toISOString().split('T')[0];
   var data = resultado.data || [];
 
+  // created_at viene en UTC — convertir antes de comparar
   var tanqueosHoy = data.filter(function(t) {
-    return t.created_at && t.created_at.startsWith(hoy);
+    if (!t.created_at) return false;
+    var fechaBogota = new Date(new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
+    return fechaBogota === hoy;
   });
 
   var stats = {

@@ -85,7 +85,8 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
       };
     });
 
-    var hoy = new Date().toISOString().split('T')[0];
+    // Fecha de hoy en zona horaria Colombia (UTC-5)
+    var hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
     var todosHoy = (resultado.data || []).filter(function (r) { return r.fecha === hoy; });
     var stats = {
       total: data.length,
