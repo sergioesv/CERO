@@ -156,6 +156,26 @@ async function manejarConfirmacionOdometro(
       sesion.estado = opciones.estadoEsperandoFoto;
       return responderFn(res, opciones.mensajeInicioOdometro(sesion));
     }
+    // Si el conductor escribe el km directamente sin presionar 1 primero
+    var kmDirecto = String(mensaje || '').replace(/[^0-9]/g, '');
+    if (kmDirecto.length >= 4 && opciones.registrarKilometrajePreoperacional) {
+      var kmDirectoNum = parseInt(kmDirecto, 10);
+      var evalDirecto = evaluarKilometrajeContraHistorico(sesion, kmDirectoNum);
+      if (evalDirecto.tipo === 'menor') {
+        return responderFn(
+          res,
+          evalDirecto.mensaje + '\n\nEscribe el kilometraje correcto.'
+        );
+      }
+      var origenDirecto = 'Kilometraje corregido manualmente: ' + kmDirectoNum + ' km';
+      var avisoDirecto = '';
+      if (!evalDirecto.ok && evalDirecto.tipo === 'alto') {
+        origenDirecto += ' (supera el rango automático)';
+        avisoDirecto = '⚠️ Kilometraje fuera del rango automático. Queda registrado.\n\n';
+      }
+      opciones.registrarKilometrajePreoperacional(sesion, kmDirectoNum, origenDirecto);
+      return responderFn(res, avisoDirecto + mensajes.primerMensajeInspeccion(sesion));
+    }
     return responderFn(
       res,
       mensajes.mensajeKilometrajeFueraRango(

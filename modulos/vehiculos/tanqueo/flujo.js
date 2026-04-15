@@ -436,7 +436,10 @@ async function manejarTanqueo(req, res) {
           {
             mensajesModulo: {
               mensajeConfirmacionOdometro: mensajeConfirmacionOdometroTanqueo,
-              mensajeKilometrajeFueraRango: mensajeKilometrajeFueraRangoTanqueo
+              mensajeKilometrajeFueraRango: mensajeKilometrajeFueraRangoTanqueo,
+              primerMensajeInspeccion: function(s) {
+                return mensajes.kilometrajeConfirmadoPrefijo(s.kilometraje) + mensajes.solicitarFotoFactura();
+              }
             },
             responderFn: validaciones.responderTwiml,
             estadoManual: ESTADOS.KM_MANUAL,
@@ -454,6 +457,22 @@ async function manejarTanqueo(req, res) {
             },
             manejarAtrasDesdeOdometro: manejarAtras,
             esOpcion: nav.esOpcion,
+            registrarKilometrajePreoperacional: function(s, km, origen) {
+              s.kilometraje = km;
+              s.kmOcrOdometro = km;
+              aplicarReferenciaKilometrajeTanqueo(s);
+              storage.guardarFotoUnica(s, {
+                tipo: 'odometro',
+                url: s.fotoOdometroTemporal,
+                descripcion: 'Foto del odómetro',
+                validacion: origen,
+                validada: true
+              });
+              s.kmDetectado = null;
+              s.kmLecturaFueraRango = false;
+              s.fotoOdometroTemporal = null;
+              s.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+            },
             onConfirmarPreoperacional: async function(res2, s) {
               s.kilometraje = s.kmDetectado;
               s.kmOcrOdometro = s.kmDetectado;
