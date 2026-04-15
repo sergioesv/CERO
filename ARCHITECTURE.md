@@ -201,6 +201,10 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 15/04/2026 | Refactor módulo panel `public/modules/tanqueos.js` en 4 objetos (TanqueosAPI, TanqueosLogic, TanqueosRender, Tanqueos) | Separar responsabilidades (datos, lógica, render y orquestación), mejorar mantenibilidad y eliminar mezcla de UI/lógica |
+| 15/04/2026 | UX tanqueos ajustada: filtros reducidos (Todos/Pendientes/Revisados), drawer sin rechazar y lightbox inline con ESC | Simplificar operación diaria del panel, reducir errores de revisión y mejorar experiencia móvil |
+| 15/04/2026 | Backend tanqueos: stats por período filtrado + soporte `estado_validacion=revisados` combinado | Alinear tarjetas y tabla con los filtros activos, evitando métricas fijas de "hoy" |
+| 15/04/2026 | SQL v24 día 5 agregado para campos v3 de tanqueos + índices + columnas opcionales en vehículos | Formalizar cambios de esquema para OCR/revisión administrativa y mejorar consultas del panel |
 | 14/04/2026 | Fix validarTipoCombustible — mapeo por keywords GASOLINA/DIESEL/GAS | OCR Terpel retorna "GASOLINA CORRIENTE 10% OXIG" — regex exacto no funcionaba |
 | 14/04/2026 | Fix km manual directo en fuera de rango — conductor puede escribir número sin presionar 1 | UX campo en CONFIRMACION_KM |
 | 14/04/2026 | Tanqueo v3 completo — OCR factura, score/tier, fallback, cierre con inferencia tipo_tanqueo | Semana 1 del plan v24 completa |
