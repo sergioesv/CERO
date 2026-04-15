@@ -1,108 +1,380 @@
 // ═══════════════════════════════════════════════════════════
-// CERO — Módulo Tanqueos
-// Panel de control de combustible con validación cruzada
-// Fase 2.1 — 13/04/2026
+// CERO — Módulo Tanqueos (refactor API/Logic/Render/Orquestación)
 // ═══════════════════════════════════════════════════════════
 
-var Tanqueos = {
+const TanqueosAPI = {
+  async listar(filtros) {
+    var params = new URLSearchParams();
+    if (filtros.fecha_inicio) params.append('fecha_inicio', filtros.fecha_inicio);
+    if (filtros.fecha_fin) params.append('fecha_fin', filtros.fecha_fin);
+    if (filtros.placa) params.append('placa', filtros.placa);
+    if (filtros.estado_validacion === 'pendiente_revision') {
+      params.append('estado_validacion', 'pendiente_revision');
+    }
+    if (filtros.estado_validacion === 'revisados') {
+      params.append('estado_validacion', 'revisados');
+    }
+    var qs = params.toString();
+    var resp = await API.get('/tanqueos' + (qs ? '?' + qs : ''));
+    return {
+      data: resp.data || [],
+      stats: resp.stats || {}
+    };
+  },
+
+  async obtenerDetalle(id) {
+    var resp = await API.get('/tanqueos/' + id);
+    return resp.data;
+  },
+
+  async marcarRevisado(id, notas) {
+    return API.put('/tanqueos/' + id + '/validar', {
+      decision: 'validar',
+      notas_admin: notas || ''
+    });
+  },
+
+  async revisarLote(ids) {
+    return API.put('/tanqueos/validar-lote', { ids: ids });
+  },
+
+  async obtenerConsolidado(mes) {
+    return API.get('/tanqueos/consolidado?mes=' + encodeURIComponent(mes));
+  },
+
+  async exportarCsv(mes) {
+    var token = sessionStorage.getItem('cero_token');
+    var url = '/api/tanqueos/consolidado/exportar?mes=' + encodeURIComponent(mes);
+    var resp = await fetch(url, {
+      method: 'GET',
+      headers: token ? { Authorization: 'Bearer ' + token } : {}
+    });
+    if (!resp.ok) throw new Error('export');
+    var blob = await resp.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tanqueos-' + mes + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+};
+
+const TanqueosLogic = {
+  ordenarDatos(data) {
+    var orden = { pendiente_revision: 0, auto_validado: 1, revisado: 2, validado: 2 };
+    return (data || []).slice().sort(function(a, b) {
+      var pa = orden[a.estado_validacion] == null ? 9 : orden[a.estado_validacion];
+      var pb = orden[b.estado_validacion] == null ? 9 : orden[b.estado_validacion];
+      if (pa !== pb) return pa - pb;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  },
+
+  badgeEstado(estado) {
+    var mapa = {
+      pendiente_revision: '<span class="badge badge-warning">Pendiente</span>',
+      auto_validado: '<span class="badge badge-info">Auto-validado</span>',
+      revisado: '<span class="badge badge-success">Revisado</span>',
+      validado: '<span class="badge badge-success">Revisado</span>'
+    };
+    return mapa[estado] || '<span class="badge">' + (estado || '-') + '</span>';
+  },
+
+  proxyUrl(foto) {
+    if (!foto) return null;
+    var candidata = foto.url_firmada || foto.foto_url || '';
+    if (typeof candidata === 'string' && candidata.indexOf('https://api.twilio.com') === 0 && foto.id) {
+      var base = '/api/tanqueos/media/' + foto.id;
+      var tok = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cero_token') : null;
+      return tok ? base + '?token=' + encodeURIComponent(tok) : base;
+    }
+    return candidata || null;
+  },
+
+  indicadorCruce(discrepancias, campo) {
+    var hay = (discrepancias || []).some(function(d) { return d.campo === campo; });
+    if (hay) return '<span style="color:var(--color-danger);font-weight:700;">✗</span>';
+    return '<span style="color:var(--color-success);font-weight:700;">✓</span>';
+  },
+
+  tieneDiscrepancias(t) {
+    return !!(t && Array.isArray(t.discrepancias) && t.discrepancias.length > 0);
+  },
+
+  formatearCantidad(cantidad, unidad) {
+    if (!cantidad) return '-';
+    return parseFloat(cantidad).toFixed(3) + ' ' + (unidad || 'L');
+  },
+
+  formatearRendimiento(t) {
+    if (!t) return '-';
+    var valor = parseFloat(t.rendimiento_calculado || 0);
+    if (t.es_primer_tanqueo === true || valor >= 500) return 'Línea base';
+    if (t.rendimiento_calculado) return valor.toFixed(2) + ' km/u';
+    return '-';
+  },
+
+  formatearValor(valor) {
+    if (!valor) return '-';
+    return '$' + parseInt(valor, 10).toLocaleString('es-CO');
+  },
+
+  formatearLitrosOGalones(s) {
+    var c = s && s.combustible_total ? s.combustible_total : {};
+    var gal = parseFloat(c.galones || s.galones_total || 0);
+    var lit = parseFloat(c.litros || s.litros_total || 0);
+    var partes = [];
+    if (gal > 0) partes.push(gal.toFixed(3) + ' gal');
+    if (lit > 0) partes.push(lit.toFixed(3) + ' lit');
+    return partes.length ? partes.join(' + ') : '-';
+  }
+};
+
+const TanqueosRender = {
+  stats(s) {
+    return Card.statsGrid([
+      { label: 'Tanqueos período', value: s.total || 0 },
+      { label: 'Combustible período', value: TanqueosLogic.formatearLitrosOGalones(s) },
+      { label: 'Pendientes revisión', value: s.pendientes || 0, type: (s.pendientes || 0) > 0 ? 'danger' : null },
+      { label: 'Anomalías rendimiento', value: s.anomalias || 0, type: (s.anomalias || 0) > 0 ? 'warning' : null }
+    ]);
+  },
+
+  filaTabla(t) {
+    var fecha = t.created_at ? t.created_at.substring(0, 10) : '-';
+    var conductor = t.conductores ? t.conductores.nombre : '-';
+    var alerta = TanqueosLogic.tieneDiscrepancias(t) ? ' <span title="Con discrepancias">⚠</span>' : '';
+    var check = (t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado')
+      ? '<input type="checkbox" class="tanq-check" data-id="' + t.id + '" onchange="Tanqueos.toggleSeleccion(\'' + t.id + '\')">'
+      : '';
+
+    return '<tr class="table-row-clickable" onclick="Tanqueos.abrirDrawer(\'' + t.id + '\')" style="cursor:pointer;">' +
+      '<td onclick="event.stopPropagation()" style="width:36px;">' + check + '</td>' +
+      '<td>' + fecha + '</td>' +
+      '<td><strong>' + (t.vehiculo_placa || '-') + '</strong></td>' +
+      '<td>' + conductor + '</td>' +
+      '<td>' + TanqueosLogic.formatearCantidad(t.cantidad, t.unidad_medida) + '</td>' +
+      '<td>' + TanqueosLogic.formatearValor(t.valor_total) + '</td>' +
+      '<td>' + TanqueosLogic.badgeEstado(t.estado_validacion) + alerta + '</td>' +
+      '</tr>';
+  },
+
+  tabla(data) {
+    if (!data || !data.length) {
+      return '<div style="text-align:center;padding:40px;"><span class="text-secondary">Sin tanqueos para los filtros seleccionados</span></div>';
+    }
+    var datos = TanqueosLogic.ordenarDatos(data);
+    var filas = datos.map(TanqueosRender.filaTabla).join('');
+    var haySeleccionables = datos.some(function(t) {
+      return t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado';
+    });
+    return '<table class="table">' +
+      '<thead><tr>' +
+      '<th style="width:36px;">' + (haySeleccionables ? '<input type="checkbox" onchange="Tanqueos.toggleTodos(this.checked)">' : '') + '</th>' +
+      '<th>Fecha</th><th>Placa</th><th>Conductor</th><th>Cantidad</th><th>Valor</th><th>Estado</th>' +
+      '</tr></thead>' +
+      '<tbody>' + filas + '</tbody>' +
+      '</table>';
+  },
+
+  drawer(t) {
+    var fotos = t.fotos || [];
+    var fotoFact = fotos.find(function(f) { return f.tipo === 'factura'; });
+    var fotoOdom = fotos.find(function(f) { return f.tipo === 'odometro'; });
+    var urlFact = TanqueosLogic.proxyUrl(fotoFact);
+    var urlOdom = TanqueosLogic.proxyUrl(fotoOdom);
+    var disc = t.discrepancias || [];
+    var puedeRevisar = t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado';
+    var kmOcrFact = t.km_ocr_factura != null && t.km_ocr_factura !== '' ? String(t.km_ocr_factura) : '-';
+    var kmOdom = t.km_ocr_odometro != null && t.km_ocr_odometro !== '' ? String(t.km_ocr_odometro) : '-';
+    var camposDisc = disc.map(function(d) { return d.campo; }).join(', ');
+
+    var html = '';
+
+    html += '<div style="padding:14px;border-bottom:1px solid var(--border-color);position:sticky;top:0;background:var(--bg-primary);z-index:2;">';
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+    html += '<span style="font-size:1.05rem;">' + TanqueosLogic.badgeEstado(t.estado_validacion) + '</span>';
+    if (puedeRevisar) html += '<button id="tanq-btn-revisado" class="btn btn-success btn-sm">Marcar revisado</button>';
+    html += '<button id="tanq-btn-notas" class="btn btn-secondary btn-sm">+ Notas</button>';
+    html += '</div></div>';
+
+    html += '<div style="padding:16px;">';
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div class="text-xs text-secondary" style="margin-bottom:6px;">FOTO FACTURA</div>';
+    if (urlFact) {
+      html += '<img id="tanq-foto-factura" data-url="' + urlFact + '" src="' + urlFact + '" style="width:100%;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;" />';
+    } else {
+      html += '<div style="padding:18px;border:1px dashed var(--border-color);border-radius:8px;text-align:center;" class="text-secondary">Sin foto de recibo</div>';
+    }
+    if (urlOdom) {
+      html += '<div style="margin-top:8px;">';
+      html += '<div class="text-xs text-secondary" style="margin-bottom:6px;">Odómetro</div>';
+      html += '<img id="tanq-foto-odometro" data-url="' + urlOdom + '" src="' + urlOdom + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border-color);cursor:zoom-in;" />';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div style="font-size:0.78rem;letter-spacing:.08em;color:var(--text-secondary);font-weight:700;margin-bottom:8px;">CRUCE TERPEL</div>';
+    html += '<table class="table"><tbody>';
+    html += '<tr><td>Placa recibo OCR</td><td><strong>' + (t.placa_ocr_factura || '-') + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'placa') + '</td></tr>';
+    html += '<tr><td>Placa BD</td><td><strong>' + (t.vehiculo_placa || '-') + '</strong></td></tr>';
+    html += '<tr><td>Km recibo OCR</td><td><strong>' + kmOcrFact + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'kilometraje') + '</td></tr>';
+    html += '<tr><td>Km odómetro foto</td><td><strong>' + kmOdom + '</strong></td></tr>';
+    html += '<tr><td>Cantidad OCR</td><td><strong>' + TanqueosLogic.formatearCantidad(t.cantidad_ocr, t.unidad_medida) + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'cantidad') + '</td></tr>';
+    html += '<tr><td>Valor total</td><td><strong>' + TanqueosLogic.formatearValor(t.valor_total) + '</strong></td></tr>';
+    html += '</tbody></table>';
+    if (disc.length) {
+      html += '<div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(239,68,68,.12);color:var(--color-danger);font-size:.85rem;">Conflictos detectados: ' + camposDisc + '</div>';
+    }
+    html += '</div>';
+
+    html += '<div id="tanq-notas-wrap" style="display:none;margin-bottom:16px;">';
+    html += '<div class="text-xs text-secondary" style="margin-bottom:6px;">Notas internas</div>';
+    html += '<textarea id="tanq-notas-input" class="input" rows="3" placeholder="Agregar nota interna..." style="width:100%;">' + Utils.escaparHTML(Tanqueos.notasDrawer || '') + '</textarea>';
+    html += '</div>';
+
+    html += '<div style="margin-bottom:16px;">';
+    html += '<button id="tanq-toggle-adicionales" class="btn btn-secondary btn-sm">Datos adicionales ▼</button>';
+    html += '<div id="tanq-datos-adicionales" style="display:none;margin-top:10px;">';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Conductor</span><strong>' + (t.conductores ? t.conductores.nombre : '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Fecha</span><strong>' + (t.created_at ? t.created_at.substring(0, 10) : '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tipo tanqueo</span><strong>' + (t.tipo_tanqueo || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número factura OCR</span><strong>' + (t.factura_numero_ocr || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número manual</span><strong>' + (t.factura_numero_manual || t.factura_numero || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Score OCR</span><strong>' + (t.ocr_score || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tier OCR</span><strong>' + (t.ocr_tier || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Serial iButton</span><strong>' + (t.ibutton_serial || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Rendimiento calculado</span><strong>' + TanqueosLogic.formatearRendimiento(t) + '</strong></div>';
+    if (t.vehiculos && t.vehiculos.rendimiento_min && t.vehiculos.rendimiento_max) {
+      html += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:180px;">Rango esperado</span><strong>' + t.vehiculos.rendimiento_min + ' - ' + t.vehiculos.rendimiento_max + ' km/u</strong></div>';
+    }
+    html += '</div></div>';
+
+    html += '</div>';
+    return html;
+  },
+
+  lightbox() {
+    return '<div id="tanq-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;">' +
+      '<button id="tanq-lightbox-close" class="btn btn-secondary btn-sm" style="position:absolute;top:14px;right:14px;">✕</button>' +
+      '<img id="tanq-lightbox-img" src="" style="max-width:95vw;max-height:95vh;">' +
+      '</div>';
+  },
+
+  consolidado(resp, mes) {
+    var r = resp.resumen || {};
+    var veh = resp.porVehiculo || [];
+    var html = '';
+    html += '<div class="flex gap-sm items-center" style="margin-bottom:16px;">';
+    html += '<label class="text-xs text-secondary">Mes</label>';
+    html += '<input type="month" class="input input-sm" value="' + mes + '" id="tanq-consolidado-mes" style="width:160px;">';
+    html += '<button type="button" class="btn btn-secondary btn-sm" onclick="Tanqueos.exportarCsvConsolidado()">⬇️ Exportar CSV</button>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">';
+    html += Tanqueos._cardResumen('Total tanqueos', r.total_tanqueos || 0);
+    html += Tanqueos._cardResumen('Total galones', (r.total_galones || 0).toFixed(1));
+    html += Tanqueos._cardResumen('Total pesos', TanqueosLogic.formatearValor(r.total_pesos));
+    html += Tanqueos._cardResumen('Precio prom./gal', r.precio_promedio_galon ? TanqueosLogic.formatearValor(r.precio_promedio_galon) : '-');
+    html += '</div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:16px;">';
+    html += '<span class="badge badge-info">Convenio: ' + (r.convenio || 0) + '</span>';
+    html += '<span class="badge badge-warning">Emergencia: ' + (r.emergencia || 0) + '</span>';
+    html += '</div>';
+    if (veh.length === 0) {
+      html += '<div class="text-secondary" style="text-align:center;padding:24px;">Sin tanqueos validados en este período.</div>';
+      return html;
+    }
+    html += '<table class="table"><thead><tr>';
+    html += '<th>Placa</th><th>Vehículo</th><th># Tanqueos</th><th>Galones</th><th>Litros</th><th>Total pesos</th><th>Rend. promedio</th>';
+    html += '</tr></thead><tbody>';
+    veh.forEach(function(v) {
+      html += '<tr>';
+      html += '<td><strong>' + v.placa + '</strong></td>';
+      html += '<td>' + [v.marca, v.modelo].filter(Boolean).join(' ') + '</td>';
+      html += '<td>' + v.tanqueos + '</td>';
+      html += '<td>' + (v.total_galones || 0).toFixed(1) + '</td>';
+      html += '<td>' + (v.total_litros || 0).toFixed(1) + '</td>';
+      html += '<td>' + TanqueosLogic.formatearValor(v.total_pesos) + '</td>';
+      html += '<td>' + (v.rendimiento_promedio ? v.rendimiento_promedio + ' km/u' : '-') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+};
+
+const Tanqueos = {
   data: [],
   stats: {},
   filtros: {
     fecha_inicio: '',
     fecha_fin: '',
     placa: '',
-    estado_validacion: 'todos',
-    tipo_tanqueo: 'todos'
+    estado_validacion: 'todos'
   },
   drawerAbierto: false,
   detalleActual: null,
   seleccionados: [],
-  vistaConsolidado: false,
-  consolidadoData: null,
   consolidadoMes: '',
-
-  // ─────────────────────────────────────────────────────────
-  // RENDER PRINCIPAL
-  // ─────────────────────────────────────────────────────────
+  notasDrawer: '',
+  _lightboxEscHandler: null,
+  _lightboxEventosBindeados: false,
 
   async render() {
     var hoy = fechaHoyBogota();
     var hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     this.filtros.fecha_inicio = this.filtros.fecha_inicio || hace30;
     this.filtros.fecha_fin = this.filtros.fecha_fin || hoy;
-    this.consolidadoMes = this.consolidadoMes || hoy.substring(0, 7);
+    if (!this.consolidadoMes) this.consolidadoMes = hoy.substring(0, 7);
 
     var main = document.getElementById('main');
-    main.innerHTML = `
-      <div class="main-header">
-        <div>
-          <h1 class="main-title">Tanqueos</h1>
-          <p class="main-subtitle">Control de combustible y validación cruzada</p>
-        </div>
-        <div class="main-actions">
-          <button class="btn btn-secondary btn-sm" onclick="Tanqueos.abrirConsolidado()">📊 Consolidado mensual</button>
-          <button class="btn btn-secondary btn-sm" onclick="Tanqueos.resetFiltros()">Limpiar filtros</button>
-        </div>
-      </div>
-      <div class="main-content">
-        <div id="tanq-stats"></div>
-        <div class="filters-row">
-          <div class="flex gap-sm items-center">
-            <label class="text-xs text-secondary">Desde</label>
-            <input type="date" class="input input-sm" id="tanq-desde" value="${this.filtros.fecha_inicio}" style="width:140px;">
-            <label class="text-xs text-secondary">Hasta</label>
-            <input type="date" class="input input-sm" id="tanq-hasta" value="${this.filtros.fecha_fin}" style="width:140px;">
-          </div>
-          <div class="search-box" style="min-width:130px;max-width:160px;">
-            <input type="text" class="input input-sm" placeholder="Placa..." id="tanq-placa" value="${this.filtros.placa}" style="text-transform:uppercase;">
-          </div>
-          <div class="flex gap-sm">
-            <button class="btn btn-sm ${this.filtros.estado_validacion === 'todos' ? 'btn-primary' : 'btn-secondary'}" onclick="Tanqueos.filtrarEstado('todos')">Todos</button>
-            <button class="btn btn-sm ${this.filtros.estado_validacion === 'pendiente_revision' ? 'btn-warning' : 'btn-secondary'}" onclick="Tanqueos.filtrarEstado('pendiente_revision')">Pendientes</button>
-            <button class="btn btn-sm ${this.filtros.estado_validacion === 'auto_validado' ? 'btn-info' : 'btn-secondary'}" onclick="Tanqueos.filtrarEstado('auto_validado')">Auto-validados</button>
-            <button class="btn btn-sm ${this.filtros.estado_validacion === 'validado' ? 'btn-success' : 'btn-secondary'}" onclick="Tanqueos.filtrarEstado('validado')">Validados</button>
-            <button class="btn btn-sm ${this.filtros.estado_validacion === 'rechazado' ? 'btn-danger' : 'btn-secondary'}" onclick="Tanqueos.filtrarEstado('rechazado')">Rechazados</button>
-          </div>
-          <div class="flex gap-sm">
-            <button class="btn btn-sm ${this.filtros.tipo_tanqueo === 'todos' ? 'btn-primary' : 'btn-secondary'}" onclick="Tanqueos.filtrarTipo('todos')">Todos</button>
-            <button class="btn btn-sm ${this.filtros.tipo_tanqueo === 'convenio' ? 'btn-primary' : 'btn-secondary'}" onclick="Tanqueos.filtrarTipo('convenio')">Convenio</button>
-            <button class="btn btn-sm ${this.filtros.tipo_tanqueo === 'emergencia' ? 'btn-warning' : 'btn-secondary'}" onclick="Tanqueos.filtrarTipo('emergencia')">Emergencia</button>
-          </div>
-        </div>
-        <div id="tanq-acciones-lote" class="flex gap-sm" style="display:none;margin-bottom:8px;">
-          <span id="tanq-seleccionados-count" class="text-sm text-secondary"></span>
-          <button class="btn btn-sm btn-success" onclick="Tanqueos.validarLote()">✅ Validar seleccionados</button>
-        </div>
-        <div id="tanq-tabla">
-          <div style="text-align:center;padding:40px;">
-            <span class="text-secondary">Cargando tanqueos...</span>
-          </div>
-        </div>
-      </div>
+    main.innerHTML = '' +
+      '<div class="main-header">' +
+      '<div><h1 class="main-title">Tanqueos</h1><p class="main-subtitle">Control de combustible y validación cruzada</p></div>' +
+      '<div class="main-actions">' +
+      '<button class="btn btn-secondary btn-sm" onclick="Tanqueos.abrirConsolidado()">📊 Consolidado mensual</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="Tanqueos.resetFiltros()">Limpiar filtros</button>' +
+      '</div></div>' +
+      '<div class="main-content">' +
+      '<div id="tanq-stats"></div>' +
+      '<div class="filters-row">' +
+      '<div class="flex gap-sm items-center">' +
+      '<label class="text-xs text-secondary">Desde</label>' +
+      '<input type="date" class="input input-sm" id="tanq-desde" value="' + this.filtros.fecha_inicio + '" style="width:140px;">' +
+      '<label class="text-xs text-secondary">Hasta</label>' +
+      '<input type="date" class="input input-sm" id="tanq-hasta" value="' + this.filtros.fecha_fin + '" style="width:140px;">' +
+      '</div>' +
+      '<div class="search-box" style="min-width:130px;max-width:160px;">' +
+      '<input type="text" class="input input-sm" placeholder="Placa..." id="tanq-placa" value="' + this.filtros.placa + '" style="text-transform:uppercase;">' +
+      '</div>' +
+      '<div class="flex gap-sm">' +
+      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'todos' ? 'btn-primary' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'todos\')">Todos</button>' +
+      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'pendiente_revision' ? 'btn-warning' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'pendiente_revision\')">Pendientes</button>' +
+      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'revisados' ? 'btn-success' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'revisados\')">Revisados</button>' +
+      '</div></div>' +
+      '<div id="tanq-acciones-lote" class="flex gap-sm" style="display:none;margin-bottom:8px;">' +
+      '<span id="tanq-seleccionados-count" class="text-sm text-secondary"></span>' +
+      '<button class="btn btn-sm btn-success" onclick="Tanqueos.validarLote()">Marcar revisados</button>' +
+      '</div>' +
+      '<div id="tanq-tabla"><div style="text-align:center;padding:40px;"><span class="text-secondary">Cargando tanqueos...</span></div></div>' +
+      '</div>' +
+      '<div class="drawer-backdrop" id="drawer-backdrop" onclick="Tanqueos.cerrarDrawer()"></div>' +
+      '<div class="drawer" id="drawer-panel" style="width:min(780px,95vw);">' +
+      '<div class="drawer-header"><h3 class="drawer-title" id="drawer-titulo">Detalle del tanqueo</h3><button class="modal-close" onclick="Tanqueos.cerrarDrawer()">&times;</button></div>' +
+      '<div class="drawer-body" id="drawer-contenido" style="padding:0;"></div>' +
+      '</div>' +
+      '<div class="modal-overlay" id="modal-consolidado" style="display:none;" onclick="if(event.target===this)Tanqueos.cerrarConsolidado()">' +
+      '<div class="modal" style="max-width:860px;width:95vw;">' +
+      '<div class="modal-header"><h3 class="modal-title">📊 Consolidado mensual</h3><button class="modal-close" onclick="Tanqueos.cerrarConsolidado()">&times;</button></div>' +
+      '<div class="modal-body" id="modal-consolidado-body">Cargando...</div>' +
+      '</div></div>';
 
-      <!-- Drawer lateral -->
-      <div class="drawer-backdrop" id="drawer-backdrop" onclick="Tanqueos.cerrarDrawer()"></div>
-      <div class="drawer" id="drawer-panel" style="width:min(780px,95vw);">
-        <div class="drawer-header">
-          <h3 class="drawer-title" id="drawer-titulo">Detalle del tanqueo</h3>
-          <button class="modal-close" onclick="Tanqueos.cerrarDrawer()">&times;</button>
-        </div>
-        <div class="drawer-body" id="drawer-contenido" style="padding:0;"></div>
-      </div>
+    if (!document.getElementById('tanq-lightbox')) {
+      document.body.insertAdjacentHTML('beforeend', TanqueosRender.lightbox());
+    }
+    this._bindLightboxEvents();
 
-      <!-- Modal consolidado -->
-      <div class="modal-overlay" id="modal-consolidado" style="display:none;" onclick="if(event.target===this)Tanqueos.cerrarConsolidado()">
-        <div class="modal" style="max-width:860px;width:95vw;">
-          <div class="modal-header">
-            <h3 class="modal-title">📊 Consolidado mensual</h3>
-            <button class="modal-close" onclick="Tanqueos.cerrarConsolidado()">&times;</button>
-          </div>
-          <div class="modal-body" id="modal-consolidado-body">Cargando...</div>
-        </div>
-      </div>
-    `;
-
-    // Eventos filtros
     document.getElementById('tanq-desde').addEventListener('change', function() {
       Tanqueos.filtros.fecha_inicio = this.value;
       Tanqueos.cargarDatos();
@@ -119,148 +391,184 @@ var Tanqueos = {
     await this.cargarDatos();
   },
 
-  // ─────────────────────────────────────────────────────────
-  // CARGA DE DATOS
-  // ─────────────────────────────────────────────────────────
+  _bindLightboxEvents() {
+    if (this._lightboxEventosBindeados) return;
+    var overlay = document.getElementById('tanq-lightbox');
+    var closeBtn = document.getElementById('tanq-lightbox-close');
+    if (!overlay || !closeBtn) return;
+    overlay.addEventListener('click', function() { Tanqueos.cerrarLightbox(); });
+    closeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      Tanqueos.cerrarLightbox();
+    });
+    this._lightboxEventosBindeados = true;
+  },
 
   async cargarDatos() {
     try {
-      var params = new URLSearchParams();
-      if (this.filtros.fecha_inicio) params.append('fecha_inicio', this.filtros.fecha_inicio);
-      if (this.filtros.fecha_fin) params.append('fecha_fin', this.filtros.fecha_fin);
-      if (this.filtros.placa) params.append('placa', this.filtros.placa);
-      if (this.filtros.estado_validacion !== 'todos') params.append('estado_validacion', this.filtros.estado_validacion);
-      if (this.filtros.tipo_tanqueo !== 'todos') params.append('tipo_tanqueo', this.filtros.tipo_tanqueo);
-
-      var qs = params.toString();
-      var resp = await API.get('/tanqueos' + (qs ? '?' + qs : ''));
+      var resp = await TanqueosAPI.listar(this.filtros);
       this.data = resp.data || [];
       this.stats = resp.stats || {};
       this.seleccionados = [];
-      this.renderStats();
-      this.renderTabla();
+      document.getElementById('tanq-stats').innerHTML = TanqueosRender.stats(this.stats);
+      document.getElementById('tanq-tabla').innerHTML = TanqueosRender.tabla(this.data);
+      this._actualizarBarraLote();
     } catch (error) {
       this.data = [];
       Toast.error('Error cargando tanqueos');
-      this.renderTabla();
+      document.getElementById('tanq-tabla').innerHTML = TanqueosRender.tabla([]);
     }
   },
 
-  // ─────────────────────────────────────────────────────────
-  // STATS CARDS
-  // ─────────────────────────────────────────────────────────
-
-  renderStats() {
-    var s = this.stats;
-    document.getElementById('tanq-stats').innerHTML = Card.statsGrid([
-      { label: 'Tanqueos hoy', value: s.hoy || 0 },
-      { label: 'Galones hoy', value: (s.galones_hoy || 0).toFixed(1) },
-      { label: 'Pendientes revisión', value: s.pendientes || 0, type: (s.pendientes || 0) > 0 ? 'danger' : null },
-      { label: 'Anomalías rendimiento', value: s.anomalias || 0, type: (s.anomalias || 0) > 0 ? 'warning' : null }
-    ]);
-  },
-
-  // ─────────────────────────────────────────────────────────
-  // TABLA PRINCIPAL
-  // ─────────────────────────────────────────────────────────
-
-  renderTabla() {
-    var contenedor = document.getElementById('tanq-tabla');
-    if (!contenedor) return;
-
-    if (!this.data.length) {
-      contenedor.innerHTML = '<div style="text-align:center;padding:40px;"><span class="text-secondary">Sin tanqueos para los filtros seleccionados.</span></div>';
-      return;
-    }
-
-    // Ordenar: pendientes arriba, luego auto_validados, luego el resto
-    var orden = { pendiente_revision: 0, auto_validado: 1, validado: 2, rechazado: 3 };
-    var datos = this.data.slice().sort(function(a, b) {
-      return (orden[a.estado_validacion] || 9) - (orden[b.estado_validacion] || 9);
+  filtrarEstado(estado) {
+    this.filtros.estado_validacion = estado;
+    this.cargarDatos();
+    var botones = document.querySelectorAll('.filters-row .flex.gap-sm button');
+    botones.forEach(function(btn) {
+      var texto = (btn.textContent || '').trim();
+      var activo = (texto === 'Todos' && estado === 'todos') ||
+        (texto === 'Pendientes' && estado === 'pendiente_revision') ||
+        (texto === 'Revisados' && estado === 'revisados');
+      btn.className = 'btn btn-sm ' + (activo ? (texto === 'Pendientes' ? 'btn-warning' : (texto === 'Revisados' ? 'btn-success' : 'btn-primary')) : 'btn-secondary');
     });
-
-    var hayAutoValidados = datos.some(function(t) { return t.estado_validacion === 'auto_validado'; });
-
-    var filas = datos.map(function(t) {
-      var fecha = t.created_at ? t.created_at.substring(0, 10) : '-';
-      var placa = t.vehiculo_placa || '-';
-      var conductor = t.conductores ? t.conductores.nombre : '-';
-      var galones = t.cantidad ? (parseFloat(t.cantidad).toFixed(3) + ' ' + (t.unidad_medida || 'L')) : '-';
-      var valor = t.valor_total ? ('$' + parseInt(t.valor_total, 10).toLocaleString('es-CO')) : '-';
-      var km = t.kilometraje ? t.kilometraje.toLocaleString('es-CO') : '-';
-      var rend = t.rendimiento_calculado
-        ? (parseFloat(t.rendimiento_calculado).toFixed(1) + ' km/u')
-        : '<span class="text-secondary">-</span>';
-
-      // Badge estado validación
-      var badgeEstado = Tanqueos._badgeEstado(t.estado_validacion);
-
-      // Badge tipo tanqueo
-      var badgeTipo = t.tipo_tanqueo === 'emergencia'
-        ? '<span class="badge badge-warning" style="font-size:0.7rem;">⚠️ Emerg.</span>'
-        : '';
-
-      // Alerta rendimiento
-      var alertaRend = t.rendimiento_alerta
-        ? '<span class="badge badge-warning" style="font-size:0.7rem;" title="Rendimiento fuera de rango">📉</span>'
-        : '';
-
-      // Checkbox solo para auto_validado
-      var checkbox = (t.estado_validacion === 'auto_validado')
-        ? '<input type="checkbox" class="tanq-check" data-id="' + t.id + '" onchange="Tanqueos.toggleSeleccion(\'' + t.id + '\')">'
-        : '';
-
-      return '<tr class="table-row-clickable" onclick="Tanqueos.abrirDrawer(\'' + t.id + '\')" style="cursor:pointer;">' +
-        '<td onclick="event.stopPropagation()" style="width:36px;">' + checkbox + '</td>' +
-        '<td>' + fecha + '</td>' +
-        '<td><strong>' + placa + '</strong> ' + badgeTipo + '</td>' +
-        '<td>' + conductor + '</td>' +
-        '<td>' + galones + '</td>' +
-        '<td>' + valor + '</td>' +
-        '<td>' + km + '</td>' +
-        '<td>' + rend + ' ' + alertaRend + '</td>' +
-        '<td>' + badgeEstado + '</td>' +
-        '</tr>';
-    }).join('');
-
-    contenedor.innerHTML =
-      '<table class="table">' +
-        '<thead><tr>' +
-          '<th style="width:36px;">' +
-            (hayAutoValidados ? '<input type="checkbox" onchange="Tanqueos.toggleTodos(this.checked)" title="Seleccionar auto-validados">' : '') +
-          '</th>' +
-          '<th>Fecha</th><th>Placa</th><th>Conductor</th>' +
-          '<th>Cantidad</th><th>Valor</th><th>Km</th>' +
-          '<th>Rendimiento</th><th>Estado</th>' +
-        '</tr></thead>' +
-        '<tbody>' + filas + '</tbody>' +
-      '</table>';
-
-    this._actualizarBarraLote();
   },
 
-  _badgeEstado: function(estado) {
-    var mapa = {
-      auto_validado: '<span class="badge badge-info">Auto-validado</span>',
-      pendiente_revision: '<span class="badge badge-warning">Pendiente</span>',
-      validado: '<span class="badge badge-success">Validado</span>',
-      rechazado: '<span class="badge badge-danger">Rechazado</span>'
+  resetFiltros() {
+    this.filtros = { fecha_inicio: '', fecha_fin: '', placa: '', estado_validacion: 'todos' };
+    this.render();
+  },
+
+  async abrirDrawer(id) {
+    var drawer = document.getElementById('drawer-panel');
+    var backdrop = document.getElementById('drawer-backdrop');
+    var contenido = document.getElementById('drawer-contenido');
+    var titulo = document.getElementById('drawer-titulo');
+    if (!drawer) return;
+
+    titulo.textContent = 'Cargando...';
+    contenido.innerHTML = '<div style="padding:40px;text-align:center;"><span class="text-secondary">Cargando detalle...</span></div>';
+    drawer.classList.add('open');
+    if (backdrop) backdrop.classList.add('active');
+    this.drawerAbierto = true;
+    this.notasDrawer = '';
+
+    try {
+      var t = await TanqueosAPI.obtenerDetalle(id);
+      this.detalleActual = t;
+      titulo.textContent = 'Tanqueo — ' + (t.vehiculo_placa || '-');
+      contenido.innerHTML = TanqueosRender.drawer(t);
+
+      var btnRevisado = document.getElementById('tanq-btn-revisado');
+      var btnNotas = document.getElementById('tanq-btn-notas');
+      var notasWrap = document.getElementById('tanq-notas-wrap');
+      var notasInput = document.getElementById('tanq-notas-input');
+      var fotoFact = document.getElementById('tanq-foto-factura');
+      var fotoOdom = document.getElementById('tanq-foto-odometro');
+      var toggleAdicionales = document.getElementById('tanq-toggle-adicionales');
+      var panelAdicionales = document.getElementById('tanq-datos-adicionales');
+
+      if (btnRevisado) {
+        btnRevisado.addEventListener('click', function() { Tanqueos.accionRevisar(id); });
+      }
+      if (btnNotas && notasWrap) {
+        btnNotas.addEventListener('click', function() {
+          notasWrap.style.display = notasWrap.style.display === 'none' ? 'block' : 'none';
+          if (notasInput) notasInput.focus();
+        });
+      }
+      if (notasInput) {
+        notasInput.addEventListener('input', function() {
+          Tanqueos.notasDrawer = this.value || '';
+        });
+      }
+      if (fotoFact) {
+        fotoFact.addEventListener('click', function() {
+          Tanqueos.abrirLightbox(fotoFact.getAttribute('data-url'));
+        });
+      }
+      if (fotoOdom) {
+        fotoOdom.addEventListener('click', function() {
+          Tanqueos.abrirLightbox(fotoOdom.getAttribute('data-url'));
+        });
+      }
+      if (toggleAdicionales && panelAdicionales) {
+        toggleAdicionales.addEventListener('click', function() {
+          var abierto = panelAdicionales.style.display === 'block';
+          panelAdicionales.style.display = abierto ? 'none' : 'block';
+          toggleAdicionales.textContent = abierto ? 'Datos adicionales ▼' : 'Datos adicionales ▲';
+        });
+      }
+    } catch (e) {
+      contenido.innerHTML = '<div style="padding:24px;"><span class="badge badge-danger">Error cargando detalle</span></div>';
+    }
+  },
+
+  cerrarDrawer() {
+    var drawer = document.getElementById('drawer-panel');
+    var backdrop = document.getElementById('drawer-backdrop');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('active');
+    this.drawerAbierto = false;
+    this.detalleActual = null;
+    this.notasDrawer = '';
+  },
+
+  abrirLightbox(url) {
+    if (!url) return;
+    var img = document.getElementById('tanq-lightbox-img');
+    var box = document.getElementById('tanq-lightbox');
+    if (!img || !box) return;
+    img.src = url;
+    box.style.display = 'flex';
+    this._lightboxEscHandler = function(e) {
+      if (e.key === 'Escape') Tanqueos.cerrarLightbox();
     };
-    return mapa[estado] || '<span class="badge">' + (estado || '-') + '</span>';
+    document.addEventListener('keydown', this._lightboxEscHandler);
   },
 
-  // ─────────────────────────────────────────────────────────
-  // SELECCIÓN EN LOTE
-  // ─────────────────────────────────────────────────────────
+  cerrarLightbox() {
+    var box = document.getElementById('tanq-lightbox');
+    if (box) box.style.display = 'none';
+    if (this._lightboxEscHandler) {
+      document.removeEventListener('keydown', this._lightboxEscHandler);
+      this._lightboxEscHandler = null;
+    }
+  },
 
-  toggleSeleccion: function(id) {
+  async accionRevisar(id) {
+    var notas = this.notasDrawer || '';
+    if (!confirm('¿Marcar este tanqueo como revisado?')) return;
+    try {
+      await TanqueosAPI.marcarRevisado(id, notas);
+      Toast.success('Tanqueo marcado como revisado');
+      this.cerrarDrawer();
+      await this.cargarDatos();
+    } catch (e) {
+      Toast.error('Error al procesar la acción');
+    }
+  },
+
+  async validarLote() {
+    if (!this.seleccionados.length) return;
+    if (!confirm('¿Marcar ' + this.seleccionados.length + ' tanqueo(s) como revisados?')) return;
+    try {
+      await TanqueosAPI.revisarLote(this.seleccionados);
+      Toast.success('Tanqueos marcados como revisados');
+      this.seleccionados = [];
+      await this.cargarDatos();
+    } catch (e) {
+      Toast.error('Error al procesar en lote');
+    }
+  },
+
+  toggleSeleccion(id) {
     var idx = this.seleccionados.indexOf(id);
     if (idx === -1) this.seleccionados.push(id);
     else this.seleccionados.splice(idx, 1);
     this._actualizarBarraLote();
   },
 
-  toggleTodos: function(checked) {
+  toggleTodos(checked) {
     var checks = document.querySelectorAll('.tanq-check');
     this.seleccionados = [];
     checks.forEach(function(c) {
@@ -270,7 +578,7 @@ var Tanqueos = {
     this._actualizarBarraLote();
   },
 
-  _actualizarBarraLote: function() {
+  _actualizarBarraLote() {
     var barra = document.getElementById('tanq-acciones-lote');
     var count = document.getElementById('tanq-seleccionados-count');
     if (!barra) return;
@@ -282,274 +590,6 @@ var Tanqueos = {
     }
   },
 
-  async validarLote() {
-    if (!this.seleccionados.length) return;
-    if (!confirm('¿Validar ' + this.seleccionados.length + ' tanqueo(s)?')) return;
-    try {
-      await API.put('/tanqueos/validar-lote', { ids: this.seleccionados });
-      Toast.success('Tanqueos validados correctamente');
-      this.seleccionados = [];
-      await this.cargarDatos();
-    } catch (e) {
-      Toast.error('Error al validar en lote');
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────
-  // FILTROS
-  // ─────────────────────────────────────────────────────────
-
-  filtrarEstado: function(estado) {
-    this.filtros.estado_validacion = estado;
-    this.render();
-  },
-
-  filtrarTipo: function(tipo) {
-    this.filtros.tipo_tanqueo = tipo;
-    this.render();
-  },
-
-  resetFiltros: function() {
-    this.filtros = { fecha_inicio: '', fecha_fin: '', placa: '', estado_validacion: 'todos', tipo_tanqueo: 'todos' };
-    this.render();
-  },
-
-  // ─────────────────────────────────────────────────────────
-  // DRAWER DETALLE — SPLIT 50/50
-  // ─────────────────────────────────────────────────────────
-
-  async abrirDrawer(id) {
-    var drawer = document.getElementById('drawer-panel');
-    var backdrop = document.getElementById('drawer-backdrop');
-    var contenido = document.getElementById('drawer-contenido');
-    var titulo = document.getElementById('drawer-titulo');
-
-    if (!drawer) return;
-    titulo.textContent = 'Cargando...';
-    contenido.innerHTML = '<div style="padding:40px;text-align:center;"><span class="text-secondary">Cargando detalle...</span></div>';
-    drawer.classList.add('open');
-    if (backdrop) backdrop.classList.add('active');
-    this.drawerAbierto = true;
-
-    try {
-      var resp = await API.get('/tanqueos/' + id);
-      var t = resp.data;
-      this.detalleActual = t;
-      titulo.textContent = 'Tanqueo — ' + t.vehiculo_placa;
-      contenido.innerHTML = this._renderDrawerContenido(t);
-    } catch (e) {
-      contenido.innerHTML = '<div style="padding:24px;"><span class="badge badge-danger">Error cargando detalle</span></div>';
-    }
-  },
-
-  cerrarDrawer: function() {
-    var drawer = document.getElementById('drawer-panel');
-    var backdrop = document.getElementById('drawer-backdrop');
-    if (drawer) drawer.classList.remove('open');
-    if (backdrop) backdrop.classList.remove('active');
-    this.drawerAbierto = false;
-    this.detalleActual = null;
-  },
-
-  _renderDrawerContenido: function(t) {
-    // Buscar foto factura para el panel derecho
-    var fotos = t.fotos || [];
-    var fotoFact = fotos.find(function(f) { return f.tipo === 'factura'; });
-    var fotoPlaca = fotos.find(function(f) { return f.tipo === 'placa'; });
-    var fotoOdom = fotos.find(function(f) { return f.tipo === 'odometro'; });
-
-    // Twilio: proxy seguro por fotoId (el backend resuelve la URL). Otras URLs (p. ej. Storage firmada) directas.
-    function proxyUrl(foto) {
-      if (!foto) return null;
-      var candidata = foto.url_firmada || foto.foto_url || '';
-      if (typeof candidata === 'string' && candidata.startsWith('https://api.twilio.com/') && foto.id) {
-        var base = '/api/tanqueos/media/' + foto.id;
-        var tok = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cero_token') : null;
-        return tok ? base + '?token=' + encodeURIComponent(tok) : base;
-      }
-      return candidata || null;
-    }
-
-    var urlFact = fotoFact ? proxyUrl(fotoFact) : null;
-    var urlPlaca = fotoPlaca ? proxyUrl(fotoPlaca) : null;
-    var urlOdom = fotoOdom ? proxyUrl(fotoOdom) : null;
-
-    // Indicadores de coincidencia
-    var disc = t.discrepancias || [];
-    var discMapa = {};
-    disc.forEach(function(d) { discMapa[d.campo] = d; });
-
-    function indicador(campo) {
-      return discMapa[campo]
-        ? '<span style="color:var(--color-danger);font-weight:600;" title="Discrepancia">✗</span>'
-        : '<span style="color:var(--color-success);font-weight:600;" title="Coincide">✓</span>';
-    }
-
-    // Panel izquierdo
-    var izq = '<div style="padding:20px;overflow-y:auto;height:100%;">';
-
-    // Header con badges
-    izq += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">';
-    izq += Tanqueos._badgeEstado(t.estado_validacion);
-    if (t.tipo_tanqueo === 'emergencia') {
-      izq += '<span class="badge badge-warning">⚠️ Emergencia</span>';
-    }
-    if (t.rendimiento_alerta) {
-      izq += '<span class="badge badge-warning">📉 Rendimiento anómalo</span>';
-    }
-    izq += '</div>';
-
-    // Fecha y conductor
-    izq += '<div style="margin-bottom:16px;">';
-    izq += '<div class="text-xs text-secondary">Fecha</div>';
-    izq += '<div>' + (t.created_at ? t.created_at.substring(0, 10) : '-') + '</div>';
-    izq += '<div class="text-xs text-secondary" style="margin-top:8px;">Conductor</div>';
-    izq += '<div>' + (t.conductores ? t.conductores.nombre : '-') + '</div>';
-    izq += '</div>';
-
-    // Sección: datos factura
-    izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-    izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Factura</div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Nro. manual</span><strong>' + (t.factura_numero_manual || '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:140px;">Nro. OCR</span><strong>' + (t.factura_numero_ocr || '-') + '</strong> ' + indicador('factura_numero') + '</div>';
-    izq += '</div>';
-
-    // Sección: vehículo / placa
-    izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-    izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Vehículo</div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Placa foto</span><strong>' + (t.placa_ocr_foto || t.vehiculo_placa || '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:140px;">Placa recibo OCR</span><strong>' + (t.placa_ocr_factura || '-') + '</strong> ' + indicador('placa') + '</div>';
-    izq += '</div>';
-
-    // Sección: kilometraje
-    var kmOcrFact = t.km_ocr_factura;
-    var kmOcrFactTxt = kmOcrFact != null && kmOcrFact !== ''
-      ? (typeof kmOcrFact === 'number' ? kmOcrFact.toLocaleString('es-CO') : String(kmOcrFact)) + ' km'
-      : '-';
-    izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-    izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Kilometraje</div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Odómetro foto</span><strong>' + (t.km_ocr_odometro != null ? t.km_ocr_odometro.toLocaleString('es-CO') + ' km' : '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:140px;">Km recibo OCR</span><strong>' + kmOcrFactTxt + '</strong> ' + indicador('kilometraje') + '</div>';
-    izq += '</div>';
-
-    // Sección: combustible
-    izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-    izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Combustible</div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Tipo</span><strong>' + (t.tipo_combustible || '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Cantidad OCR</span><strong>' + (t.cantidad_ocr ? t.cantidad_ocr + ' ' + (t.unidad_medida || '') : '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Cantidad conductor</span><strong>' + (t.cantidad_manual ? t.cantidad_manual + ' ' + (t.unidad_medida || '') : '-') + '</strong> ' + indicador('cantidad') + '</div>';
-    izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Valor total</span><strong>' + (t.valor_total ? '$' + parseInt(t.valor_total, 10).toLocaleString('es-CO') : '-') + '</strong></div>';
-    izq += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:140px;">Precio / unidad</span><strong>' + (t.precio_unitario ? '$' + parseFloat(t.precio_unitario).toLocaleString('es-CO') : '-') + '</strong></div>';
-    izq += '</div>';
-
-    // Sección: rendimiento
-    izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-    izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Rendimiento</div>';
-    if (t.rendimiento_calculado) {
-      var veh = t.vehiculos || {};
-      var rendTxt = (t.es_primer_tanqueo === true || parseFloat(t.rendimiento_calculado) >= 500)
-        ? 'Primer registro'
-        : (parseFloat(t.rendimiento_calculado).toFixed(2) + ' km/u');
-      izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Km recorridos</span><strong>' + (t.diferencia_km != null ? t.diferencia_km.toLocaleString('es-CO') + ' km' : '-') + '</strong></div>';
-      izq += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:140px;">Rendimiento</span><strong>' + rendTxt + '</strong>';
-      if (t.rendimiento_alerta) izq += ' <span class="badge badge-warning" style="font-size:0.7rem;">Fuera de rango</span>';
-      izq += '</div>';
-      if (veh.rendimiento_min && veh.rendimiento_max) {
-        izq += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:140px;">Rango esperado</span><strong>' + veh.rendimiento_min + ' – ' + veh.rendimiento_max + ' km/u</strong></div>';
-      }
-    } else {
-      izq += '<div class="text-secondary" style="font-size:0.85rem;">Línea base — sin cálculo (primer tanqueo)</div>';
-    }
-    izq += '</div>';
-
-    // Miniaturas fotos placa y odómetro
-    if (urlPlaca || urlOdom) {
-      izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-      izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Fotos</div>';
-      izq += '<div class="flex gap-sm">';
-      if (urlPlaca) izq += '<a href="' + urlPlaca + '" target="_blank"><img src="' + urlPlaca + '" style="width:90px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border-color);" title="Foto placa"></a>';
-      if (urlOdom) izq += '<a href="' + urlOdom + '" target="_blank"><img src="' + urlOdom + '" style="width:90px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border-color);" title="Odómetro"></a>';
-      izq += '</div></div>';
-    }
-
-    // Discrepancias
-    if (disc.length > 0) {
-      izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-      izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-danger);">Discrepancias</div>';
-      disc.forEach(function(d) {
-        izq += '<div style="margin-bottom:4px;font-size:0.85rem;"><strong>' + d.campo + '</strong>: conductor <em>' + d.valor_conductor + '</em> vs OCR <em>' + d.valor_ocr + '</em></div>';
-      });
-      izq += '</div>';
-    }
-
-    // Motivo rechazo
-    if (t.estado_validacion === 'rechazado' && t.motivo_rechazo) {
-      izq += '<div class="drawer-section" style="margin-bottom:12px;">';
-      izq += '<div class="text-xs text-secondary" style="margin-bottom:6px;color:var(--color-danger);">MOTIVO RECHAZO</div>';
-      izq += '<div style="font-size:0.9rem;">' + t.motivo_rechazo + '</div>';
-      izq += '</div>';
-    }
-
-    // Botones acción
-    if (t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado') {
-      izq += '<div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border-color);">';
-      izq += '<button class="btn btn-success btn-sm" onclick="Tanqueos.accionValidar(\'' + t.id + '\', \'validar\')">✅ Validar</button>';
-      izq += '<button class="btn btn-danger btn-sm" onclick="Tanqueos.accionValidar(\'' + t.id + '\', \'rechazar\')">❌ Rechazar</button>';
-      izq += '</div>';
-    }
-
-    izq += '</div>'; // fin panel izquierdo
-
-    // Panel derecho — foto factura sticky
-    var der = '<div style="background:var(--bg-secondary);border-left:1px solid var(--border-color);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;min-height:100%;">';
-    der += '<div style="position:sticky;top:0;">';
-    if (urlFact) {
-      der += '<div class="text-xs text-secondary" style="margin-bottom:8px;text-align:center;">📄 Foto recibo</div>';
-      der += '<a href="' + urlFact + '" target="_blank" title="Ampliar">';
-      der += '<img src="' + urlFact + '" style="width:100%;max-width:340px;border-radius:6px;border:1px solid var(--border-color);cursor:zoom-in;" onerror="this.parentElement.innerHTML=\'<span class=\\\"text-secondary\\\">Foto no disponible</span>\'">';
-      der += '</a>';
-      der += '<div class="text-xs text-secondary" style="margin-top:6px;text-align:center;">Clic para ampliar</div>';
-    } else {
-      der += '<div style="text-align:center;padding:40px 0;"><span class="text-secondary">Sin foto de recibo</span></div>';
-    }
-    der += '</div></div>';
-
-    // Layout split 50/50
-    return '<div style="display:grid;grid-template-columns:1fr 1fr;height:100%;overflow:hidden;">' + izq + der + '</div>';
-  },
-
-  // ─────────────────────────────────────────────────────────
-  // ACCIONES DE VALIDACIÓN
-  // ─────────────────────────────────────────────────────────
-
-  async accionValidar(id, decision) {
-    var motivoRechazo = '';
-    if (decision === 'rechazar') {
-      motivoRechazo = prompt('Motivo de rechazo (obligatorio):');
-      if (!motivoRechazo || motivoRechazo.trim().length < 5) {
-        Toast.error('Motivo requerido (mín 5 caracteres)');
-        return;
-      }
-    } else {
-      if (!confirm('¿Confirmar validación del tanqueo?')) return;
-    }
-    try {
-      await API.put('/tanqueos/' + id + '/validar', {
-        decision: decision,
-        motivo_rechazo: motivoRechazo
-      });
-      Toast.success(decision === 'validar' ? 'Tanqueo validado' : 'Tanqueo rechazado');
-      this.cerrarDrawer();
-      await this.cargarDatos();
-    } catch (e) {
-      Toast.error('Error al procesar la acción');
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────
-  // CONSOLIDADO MENSUAL
-  // ─────────────────────────────────────────────────────────
-
   async abrirConsolidado() {
     var modal = document.getElementById('modal-consolidado');
     var body = document.getElementById('modal-consolidado-body');
@@ -559,7 +599,7 @@ var Tanqueos = {
     await this.cargarConsolidado();
   },
 
-  cerrarConsolidado: function() {
+  cerrarConsolidado() {
     var modal = document.getElementById('modal-consolidado');
     if (modal) modal.style.display = 'none';
   },
@@ -567,93 +607,34 @@ var Tanqueos = {
   async cargarConsolidado() {
     var body = document.getElementById('modal-consolidado-body');
     try {
-      var resp = await API.get('/tanqueos/consolidado?mes=' + encodeURIComponent(this.consolidadoMes));
-      this.consolidadoData = resp;
-      body.innerHTML = this._renderConsolidado(resp);
+      var resp = await TanqueosAPI.obtenerConsolidado(this.consolidadoMes);
+      body.innerHTML = TanqueosRender.consolidado(resp, this.consolidadoMes);
+      var mesInput = document.getElementById('tanq-consolidado-mes');
+      if (mesInput) {
+        mesInput.addEventListener('change', function() {
+          Tanqueos.consolidadoMes = this.value;
+          Tanqueos.cargarConsolidado();
+        });
+      }
     } catch (e) {
       body.innerHTML = '<div style="padding:24px;"><span class="badge badge-danger">Error cargando consolidado</span></div>';
     }
   },
 
-  /** Descarga CSV con el mismo token que el resto del panel (fetch + blob). */
   async exportarCsvConsolidado() {
     try {
-      var token = sessionStorage.getItem('cero_token');
-      var url = '/api/tanqueos/consolidado/exportar?mes=' + encodeURIComponent(this.consolidadoMes);
-      var resp = await fetch(url, {
-        method: 'GET',
-        headers: token ? { Authorization: 'Bearer ' + token } : {}
-      });
-      if (!resp.ok) throw new Error('export');
-      var blob = await resp.blob();
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'tanqueos-' + this.consolidadoMes + '.csv';
-      a.click();
-      URL.revokeObjectURL(a.href);
+      await TanqueosAPI.exportarCsv(this.consolidadoMes);
     } catch (e) {
       Toast.error('No se pudo exportar el CSV');
     }
   },
 
-  _renderConsolidado: function(resp) {
-    var r = resp.resumen || {};
-    var veh = resp.porVehiculo || [];
-
-    var html = '';
-
-    // Selector de mes + botón exportar
-    html += '<div class="flex gap-sm items-center" style="margin-bottom:16px;">';
-    html += '<label class="text-xs text-secondary">Mes</label>';
-    html += '<input type="month" class="input input-sm" value="' + this.consolidadoMes + '" onchange="Tanqueos.consolidadoMes=this.value;Tanqueos.cargarConsolidado()" style="width:160px;">';
-    html += '<button type="button" class="btn btn-secondary btn-sm" onclick="Tanqueos.exportarCsvConsolidado()">⬇️ Exportar CSV</button>';
-    html += '</div>';
-
-    // Resumen
-    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">';
-    html += Tanqueos._cardResumen('Total tanqueos', r.total_tanqueos || 0);
-    html += Tanqueos._cardResumen('Total galones', (r.total_galones || 0).toFixed(1));
-    html += Tanqueos._cardResumen('Total pesos', '$' + (r.total_pesos || 0).toLocaleString('es-CO'));
-    html += Tanqueos._cardResumen('Precio prom./gal', r.precio_promedio_galon ? '$' + parseInt(r.precio_promedio_galon, 10).toLocaleString('es-CO') : '-');
-    html += '</div>';
-
-    // Desglose convenio vs emergencia
-    html += '<div class="flex gap-sm" style="margin-bottom:16px;">';
-    html += '<span class="badge badge-info">Convenio: ' + (r.convenio || 0) + '</span>';
-    html += '<span class="badge badge-warning">Emergencia: ' + (r.emergencia || 0) + '</span>';
-    html += '</div>';
-
-    // Tabla por vehículo
-    if (veh.length === 0) {
-      html += '<div class="text-secondary" style="text-align:center;padding:24px;">Sin tanqueos validados en este período.</div>';
-      return html;
-    }
-
-    html += '<table class="table"><thead><tr>';
-    html += '<th>Placa</th><th>Vehículo</th><th># Tanqueos</th><th>Galones</th><th>Litros</th><th>Total pesos</th><th>Rend. promedio</th>';
-    html += '</tr></thead><tbody>';
-
-    veh.forEach(function(v) {
-      html += '<tr>';
-      html += '<td><strong>' + v.placa + '</strong></td>';
-      html += '<td>' + [v.marca, v.modelo].filter(Boolean).join(' ') + '</td>';
-      html += '<td>' + v.tanqueos + '</td>';
-      html += '<td>' + (v.total_galones || 0).toFixed(1) + '</td>';
-      html += '<td>' + (v.total_litros || 0).toFixed(1) + '</td>';
-      html += '<td>$' + (v.total_pesos || 0).toLocaleString('es-CO') + '</td>';
-      html += '<td>' + (v.rendimiento_promedio ? v.rendimiento_promedio + ' km/u' : '-') + '</td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    return html;
-  },
-
-  _cardResumen: function(label, value) {
+  _cardResumen(label, value) {
     return '<div style="background:var(--bg-tertiary);border-radius:8px;padding:12px;">' +
       '<div class="text-xs text-secondary">' + label + '</div>' +
       '<div style="font-size:1.4rem;font-weight:700;">' + value + '</div>' +
       '</div>';
   }
-
 };
+
+window.Tanqueos = Tanqueos;

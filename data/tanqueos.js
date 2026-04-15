@@ -100,7 +100,11 @@ async function listarTanqueos(filtros) {
   if (filtros.placa) query = query.eq('vehiculo_placa', filtros.placa.toUpperCase());
   if (filtros.conductor_id) query = query.eq('conductor_id', filtros.conductor_id);
   if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
-    query = query.eq('estado_validacion', filtros.estado_validacion);
+    if (filtros.estado_validacion === 'revisados') {
+      query = query.in('estado_validacion', ['auto_validado', 'revisado', 'validado']);
+    } else {
+      query = query.eq('estado_validacion', filtros.estado_validacion);
+    }
   }
   if (filtros.tipo_tanqueo && filtros.tipo_tanqueo !== 'todos') {
     query = query.eq('tipo_tanqueo', filtros.tipo_tanqueo);
@@ -109,34 +113,116 @@ async function listarTanqueos(filtros) {
   var resultado = await query.limit(200);
   if (resultado.error) return { error: resultado.error, data: [], stats: {} };
 
-  // Stats calculadas sobre el período filtrado
-  // Fecha de hoy en zona horaria Colombia (UTC-5)
-  var ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-  var hoy = ahora.toISOString().split('T')[0];
   var data = resultado.data || [];
-
-  // created_at viene en UTC — convertir antes de comparar
-  var tanqueosHoy = data.filter(function(t) {
-    if (!t.created_at) return false;
-    var fechaBogota = new Date(new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
-    return fechaBogota === hoy;
-  });
-
-  var stats = {
-    total: data.length,
-    hoy: tanqueosHoy.length,
-    galones_hoy: tanqueosHoy.reduce(function(acc, t) {
-      return acc + (t.unidad_medida === 'galones' ? parseFloat(t.cantidad || 0) : 0);
-    }, 0),
-    pendientes: data.filter(function(t) {
-      return t.estado_validacion === 'pendiente_revision';
-    }).length,
-    anomalias: data.filter(function(t) {
-      return t.rendimiento_alerta === true;
-    }).length
-  };
+  var stats = await obtenerStatsPeriodo(filtros);
 
   return { data: data, stats: stats };
+}
+
+function aplicarFiltrosBase(query, filtros) {
+  if (filtros.fecha_inicio) query = query.gte('created_at', filtros.fecha_inicio);
+  if (filtros.fecha_fin) query = query.lte('created_at', filtros.fecha_fin + 'T23:59:59Z');
+  if (filtros.placa) query = query.eq('vehiculo_placa', filtros.placa.toUpperCase());
+  if (filtros.conductor_id) query = query.eq('conductor_id', filtros.conductor_id);
+  if (filtros.tipo_tanqueo && filtros.tipo_tanqueo !== 'todos') query = query.eq('tipo_tanqueo', filtros.tipo_tanqueo);
+  return query;
+}
+
+async function obtenerStatsPeriodo(filtros) {
+  filtros = filtros || {};
+
+  var qTotal = aplicarFiltrosBase(
+    config.supabase.from(TABLA_TANQUEOS).select('id', { count: 'exact', head: true }),
+    filtros
+  );
+  if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
+    if (filtros.estado_validacion === 'revisados') {
+      qTotal = qTotal.in('estado_validacion', ['auto_validado', 'revisado', 'validado']);
+    } else {
+      qTotal = qTotal.eq('estado_validacion', filtros.estado_validacion);
+    }
+  }
+  var resTotal = await qTotal;
+
+  var qPendientes = aplicarFiltrosBase(
+    config.supabase
+      .from(TABLA_TANQUEOS)
+      .select('id', { count: 'exact', head: true })
+      .eq('estado_validacion', 'pendiente_revision'),
+    filtros
+  );
+  var resPendientes = await qPendientes;
+
+  var qAnomalias = aplicarFiltrosBase(
+    config.supabase
+      .from(TABLA_TANQUEOS)
+      .select('id', { count: 'exact', head: true })
+      .eq('rendimiento_alerta', true),
+    filtros
+  );
+  var resAnomalias = await qAnomalias;
+
+  var qGalones = aplicarFiltrosBase(
+    config.supabase
+      .from(TABLA_TANQUEOS)
+      .select('cantidad')
+      .eq('unidad_medida', 'galones'),
+    filtros
+  );
+  if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
+    if (filtros.estado_validacion === 'revisados') {
+      qGalones = qGalones.in('estado_validacion', ['auto_validado', 'revisado', 'validado']);
+    } else {
+      qGalones = qGalones.eq('estado_validacion', filtros.estado_validacion);
+    }
+  }
+  var resGalones = await qGalones;
+
+  var qLitros = aplicarFiltrosBase(
+    config.supabase
+      .from(TABLA_TANQUEOS)
+      .select('cantidad')
+      .eq('unidad_medida', 'litros'),
+    filtros
+  );
+  if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
+    if (filtros.estado_validacion === 'revisados') {
+      qLitros = qLitros.in('estado_validacion', ['auto_validado', 'revisado', 'validado']);
+    } else {
+      qLitros = qLitros.eq('estado_validacion', filtros.estado_validacion);
+    }
+  }
+  var resLitros = await qLitros;
+
+  if (resTotal.error || resPendientes.error || resAnomalias.error || resGalones.error || resLitros.error) {
+    return {
+      total: 0,
+      pendientes: 0,
+      anomalias: 0,
+      combustible_total: { galones: 0, litros: 0 },
+      galones_total: 0,
+      litros_total: 0
+    };
+  }
+
+  var galonesTotal = (resGalones.data || []).reduce(function(acc, row) {
+    return acc + parseFloat(row.cantidad || 0);
+  }, 0);
+  var litrosTotal = (resLitros.data || []).reduce(function(acc, row) {
+    return acc + parseFloat(row.cantidad || 0);
+  }, 0);
+
+  return {
+    total: resTotal.count || 0,
+    pendientes: resPendientes.count || 0,
+    anomalias: resAnomalias.count || 0,
+    combustible_total: {
+      galones: parseFloat(galonesTotal.toFixed(3)),
+      litros: parseFloat(litrosTotal.toFixed(3))
+    },
+    galones_total: parseFloat(galonesTotal.toFixed(3)),
+    litros_total: parseFloat(litrosTotal.toFixed(3))
+  };
 }
 
 /**
@@ -198,12 +284,12 @@ async function obtenerTanqueo(id) {
  * Solo permite operar sobre pendiente_revision o auto_validado.
  *
  * @param {string} id — UUID del tanqueo
- * @param {string} decision — 'validar' | 'rechazar'
- * @param {string} motivoRechazo — obligatorio si decision = 'rechazar'
+ * @param {string} decision — 'validar'
+ * @param {string} notasAdmin — opcional
  * @param {string} usuarioId — quien toma la decisión
  * @returns {{ ok: boolean, error?: string }}
  */
-async function validarTanqueo(id, decision, motivoRechazo, usuarioId) {
+async function validarTanqueo(id, decision, notasAdmin, usuarioId) {
   var estadosPermitidos = ['pendiente_revision', 'auto_validado'];
 
   // Verificar que el tanqueo existe y está en estado operable
@@ -221,15 +307,16 @@ async function validarTanqueo(id, decision, motivoRechazo, usuarioId) {
     return { ok: false, error: 'El tanqueo ya fue procesado' };
   }
 
-  if (decision === 'rechazar' && (!motivoRechazo || motivoRechazo.trim().length < 5)) {
-    return { ok: false, error: 'Motivo de rechazo obligatorio (mín 5 caracteres)' };
+  if (decision !== 'validar') {
+    return { ok: false, error: 'Decisión no soportada' };
   }
 
   var campos = {
-    estado_validacion: decision === 'validar' ? 'validado' : 'rechazado',
+    estado_validacion: 'revisado',
     validado_por: usuarioId || 'panel',
     fecha_validacion: new Date().toISOString(),
-    motivo_rechazo: decision === 'rechazar' ? (motivoRechazo || '').trim() : null
+    notas_admin: (notasAdmin || '').trim() || null,
+    motivo_rechazo: null
   };
 
   var res = await config.supabase
@@ -283,7 +370,7 @@ async function validarLote(ids, usuarioId) {
 
 /**
  * Obtiene el consolidado mensual de tanqueos validados.
- * Agrupa por vehículo. Solo incluye validado y auto_validado.
+ * Agrupa por vehículo. Solo incluye revisado y auto_validado.
  *
  * @param {string} mes — formato YYYY-MM
  * @param {string|null} sedeId — filtro opcional por sede
@@ -314,7 +401,7 @@ async function obtenerConsolidado(mes, sedeId) {
     ].join(', '))
     .gte('created_at', inicio)
     .lt('created_at', siguienteMes)
-    .in('estado_validacion', ['validado', 'auto_validado'])
+    .in('estado_validacion', ['revisado', 'auto_validado', 'validado'])
     .order('vehiculo_placa')
     .order('created_at');
 

@@ -35,6 +35,9 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
       estado_validacion: req.query.estado_validacion || null,
       tipo_tanqueo:      req.query.tipo_tanqueo      || null
     };
+    if (filtros.estado_validacion === 'todos') {
+      filtros.estado_validacion = null;
+    }
     var resultado = await tanqueosData.listarTanqueos(filtros);
     if (resultado.error) throw resultado.error;
     res.json({ ok: true, data: resultado.data, stats: resultado.stats });
@@ -176,20 +179,20 @@ router.get('/:id', verificarToken, verificarPermiso('tanqueos', 'ver'), async fu
   }
 });
 
-// PUT /:id/validar — validar o rechazar individualmente
+// PUT /:id/validar — marcar revisado individualmente
 router.put('/:id/validar', verificarToken, verificarPermiso('tanqueos', 'editar'), async function (req, res) {
   try {
     var decision       = req.body.decision;
-    var motivoRechazo  = req.body.motivo_rechazo || '';
+    var notasAdmin     = req.body.notas_admin || '';
     var usuarioId      = req.usuario ? (req.usuario.email || req.usuario.id || 'panel') : 'panel';
 
-    if (!['validar', 'rechazar'].includes(decision)) {
-      return res.status(400).json({ ok: false, error: 'decision debe ser "validar" o "rechazar"' });
+    if (decision !== 'validar') {
+      return res.status(400).json({ ok: false, error: 'decision debe ser "validar"' });
     }
 
-    var resultado = await tanqueosData.validarTanqueo(req.params.id, decision, motivoRechazo, usuarioId);
+    var resultado = await tanqueosData.validarTanqueo(req.params.id, decision, notasAdmin, usuarioId);
     if (!resultado.ok) return res.status(400).json({ ok: false, error: resultado.error });
-    res.json({ ok: true, mensaje: 'Tanqueo ' + (decision === 'validar' ? 'validado' : 'rechazado') });
+    res.json({ ok: true, mensaje: 'Tanqueo revisado' });
   } catch (error) {
     console.error('Error en PUT /api/tanqueos/:id/validar:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
