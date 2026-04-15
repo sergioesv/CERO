@@ -1,12 +1,10 @@
 /**
- * mensajes.js — Textos de mensajes WhatsApp para el flujo de tanqueo v2
+ * mensajes.js — Textos de mensajes WhatsApp para el flujo de tanqueo v3
  * Todos los strings de usuario viven aquí. flujo.js no contiene texto directo.
  * CERO — Gestión de Operaciones de Campo
  */
 
 'use strict';
-
-var validaciones = require('./validaciones');
 
 var PIE = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 
@@ -22,31 +20,6 @@ function inicio() {
     '_Buena luz, sin reflejos._' +
     PIE
   );
-}
-
-/**
- * Pregunta el tipo de tanqueo al conductor.
- * Convenio = red TERPEL con iButton. Emergencia = otra estación.
- */
-function preguntarTipoTanqueo() {
-  return (
-    '⛽ *Registro de tanqueo*\n\n' +
-    '¿Qué tipo de tanqueo vas a registrar?\n\n' +
-    '1️⃣ Convenio (iButton / TERPEL)\n' +
-    '2️⃣ Emergencia (otra estación)\n' +
-    PIE
-  );
-}
-
-/**
- * Confirma el tipo registrado y solicita la foto de la placa.
- * @param {string} tipo — 'convenio' o 'emergencia'
- */
-function tipoTanqueoRegistrado(tipo) {
-  var etiqueta = tipo === 'emergencia'
-    ? '⚠️ Tanqueo de emergencia registrado.'
-    : '✅ Tanqueo convenio registrado.';
-  return etiqueta + '\n\n📸 *Paso 1 — Foto de la placa*\nEnvía una foto frontal donde la placa sea claramente visible.\n_Buena luz, sin reflejos._' + PIE;
 }
 
 function solicitarFotoPlaca(placaOcrRecibo) {
@@ -130,120 +103,12 @@ function solicitarKmManual(kmReferenciaMeta) {
   return msg;
 }
 
-function solicitarFacturaManual(facturaOcr) {
-  var msg = '🧾 *Número de factura o remisión*\n\nEscribe el número que aparece en el recibo.';
-  if (facturaOcr) {
-    msg += '\n\n_El recibo indica: *' + facturaOcr + '*_';
-  }
-  msg += PIE;
-  return msg;
-}
-
-function solicitarLitrosManual(cantidadOcr, unidadOcr) {
-  var msg = '🔢 *Cantidad de combustible*\n\nEscribe la cantidad en litros o galones.\nEjemplos: *45* · *45.5* · *12 gal*';
-  if (cantidadOcr) {
-    var unidad = unidadOcr || 'unidades';
-    msg += '\n\n_El recibo indica: *' + cantidadOcr + ' ' + unidad + '*_';
-  }
-  msg += PIE;
-  return msg;
-}
-
-function solicitarTipoCombustible() {
-  return (
-    '⛽ *Tipo de combustible*\n\n' +
-    '1️⃣ Diésel\n' +
-    '2️⃣ Gasolina\n' +
-    '3️⃣ Gas\n' +
-    '4️⃣ AdBlue\n' +
-    '5️⃣ Otro' +
-    PIE
-  );
-}
-
-function solicitarValorTotal() {
-  return (
-    '💰 *Valor total del tanqueo*\n\n' +
-    'Escribe solo el número en pesos.\n' +
-    'Ejemplo: *218400*' +
-    PIE
-  );
-}
-
-function solicitarEstacion() {
-  return (
-    '🏪 *Estación de servicio*\n\n' +
-    'Escribe el nombre de la estación\no *0* si no aplica.' +
-    PIE
-  );
-}
-
-function resumenFinal(sesion) {
-  var lineas = [];
-  lineas.push('───────────────');
-  lineas.push('⛽ *RESUMEN DEL TANQUEO*');
-  lineas.push('───────────────');
-  lineas.push('🚗 Placa: *' + sesion.placa + '*');
-  if (sesion.tipoTanqueo) {
-    var etiquetaTipo = sesion.tipoTanqueo === 'emergencia' ? '⚠️ Emergencia' : '✅ Convenio';
-    lineas.push('🔖 Tipo: *' + etiquetaTipo + '*');
-  }
-  lineas.push('🧾 Factura: *' + (sesion.facturaNumeroManual || sesion.facturaNumeroOcr || 'N/A') + '*');
-  lineas.push('🛣️ Kilometraje: *' + (sesion.kilometraje || 0).toLocaleString('es-CO') + ' km*');
-
-  if (typeof sesion.kmReferencia === 'number') {
-    lineas.push('↕️ Diferencia: *' + (sesion.diferenciaKm || 0).toLocaleString('es-CO') + ' km*');
-  }
-
-  lineas.push('⛽ Combustible: *' + (sesion.tipoCombustible || 'N/A') + '*');
-  lineas.push('🔢 Cantidad: *' + (sesion.cantidadManual || sesion.cantidadOcr || 0) + ' ' + (sesion.unidadMedida || 'litros') + '*');
-  lineas.push('💰 Valor: *' + validaciones.formatearValorMoneda(sesion.valorTotal) + '*');
-
-  if (sesion.estacionServicio) {
-    lineas.push('🏪 Estación: *' + sesion.estacionServicio + '*');
-  }
-
-  lineas.push('');
-  lineas.push('1️⃣ Confirmar y guardar');
-  lineas.push('2️⃣ Cancelar');
-
-  return lineas.join('\n');
-}
-
-function tanqueoGuardado(tanqueo, estadoValidacion) {
-  var msg = '───────────────\n✅ *TANQUEO GUARDADO*\n───────────────\n';
-  msg += '🚗 *' + tanqueo.vehiculo_placa + '*\n';
-  if (tanqueo.tipo_tanqueo === 'emergencia') {
-    msg += '🔖 Tipo: *⚠️ Emergencia*\n';
-  }
-  msg += '🛣️ Kilometraje: *' + (tanqueo.kilometraje || 0).toLocaleString('es-CO') + ' km*\n';
-  msg += '🔢 Cantidad: *' + tanqueo.cantidad + ' ' + tanqueo.unidad_medida + '*\n';
-  msg += '💰 Valor: *' + validaciones.formatearValorMoneda(tanqueo.valor_total) + '*';
-
-  if (estadoValidacion === 'auto_validado') {
-    msg += '\n\n✅ _Validación automática: todos los datos coinciden._';
-  } else {
-    msg += '\n\n⚠️ _Pendiente de revisión por el administrador._';
-  }
-
-  msg += '\n\nEscribe *9* para volver al menú.';
-  return msg;
-}
-
-function errorGuardado() {
-  return '❌ No pude guardar el tanqueo.\n\nRevisa el log del servidor y vuelve a intentar.';
-}
-
 function vehiculoNoEncontrado(placa) {
   return '❌ El vehículo *' + placa + '* no existe en el sistema.\n\nVerifica la placa.' + PIE;
 }
 
 function vehiculoBloqueado(placa, motivo) {
   return '🚫 *Vehículo bloqueado*\n' + placa + '\n' + (motivo || 'Contacta al supervisor.') + PIE;
-}
-
-function leyendoRecibo() {
-  return '⏳ Leyendo el recibo...';
 }
 
 function promptConfirmacionPlacaInvalida() {
@@ -270,24 +135,12 @@ function kilometrajeRegistradoPrefijo(km) {
   return '✅ Kilometraje *' + km.toLocaleString('es-CO') + ' km* registrado.';
 }
 
-function facturaRegistradaPrefijo(num) {
-  return '✅ Factura *' + num + '* registrada.\n\n';
-}
-
 function placaManualInvalida() {
   return '❌ Placa inválida. Ejemplo: *TKJ933*' + PIE;
 }
 
 function kmManualInvalido() {
   return '❌ Kilometraje inválido. Solo números. Ejemplo: *47889*' + PIE;
-}
-
-function valorInvalido() {
-  return '❌ Valor inválido. Solo el número. Ejemplo: *218400*' + PIE;
-}
-
-function promptFinalGuardarCancelar() {
-  return 'Responde *1* para guardar o *2* para cancelar.' + PIE;
 }
 
 function solicitarFotoFactura() {
@@ -329,54 +182,234 @@ function errorGenericoTanqueo() {
   return 'Ocurrió un error. Escribe *9* para volver al menú.';
 }
 
-function reciboProcesadoSolicitudFactura(facturaOcr) {
-  return '✅ Recibo procesado.\n\n' + solicitarFacturaManual(facturaOcr);
+/**
+ * Mensaje mientras Gemini procesa la foto de la factura.
+ */
+function leyendoFactura() {
+  return '🤖 _Leyendo la factura..._';
 }
 
-function kilometrajeConfirmadoSolicitudRecibo(km) {
-  return '✅ Kilometraje *' + km.toLocaleString('es-CO') + ' km* confirmado.\n\n' + solicitarFotoFactura();
+/**
+ * Resumen OCR completo — Camino A (tier 1, todos los campos críticos leídos).
+ * @param {Object} sesion
+ */
+function resumenOcrCompleto(sesion) {
+  var lineas = [];
+  lineas.push('─────────────────');
+  lineas.push('⛽ *RESUMEN DEL TANQUEO*');
+  lineas.push('─────────────────');
+
+  var ocr = sesion.datosOcrFactura || {};
+
+  if (ocr.factura_numero && ocr.factura_numero.leido) {
+    lineas.push('🧾 Remisión: *' + ocr.factura_numero.valor + '*');
+  }
+  if (ocr.fecha && ocr.fecha.leido) {
+    lineas.push('📅 Fecha: *' + ocr.fecha.valor + '*');
+  }
+  if (sesion.placa) {
+    var placaFacturaOk = ocr.placa && ocr.placa.leido && ocr.placa.valor.toUpperCase().replace(/\s/g, '') === sesion.placa;
+    lineas.push('🚗 Placa: *' + sesion.placa + '* ' + (placaFacturaOk ? '✓' : ''));
+  }
+  if (ocr.estacion && ocr.estacion.leido) {
+    lineas.push('📍 ' + ocr.estacion.valor);
+  }
+  if (ocr.producto && ocr.producto.leido) {
+    lineas.push('⛽ Combustible: *' + ocr.producto.valor + '*');
+  }
+  if (ocr.cantidad && ocr.cantidad.leido) {
+    var unidad = (sesion.unidadMedida || 'litros');
+    lineas.push('🔢 Cantidad: *' + ocr.cantidad.valor + ' ' + unidad + '*');
+  }
+  if (ocr.valor_total && ocr.valor_total.leido) {
+    lineas.push('💰 Valor: *$' + Number(ocr.valor_total.valor).toLocaleString('es-CO') + '*');
+  }
+  if (ocr.kilometraje && ocr.kilometraje.leido && sesion.kilometraje) {
+    var kmFacturaOk = Math.abs(parseInt(ocr.kilometraje.valor, 10) - sesion.kilometraje) <= 50;
+    lineas.push('🛣 Km factura: *' + Number(ocr.kilometraje.valor).toLocaleString('es-CO') + '* ' + (kmFacturaOk ? '✓' : ''));
+  }
+
+  lineas.push('');
+  lineas.push('1️⃣ Confirmar');
+  lineas.push('2️⃣ Corregir un dato');
+  lineas.push('\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_');
+
+  return lineas.join('\n');
+}
+
+/**
+ * Resumen OCR parcial — Camino B (tier 2, algunos campos con ⚠️).
+ * @param {Object} sesion
+ */
+function resumenOcrParcial(sesion) {
+  var lineas = [];
+  lineas.push('─────────────────');
+  lineas.push('⛽ *RESUMEN DEL TANQUEO*');
+  lineas.push('─────────────────');
+
+  var ocr = sesion.datosOcrFactura || {};
+
+  var factura = ocr.factura_numero && ocr.factura_numero.leido ? ocr.factura_numero.valor : null;
+  lineas.push('🧾 Remisión: *' + (factura || '⚠️ no leída') + '*');
+
+  if (sesion.placa) {
+    lineas.push('🚗 Placa: *' + sesion.placa + '*');
+  }
+
+  var producto = ocr.producto && ocr.producto.leido ? ocr.producto.valor : null;
+  lineas.push('⛽ Combustible: *' + (producto || '⚠️ no leído') + '*');
+
+  var cantidadVal = sesion.cantidadManual != null ? sesion.cantidadManual
+    : (ocr.cantidad && ocr.cantidad.leido ? ocr.cantidad.valor : null);
+  var unidad = sesion.unidadMedida || 'litros';
+  lineas.push('🔢 Cantidad: *' + (cantidadVal != null ? cantidadVal + ' ' + unidad : '⚠️ no leída') + '*');
+
+  var valorOk = ocr.valor_total && ocr.valor_total.leido;
+  if (valorOk) {
+    lineas.push('💰 Valor: *$' + Number(ocr.valor_total.valor).toLocaleString('es-CO') + '*');
+  } else {
+    lineas.push('💰 Valor: *⚠️ no leído*');
+  }
+
+  if (sesion.facturaNumeroManual) {
+    lineas.push('');
+    lineas.push('_Factura corregida manualmente._');
+  }
+
+  lineas.push('');
+  lineas.push('_Los campos ⚠️ los revisa el administrador._');
+  lineas.push('');
+  lineas.push('1️⃣ Confirmar así');
+  lineas.push('2️⃣ Corregir un dato');
+  lineas.push('\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_');
+
+  return lineas.join('\n');
+}
+
+/**
+ * Fallback cuando OCR score < 0.5 (tier 3).
+ * Opciones: otra foto / manual / foto tablero.
+ */
+function fallbackFactura() {
+  return (
+    '📸 No pude leer bien la factura 😕\n\n' +
+    '1️⃣ Enviar otra foto de la factura\n' +
+    '2️⃣ Ingresar manualmente\n' +
+    '3️⃣ Enviar foto del tablero (sin factura)\n\n' +
+    '0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+  );
+}
+
+/**
+ * Solicitar foto del tablero de combustible (camino D — sin factura física).
+ */
+function solicitarFotoTablero() {
+  return (
+    '📸 *Foto del tablero de combustible*\n' +
+    'Envía el tablero donde se vea el nivel de gasolina.\n\n' +
+    '0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+  );
+}
+
+/**
+ * Solicitar solo el número de factura (fallback manual — camino C).
+ */
+function solicitarFacturaManualSimple() {
+  return (
+    '🧾 *Número de factura o remisión*\n' +
+    'Escribe el número que aparece en el recibo.\n' +
+    'Ejemplo: *01817613*\n\n' +
+    '0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+  );
+}
+
+/**
+ * Solicitar solo la cantidad de combustible.
+ */
+function solicitarCantidadManual() {
+  return (
+    '🔢 *Cantidad de combustible*\n' +
+    'Escribe la cantidad.\n' +
+    'Ejemplos: *45*  ·  *45.5*  ·  *9.759 gal*\n\n' +
+    '0️⃣ _Atrás_  •  9️⃣ _Menú principal_'
+  );
+}
+
+/**
+ * Confirmación de tanqueo guardado — Camino A (auto_validado).
+ * @param {Object} tanqueo — registro guardado en BD
+ */
+function tanqueoGuardadoAutoValidado(tanqueo) {
+  var msg = '✅ *Tanqueo registrado*\n';
+  msg += tanqueo.vehiculo_placa + '  •  ';
+  msg += (tanqueo.kilometraje || 0).toLocaleString('es-CO') + ' km\n';
+  if (tanqueo.cantidad) {
+    msg += tanqueo.cantidad + ' ' + (tanqueo.unidad_medida || 'litros');
+    if (tanqueo.valor_total) {
+      msg += '  •  $' + Number(tanqueo.valor_total).toLocaleString('es-CO');
+    }
+    msg += '\n';
+  }
+  msg += '\n_Validación automática: todos los datos coinciden._\n\n';
+  msg += 'Escribe 9 para volver al menú.';
+  return msg;
+}
+
+/**
+ * Confirmación de tanqueo guardado — Caminos B, C, D (pendiente_revision).
+ * @param {Object} tanqueo — registro guardado en BD
+ * @param {boolean} sinFactura — true si fue camino D (foto tablero)
+ */
+function tanqueoGuardadoPendiente(tanqueo, sinFactura) {
+  var msg = '✅ *Tanqueo registrado*\n';
+  msg += tanqueo.vehiculo_placa + '  •  ';
+  msg += (tanqueo.kilometraje || 0).toLocaleString('es-CO') + ' km\n';
+  if (tanqueo.valor_total) {
+    msg += '$' + Number(tanqueo.valor_total).toLocaleString('es-CO') + '\n';
+  }
+  msg += '\n';
+  if (sinFactura) {
+    msg += '_🔴 Sin factura — requiere revisión del administrador._';
+  } else {
+    msg += '_⚠️ Pendiente de revisión por el administrador._';
+  }
+  msg += '\n\nEscribe 9 para volver al menú.';
+  return msg;
 }
 
 module.exports = {
-  faltaFotoRecibo: faltaFotoRecibo,
-  inicio: inicio,
-  preguntarTipoTanqueo: preguntarTipoTanqueo,
-  tipoTanqueoRegistrado: tipoTanqueoRegistrado,
-  solicitarFotoPlaca: solicitarFotoPlaca,
-  confirmarPlacaOcr: confirmarPlacaOcr,
-  solicitarPlacaManual: solicitarPlacaManual,
-  solicitarFotoOdometro: solicitarFotoOdometro,
-  confirmarKmOcr: confirmarKmOcr,
-  alertaKmFueraRango: alertaKmFueraRango,
-  solicitarKmManual: solicitarKmManual,
-  solicitarFacturaManual: solicitarFacturaManual,
-  solicitarLitrosManual: solicitarLitrosManual,
-  solicitarTipoCombustible: solicitarTipoCombustible,
-  solicitarValorTotal: solicitarValorTotal,
-  solicitarEstacion: solicitarEstacion,
-  resumenFinal: resumenFinal,
-  tanqueoGuardado: tanqueoGuardado,
-  errorGuardado: errorGuardado,
-  vehiculoNoEncontrado: vehiculoNoEncontrado,
-  vehiculoBloqueado: vehiculoBloqueado,
-  leyendoRecibo: leyendoRecibo,
+  faltaFotoRecibo:                faltaFotoRecibo,
+  inicio:                         inicio,
+  solicitarFotoPlaca:             solicitarFotoPlaca,
+  confirmarPlacaOcr:              confirmarPlacaOcr,
+  solicitarPlacaManual:           solicitarPlacaManual,
+  confirmarPlacaSugerida:         confirmarPlacaSugerida,
+  fallbackPlaca:                  fallbackPlaca,
+  escribePlacaSinEspacios:        escribePlacaSinEspacios,
+  formatoPlacaEstandarInvalido:   formatoPlacaEstandarInvalido,
+  solicitarFotoOdometro:          solicitarFotoOdometro,
+  confirmarKmOcr:                 confirmarKmOcr,
+  alertaKmFueraRango:             alertaKmFueraRango,
+  solicitarKmManual:              solicitarKmManual,
+  solicitarFotoFactura:           solicitarFotoFactura,
+  leyendoFactura:                 leyendoFactura,
+  resumenOcrCompleto:             resumenOcrCompleto,
+  resumenOcrParcial:              resumenOcrParcial,
+  fallbackFactura:                fallbackFactura,
+  solicitarFotoTablero:           solicitarFotoTablero,
+  solicitarFacturaManualSimple:   solicitarFacturaManualSimple,
+  solicitarCantidadManual:        solicitarCantidadManual,
+  tanqueoGuardadoAutoValidado:    tanqueoGuardadoAutoValidado,
+  tanqueoGuardadoPendiente:       tanqueoGuardadoPendiente,
+  vehiculoNoEncontrado:           vehiculoNoEncontrado,
+  vehiculoBloqueado:              vehiculoBloqueado,
+  placaConfirmadaPrefijo:         placaConfirmadaPrefijo,
+  placaRegistradaPrefijo:         placaRegistradaPrefijo,
   promptConfirmacionPlacaInvalida: promptConfirmacionPlacaInvalida,
-  placaConfirmadaPrefijo: placaConfirmadaPrefijo,
-  placaRegistradaPrefijo: placaRegistradaPrefijo,
-  promptConfirmacionKmInvalida: promptConfirmacionKmInvalida,
-  kilometrajeConfirmadoPrefijo: kilometrajeConfirmadoPrefijo,
-  kilometrajeRegistradoPrefijo: kilometrajeRegistradoPrefijo,
-  facturaRegistradaPrefijo: facturaRegistradaPrefijo,
-  placaManualInvalida: placaManualInvalida,
-  kmManualInvalido: kmManualInvalido,
-  valorInvalido: valorInvalido,
-  promptFinalGuardarCancelar: promptFinalGuardarCancelar,
-  solicitarFotoFactura: solicitarFotoFactura,
-  confirmarPlacaSugerida: confirmarPlacaSugerida,
-  fallbackPlaca: fallbackPlaca,
-  escribePlacaSinEspacios: escribePlacaSinEspacios,
-  formatoPlacaEstandarInvalido: formatoPlacaEstandarInvalido,
-  errorGenericoTanqueo: errorGenericoTanqueo,
-  reciboProcesadoSolicitudFactura: reciboProcesadoSolicitudFactura,
-  kilometrajeConfirmadoSolicitudRecibo: kilometrajeConfirmadoSolicitudRecibo
+  promptConfirmacionKmInvalida:   promptConfirmacionKmInvalida,
+  kilometrajeConfirmadoPrefijo:   kilometrajeConfirmadoPrefijo,
+  kilometrajeRegistradoPrefijo:   kilometrajeRegistradoPrefijo,
+  placaManualInvalida:            placaManualInvalida,
+  kmManualInvalido:               kmManualInvalido,
+  errorGenericoTanqueo:           errorGenericoTanqueo
 };
