@@ -85,37 +85,14 @@ function parsearValor(texto) {
   return valor;
 }
 
-function validarTipoCombustible(texto) {
-  var limpio = String(texto || '').trim().toLowerCase();
+function validarTipoCombustible(valor) {
+  var texto = String(valor || '').toUpperCase().trim();
 
-  var equivalencias = {
-    '1': 'diesel',
-    '2': 'gasolina',
-    '3': 'gas',
-    '4': 'adblue',
-    '5': 'otro',
-    diesel: 'diesel',
-    diésel: 'diesel',
-    acpm: 'diesel',
-    gasolina: 'gasolina',
-    corriente: 'gasolina',
-    extra: 'gasolina',
-    gas: 'gas',
-    gnv: 'gas',
-    adblue: 'adblue',
-    urea: 'adblue',
-    otro: 'otro'
-  };
+  if (/DIESEL|ACPM/.test(texto)) return { ok: true, valor: 'diesel' };
+  if (/GASOLINA|CORRIENTE|EXTRA|OXIG/.test(texto)) return { ok: true, valor: 'gasolina' };
+  if (/GAS|GNV|GNC/.test(texto)) return { ok: true, valor: 'gas' };
 
-  var normalizado = equivalencias[limpio] || null;
-  if (!normalizado || TIPOS_COMBUSTIBLE.indexOf(normalizado) === -1) {
-    return {
-      ok: false,
-      mensaje: '❌ Tipo de combustible inválido.\n\nResponde con:\n1️⃣ Diésel\n2️⃣ Gasolina\n3️⃣ Gas\n4️⃣ AdBlue\n5️⃣ Otro\n\n◀️ *ATRAS*  •  ✖️ *CANCELAR*'
-    };
-  }
-
-  return { ok: true, valor: normalizado };
+  return { ok: false, valor: null };
 }
 
 function evaluarKilometrajeContraReferencia(kilometraje, referenciaMeta) {

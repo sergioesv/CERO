@@ -147,7 +147,7 @@ async function manejarConfirmacionOdometro(
       sesion.estado = opciones.estadoManual;
       return responderFn(
         res,
-        '⌨️ Escribe el kilometraje correcto usando solo numeros.'
+        '⌨️ Escribe el kilometraje correcto usando solo números.\nEjemplo: *267354*\n\n0️⃣ Atrás  •  9️⃣ Menú principal'
       );
     }
     if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
@@ -191,7 +191,7 @@ async function manejarConfirmacionOdometro(
       sesion.estado = opciones.estadoManual;
       return responderFn(
         res,
-        '⌨️ Escribe el kilometraje correcto usando solo numeros.'
+        '⌨️ Escribe el kilometraje correcto usando solo números.\nEjemplo: *267354*\n\n0️⃣ Atrás  •  9️⃣ Menú principal'
       );
     }
     if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
@@ -209,7 +209,7 @@ async function manejarConfirmacionOdometro(
     sesion.estado = opciones.estadoManual;
     return responderFn(
       res,
-      '⌨️ Escribe el kilometraje correcto usando solo numeros.'
+      '⌨️ Escribe el kilometraje correcto usando solo números.\nEjemplo: *267354*\n\n0️⃣ Atrás  •  9️⃣ Menú principal'
     );
   }
 
