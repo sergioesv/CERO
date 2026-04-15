@@ -235,7 +235,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-14 -->
+<!-- Última actualización: 2026-04-15 -->
 
 ## Folder structure
 
