@@ -339,20 +339,24 @@ function solicitarCantidadManual() {
  * Confirmación de tanqueo guardado — Camino A (auto_validado).
  * @param {Object} tanqueo — registro guardado en BD
  */
-function tanqueoGuardadoAutoValidado(tanqueo) {
-  var msg = '✅ *Tanqueo registrado*\n';
-  msg += tanqueo.vehiculo_placa + '  •  ';
-  msg += (tanqueo.kilometraje || 0).toLocaleString('es-CO') + ' km\n';
-  if (tanqueo.cantidad) {
-    msg += tanqueo.cantidad + ' ' + (tanqueo.unidad_medida || 'litros');
-    if (tanqueo.valor_total) {
-      msg += '  •  $' + Number(tanqueo.valor_total).toLocaleString('es-CO');
-    }
-    msg += '\n';
-  }
-  msg += '\n_Validación automática: todos los datos coinciden._\n\n';
-  msg += 'Escribe 9 para volver al menú.';
-  return msg;
+function tanqueoGuardadoAutoValidado(t) {
+  var km = t && t.kilometraje ? t.kilometraje.toLocaleString('es-CO') : '—';
+  var cantidad = t && t.cantidad ? t.cantidad : '—';
+  var unidad = t && t.unidad_medida ? t.unidad_medida : '';
+  var valor = t && t.valor_total
+    ? '$' + Number(t.valor_total).toLocaleString('es-CO')
+    : '—';
+  var placa = t && t.vehiculo_placa ? t.vehiculo_placa : '—';
+
+  return (
+    '───────────────\n' +
+    '✅ TANQUEO REGISTRADO\n' +
+    '───────────────\n' +
+    '🚗 ' + placa + '  •  📏 ' + km + ' km\n' +
+    '⛽ ' + cantidad + ' ' + unidad + '  •  💰 ' + valor + '\n\n' +
+    '_✓ Validación automática: todos los datos coinciden._\n\n' +
+    'Escribe 9️⃣ para volver al menú.'
+  );
 }
 
 /**
