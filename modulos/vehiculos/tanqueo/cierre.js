@@ -1,7 +1,6 @@
 /**
- * cierre.js — Guardado en BD, validación cruzada y cálculo de rendimiento
- * Módulo: Tanqueo con OCR y validación cruzada v2
- * CERO — Gestión de Operaciones de Campo
+ * cierre.js — Guardado en BD, estado de validación v3 (tier OCR) y rendimiento
+ * Módulo: Tanqueo con OCR — CERO — Gestión de Operaciones de Campo
  */
 
 'use strict';
@@ -9,94 +8,24 @@
 var tanqueosData = require('../../../data/tanqueos');
 var validaciones = require('./validaciones');
 
-var TOLERANCIA_KM = 50;
-
-var TOLERANCIA_CANTIDAD = 0.5;
-
-function ejecutarValidacionCruzada(sesion) {
-  var discrepancias = [];
-  var coincidencias = 0;
-
-  var placaRecibo = (sesion.placaOcrFactura || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
-  var placaFoto = (sesion.placaOcrFoto || sesion.placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
-  if (placaRecibo && placaFoto) {
-    if (placaRecibo === placaFoto) {
-      coincidencias++;
-    } else {
-      discrepancias.push({
-        campo: 'placa',
-        valor_conductor: placaFoto,
-        valor_ocr: placaRecibo
-      });
-    }
-  } else {
-    console.log('[Cierre] Campo placa no verificable — OCR no leyó uno de los dos.');
-  }
-
-  var kmRecibo = sesion.kmOcrFactura ? parseInt(String(sesion.kmOcrFactura).replace(/\D/g, ''), 10) : null;
-  var kmOdometroRaw = sesion.kmOcrOdometro != null ? sesion.kmOcrOdometro : sesion.kilometraje;
-  var kmOdometro = typeof kmOdometroRaw === 'number' && !isNaN(kmOdometroRaw) ? kmOdometroRaw : null;
-
-  if (kmRecibo != null && !isNaN(kmRecibo) && kmOdometro != null) {
-    if (Math.abs(kmRecibo - kmOdometro) <= TOLERANCIA_KM) {
-      coincidencias++;
-    } else {
-      discrepancias.push({
-        campo: 'kilometraje',
-        valor_conductor: kmOdometro,
-        valor_ocr: kmRecibo
-      });
-    }
-  } else {
-    console.log('[Cierre] Campo km no verificable — OCR no leyó uno de los dos.');
-  }
-
-  var cantidadOcr = sesion.cantidadOcr != null ? parseFloat(String(sesion.cantidadOcr)) : null;
-  var cantidadManual = sesion.cantidadManual != null ? parseFloat(String(sesion.cantidadManual)) : null;
-  if (cantidadOcr !== null && !isNaN(cantidadOcr) && cantidadManual !== null && !isNaN(cantidadManual)) {
-    if (Math.abs(cantidadOcr - cantidadManual) <= TOLERANCIA_CANTIDAD) {
-      coincidencias++;
-    } else {
-      discrepancias.push({
-        campo: 'cantidad',
-        valor_conductor: cantidadManual,
-        valor_ocr: cantidadOcr
-      });
-    }
-  } else {
-    console.log('[Cierre] Campo cantidad no verificable — OCR no leyó uno de los dos.');
-  }
-
-  var facturaOcr = (sesion.facturaNumeroOcr || '').trim();
-  var facturaManual = (sesion.facturaNumeroManual || '').trim();
-  if (facturaOcr && facturaManual) {
-    if (facturaOcr === facturaManual) {
-      coincidencias++;
-    } else {
-      discrepancias.push({
-        campo: 'factura_numero',
-        valor_conductor: facturaManual,
-        valor_ocr: facturaOcr
-      });
-    }
-  } else {
-    console.log('[Cierre] Campo factura no verificable — OCR no leyó uno de los dos.');
-  }
-
-  var estadoValidacion;
-  if (discrepancias.length === 0 && coincidencias === 4) {
-    estadoValidacion = 'auto_validado';
-  } else {
-    estadoValidacion = 'pendiente_revision';
-  }
-
-  console.log('[Cierre] Validación cruzada: ' + coincidencias + '/4 coinciden. Estado: ' + estadoValidacion);
-
-  return {
-    estadoValidacion: estadoValidacion,
-    discrepancias: discrepancias,
-    coincidencias: coincidencias
-  };
+/**
+ * Determina el estado de validación del tanqueo según el tier OCR
+ * y si el conductor corrigió algún dato.
+ *
+ * Reglas (v24 sección 4.4 y 8.1):
+ *   Tier 1 + sin corrección → 'auto_validado'
+ *   Tier 1 + corrección     → 'pendiente_revision'
+ *   Tier 2                  → 'pendiente_revision'
+ *   Tier 3 (manual)         → 'pendiente_revision'
+ *   Foto tablero            → 'pendiente_revision' + flag especial en BD
+ *
+ * @param {Object} sesion
+ * @returns {string} — 'auto_validado' o 'pendiente_revision'
+ */
+function calcularEstadoValidacion(sesion) {
+  if (sesion.flagSinFactura) return 'pendiente_revision';
+  if (sesion.tierOcr === 1 && !sesion.conductorCorrigioDato) return 'auto_validado';
+  return 'pendiente_revision';
 }
 
 async function calcularRendimiento(sesion) {
@@ -131,7 +60,14 @@ async function calcularRendimiento(sesion) {
     return resultado;
   }
 
-  var rendimiento = parseFloat((kmRecorridos / cantidadNum).toFixed(2));
+  // Normalizar cantidad a litros para comparación consistente
+  var cantidadEnLitros = cantidadNum;
+  var unidad = String(sesion.unidadMedida || 'litros').toLowerCase();
+  if (/gal/.test(unidad)) {
+    cantidadEnLitros = parseFloat((cantidadNum * 3.785).toFixed(3));
+  }
+
+  var rendimiento = parseFloat((kmRecorridos / cantidadEnLitros).toFixed(2));
   resultado.rendimientoCalculado = rendimiento;
 
   var vehiculo = sesion.vehiculo || {};
@@ -158,7 +94,7 @@ async function calcularRendimiento(sesion) {
           console.log('[Cierre] Alerta de rendimiento histórico: ' + rendimiento + ' vs promedio ' + historial.promedio);
         }
       }
-    } catch (e) {
+    } catch {
       console.log('[Cierre] Sin historial de rendimiento para ' + sesion.placa + ' — sin alerta.');
     }
   }
@@ -167,26 +103,40 @@ async function calcularRendimiento(sesion) {
 }
 
 async function guardarTanqueo(sesion, telefono) {
-  var validacion = ejecutarValidacionCruzada(sesion);
+  var estadoValidacion = calcularEstadoValidacion(sesion);
+  var rendimiento      = await calcularRendimiento(sesion);
 
-  var rendimiento = await calcularRendimiento(sesion);
+  // Inferir tipo de tanqueo desde el campo 'medio' del OCR (v24 decisión 4)
+  var tipoTanqueoInferido = 'emergencia'; // valor por defecto
+  var datosOcr = sesion.datosOcrFactura || {};
+  if (datosOcr.medio && datosOcr.medio.leido) {
+    var medioValor = String(datosOcr.medio.valor || '').toUpperCase().trim();
+    if (medioValor === 'IBUTTON' || medioValor.indexOf('IBUTTON') >= 0) {
+      tipoTanqueoInferido = 'convenio';
+    }
+  }
+  // Si la entrada fue manual (tier 3 sin foto tablero) → emergencia siempre
+  if (sesion.tierOcr === 3 && !sesion.flagSinFactura) {
+    tipoTanqueoInferido = 'emergencia';
+  }
+  console.log('[Cierre] Tipo tanqueo inferido: ' + tipoTanqueoInferido);
 
-  // Emergencia siempre pendiente_revision, sin importar validación cruzada
-  var estadoValidacionFinal;
-  if (sesion.tipoTanqueo === 'emergencia') {
+  var estadoValidacionFinal = estadoValidacion;
+
+  // Rendimiento anómalo siempre fuerza revisión
+  if (rendimiento.rendimientoAlerta) {
     estadoValidacionFinal = 'pendiente_revision';
-    console.log('[Cierre] Tipo emergencia — forzando pendiente_revision.');
-  } else if (rendimiento.rendimientoAlerta) {
-    estadoValidacionFinal = 'pendiente_revision';
-  } else {
-    estadoValidacionFinal = validacion.estadoValidacion;
+    console.log('[Cierre] Alerta rendimiento — forzando pendiente_revision.');
   }
 
-  if (rendimiento.rendimientoAlerta && validacion.estadoValidacion === 'auto_validado' && sesion.tipoTanqueo !== 'emergencia') {
-    console.log('[Cierre] Validación cruzada OK pero rendimiento anómalo — forzando pendiente_revision.');
+  // Emergencia siempre requiere revisión
+  if (tipoTanqueoInferido === 'emergencia') {
+    estadoValidacionFinal = 'pendiente_revision';
   }
 
-  var cantidadFinal = sesion.cantidadManual != null ? sesion.cantidadManual : (sesion.cantidadOcr != null ? sesion.cantidadOcr : 0);
+  var cantidadFinal = sesion.cantidadManual != null
+    ? sesion.cantidadManual
+    : (sesion.cantidadOcr != null ? sesion.cantidadOcr : 0);
 
   var precioUnitario = null;
   if (cantidadFinal && sesion.valorTotal) {
@@ -196,43 +146,64 @@ async function guardarTanqueo(sesion, telefono) {
   var facturaNumeroFinal = sesion.facturaNumeroManual || sesion.facturaNumeroOcr || null;
 
   var datosTanqueo = {
-    vehiculo_placa: sesion.placa,
-    conductor_id: sesion.conductor ? sesion.conductor.id : null,
-    telefono_reporta: validaciones.normalizarTelefono(telefono),
-    tipo_tanqueo: sesion.tipoTanqueo || 'convenio',
-    tipo_combustible: sesion.tipoCombustible,
-    cantidad: cantidadFinal,
-    unidad_medida: sesion.unidadMedida || 'litros',
-    valor_total: sesion.valorTotal || null,
-    precio_unitario: precioUnitario,
-    tanque_lleno: false,
+    // Campos base
+    vehiculo_placa:    sesion.placa,
+    conductor_id:      sesion.conductor ? sesion.conductor.id : null,
+    telefono_reporta:  validaciones.normalizarTelefono(telefono),
+    tipo_tanqueo:      tipoTanqueoInferido,
+    tipo_combustible:  sesion.tipoCombustible || null,
+    cantidad:          cantidadFinal,
+    unidad_medida:     sesion.unidadMedida || 'litros',
+    valor_total:       sesion.valorTotal || null,
+    precio_unitario:   precioUnitario,
+    tanque_lleno:      false,
     estacion_servicio: sesion.estacionServicio || null,
-    ciudad: null,
-    kilometraje: sesion.kilometraje,
-    km_referencia: sesion.kmReferencia != null ? sesion.kmReferencia : null,
-    diferencia_km: sesion.diferenciaKm != null ? sesion.diferenciaKm : null,
+    ciudad:            null,
+    kilometraje:       sesion.kilometraje,
+    km_referencia:     sesion.kmReferencia   != null ? sesion.kmReferencia   : null,
+    diferencia_km:     sesion.diferenciaKm   != null ? sesion.diferenciaKm   : null,
     inconsistencia_km: !!sesion.inconsistenciaKm,
-    alertas: sesion.alertasKm || [],
-    observaciones: null,
-    pdf_url: null,
+    alertas:           sesion.alertasKm || [],
+    observaciones:     null,
+    pdf_url:           null,
 
-    factura_numero: facturaNumeroFinal,
+    // Campos OCR factura
+    factura_numero:        facturaNumeroFinal,
+    factura_numero_ocr:    sesion.facturaNumeroOcr   || null,
     factura_numero_manual: sesion.facturaNumeroManual || null,
-    factura_numero_ocr: sesion.facturaNumeroOcr || null,
-    placa_ocr_factura: sesion.placaOcrFactura || null,
-    placa_ocr_foto: sesion.placaOcrFoto || null,
-    km_ocr_factura: sesion.kmOcrFactura ? parseInt(String(sesion.kmOcrFactura).replace(/\D/g, ''), 10) : null,
-    km_ocr_odometro: sesion.kmOcrOdometro != null ? sesion.kmOcrOdometro : (sesion.kilometraje != null ? sesion.kilometraje : null),
-    cantidad_manual: sesion.cantidadManual != null ? sesion.cantidadManual : null,
-    cantidad_ocr: sesion.cantidadOcr != null ? sesion.cantidadOcr : null,
-    datos_ocr_factura: sesion.datosOcrFactura || null,
-    estado_validacion: estadoValidacionFinal,
-    discrepancias: validacion.discrepancias,
-    rendimiento_calculado: rendimiento.rendimientoCalculado,
-    rendimiento_alerta: rendimiento.rendimientoAlerta,
-    es_primer_tanqueo: rendimiento.esPrimerTanqueo === true ? true : false
+    placa_ocr_factura:     sesion.placaOcrFactura     || null,
+    placa_ocr_foto:        sesion.placaOcrFoto        || null,
+    km_ocr_factura:        sesion.kmOcrFactura
+      ? parseInt(String(sesion.kmOcrFactura).replace(/\D/g, ''), 10)
+      : null,
+    km_ocr_odometro:       sesion.kmOcrOdometro != null
+      ? sesion.kmOcrOdometro
+      : (sesion.kilometraje != null ? sesion.kilometraje : null),
+    cantidad_ocr:          sesion.cantidadOcr    != null ? sesion.cantidadOcr    : null,
+    cantidad_manual:       sesion.cantidadManual  != null ? sesion.cantidadManual  : null,
+    datos_ocr_factura:     sesion.datosOcrFactura || null,
+
+    // Nuevos campos v3
+    score_ocr_global:      sesion.scoreOcrGlobal || 0,
+    tier_ocr:              sesion.tierOcr         || 3,
+    serial_ibutton:        (datosOcr.serial_ibutton  && datosOcr.serial_ibutton.leido)
+      ? String(datosOcr.serial_ibutton.valor).trim() : null,
+    autorizacion_terpel:   (datosOcr.autorizacion    && datosOcr.autorizacion.leido)
+      ? String(datosOcr.autorizacion.valor).trim()   : null,
+    nit_estacion:          (datosOcr.nit_estacion    && datosOcr.nit_estacion.leido)
+      ? String(datosOcr.nit_estacion.valor).trim()   : null,
+    flag_sin_factura:      !!sesion.flagSinFactura,
+    tiene_factura_fisica:  !sesion.flagSinFactura,
+
+    // Validación y rendimiento
+    estado_validacion:      estadoValidacionFinal,
+    discrepancias:          [],   // v3: no se calculan en runtime, se ven en drawer
+    rendimiento_calculado:  rendimiento.rendimientoCalculado,
+    rendimiento_alerta:     rendimiento.rendimientoAlerta,
+    es_primer_tanqueo:      rendimiento.esPrimerTanqueo === true
   };
 
+  // Sanear km_ocr_factura si quedó NaN
   if (datosTanqueo.km_ocr_factura != null && isNaN(datosTanqueo.km_ocr_factura)) {
     datosTanqueo.km_ocr_factura = null;
   }
@@ -244,7 +215,7 @@ async function guardarTanqueo(sesion, telefono) {
   }
 
   var fotos = (sesion.fotos || []).filter(function(f) {
-    return f.tipo === 'factura' || f.tipo === 'placa' || f.tipo === 'odometro';
+    return f.tipo === 'factura' || f.tipo === 'odometro' || f.tipo === 'tablero';
   });
 
   if (fotos.length > 0) {
@@ -267,7 +238,7 @@ async function guardarTanqueo(sesion, telefono) {
 }
 
 module.exports = {
-  guardarTanqueo: guardarTanqueo,
-  ejecutarValidacionCruzada: ejecutarValidacionCruzada,
-  calcularRendimiento: calcularRendimiento
+  guardarTanqueo:           guardarTanqueo,
+  calcularRendimiento:      calcularRendimiento,
+  calcularEstadoValidacion: calcularEstadoValidacion
 };
