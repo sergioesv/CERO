@@ -363,6 +363,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── ocr.js  # OCR via Gemini — lectura de placas y odometros
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+├── sql
+│   └── v24-dia5-tanqueos-vehiculos.sql
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
