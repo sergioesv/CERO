@@ -201,6 +201,9 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 14/04/2026 | Fix validarTipoCombustible — mapeo por keywords GASOLINA/DIESEL/GAS | OCR Terpel retorna "GASOLINA CORRIENTE 10% OXIG" — regex exacto no funcionaba |
+| 14/04/2026 | Fix km manual directo en fuera de rango — conductor puede escribir número sin presionar 1 | UX campo en CONFIRMACION_KM |
+| 14/04/2026 | Tanqueo v3 completo — OCR factura, score/tier, fallback, cierre con inferencia tipo_tanqueo | Semana 1 del plan v24 completa |
 | 14/04/2026 | Eliminar endpoint /api/tanqueos duplicado en canales/dashboard.js | Interceptaba requests antes que rutas/tanqueos.js — stats nunca llegaban al frontend |
 | 14/04/2026 | Proxy seguro imágenes Twilio — GET /api/tanqueos/media/:fotoId | Frontend nunca controla URL — backend resuelve desde BD |
 | 14/04/2026 | Zona horaria Bogotá (UTC-5) en backend y frontend | Stats "hoy" calculaban en UTC — diferencia de 5h causaba 0s en cards |
