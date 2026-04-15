@@ -1,7 +1,7 @@
 /**
- * flujo.js — Máquina de estados del módulo de tanqueo v2
+ * flujo.js — Máquina de estados del módulo de tanqueo v3
  * Basado en el patrón real del preoperacional.
- * Flujo: foto placa → odómetro → foto recibo (OCR) → factura manual → litros manual
+ * Flujo: foto placa → odómetro → foto factura (OCR con score) → confirmación / fallback
  * CERO — Gestión de Operaciones de Campo
  */
 
@@ -96,41 +96,52 @@ function mensajeKilometrajeFueraRangoTanqueo(sesion, evaluacion, maxKmSalto) {
 }
 
 function reiniciarSesionTanqueo(sesion) {
-  sesion.tipo = 'tanqueo';
-  sesion.tipoTanqueo = null; // 'convenio' o 'emergencia'
+  sesion.tipo   = 'tanqueo';
   sesion.estado = ESTADOS.INICIO;
 
-  sesion.placa = null;
-  sesion.vehiculo = null;
-  sesion.conductor = null;
-  sesion.fotoPlacaTemporal = null;
-  sesion.placaDetectada = null;
-  sesion.placaSugerida = null;
+  // Vehículo y conductor
+  sesion.placa              = null;
+  sesion.vehiculo           = null;
+  sesion.conductor          = null;
+  sesion.fotoPlacaTemporal  = null;
+  sesion.placaDetectada     = null;
+  sesion.placaSugerida      = null;
 
-  sesion.kilometraje = null;
-  sesion.kmDetectado = null;
-  sesion.kmLecturaFueraRango = false;
+  // Kilometraje
+  sesion.kilometraje          = null;
+  sesion.kmDetectado          = null;
+  sesion.kmLecturaFueraRango  = false;
   sesion.fotoOdometroTemporal = null;
-  sesion.kmReferenciaMeta = null;
-  sesion.kmReferencia = null;
-  sesion.diferenciaKm = null;
-  sesion.inconsistenciaKm = false;
-  sesion.alertasKm = [];
+  sesion.kmReferenciaMeta     = null;
+  sesion.kmReferencia         = null;
+  sesion.diferenciaKm         = null;
+  sesion.inconsistenciaKm     = false;
+  sesion.alertasKm            = [];
 
-  sesion.datosOcrFactura = null;
-  sesion.facturaNumeroOcr = null;
-  sesion.facturaNumeroManual = null;
-  sesion.placaOcrFactura = null;
-  sesion.placaOcrFoto = null;
-  sesion.kmOcrFactura = null;
-  sesion.kmOcrOdometro = null;
-  sesion.cantidadOcr = null;
-  sesion.cantidadManual = null;
-  sesion.unidadMedida = 'litros';
-  sesion.tipoCombustible = null;
-  sesion.valorTotal = null;
-  sesion.estacionServicio = null;
-  sesion.fotoFacturaTemporal = null;
+  // OCR factura
+  sesion.datosOcrFactura      = null;
+  sesion.scoreOcrGlobal       = 0;
+  sesion.tierOcr              = 3;
+  sesion.fotoFacturaTemporal  = null;
+
+  // Campos extraídos de OCR o ingresados manualmente
+  sesion.facturaNumeroOcr     = null;
+  sesion.facturaNumeroManual  = null;
+  sesion.placaOcrFactura      = null;
+  sesion.placaOcrFoto         = null;
+  sesion.kmOcrFactura         = null;
+  sesion.kmOcrOdometro        = null;
+  sesion.cantidadOcr          = null;
+  sesion.cantidadManual       = null;
+  sesion.unidadMedida         = 'litros';
+  sesion.tipoCombustible      = null;
+  sesion.valorTotal           = null;
+  sesion.estacionServicio     = null;
+
+  // Control de flujo
+  sesion.conductorCorrigioDato = false;
+  sesion.fotoTableroTemporal   = null;
+  sesion.flagSinFactura        = false;
 
   sesion.fotos = [];
 }
@@ -218,83 +229,99 @@ async function procesarFotoOdometroTanqueo(res, sesion, fotoUrl) {
   });
 }
 
-function siguienteEstadoCompletarCampos(sesion) {
-  if (!sesion.tipoCombustible) return ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE;
-  if (!sesion.valorTotal) return ESTADOS.COMPLETAR_VALOR;
-  if (!sesion.estacionServicio) return ESTADOS.COMPLETAR_ESTACION;
-  return ESTADOS.CONFIRMACION_FINAL;
-}
-
 function manejarAtras(res, sesion) {
   switch (sesion.estado) {
+
+    // Desde placa → reiniciar
     case ESTADOS.ESPERANDO_FOTO_PLACA:
     case ESTADOS.PLACA_FALLBACK:
     case ESTADOS.PLACA_CONFIRMACION_SUGERIDA:
     case ESTADOS.PLACA_MANUAL:
-      sesion.placaDetectada = null;
-      sesion.placaSugerida = null;
+      sesion.placaDetectada   = null;
+      sesion.placaSugerida    = null;
       sesion.fotoPlacaTemporal = null;
-      sesion.tipoTanqueo = null;
-      sesion.estado = ESTADOS.TIPO_TANQUEO;
-      return validaciones.responderTwiml(res, '◀️ Volvemos al inicio.\n\n' + mensajes.preguntarTipoTanqueo());
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      return validaciones.responderTwiml(res, mensajes.inicio());
 
+    // Desde odómetro → placa
     case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
     case ESTADOS.CONFIRMACION_KM:
     case ESTADOS.KM_MANUAL:
-      sesion.placa = null;
-      sesion.vehiculo = null;
-      sesion.conductor = null;
+      sesion.placa            = null;
+      sesion.vehiculo         = null;
+      sesion.conductor        = null;
       sesion.kmReferenciaMeta = null;
-      sesion.placaOcrFoto = null;
-      sesion.kmDetectado = null;
+      sesion.placaOcrFoto     = null;
+      sesion.kmDetectado      = null;
       sesion.kmLecturaFueraRango = false;
-      sesion.kmReferencia = null;
-      sesion.diferenciaKm = null;
+      sesion.kmReferencia     = null;
+      sesion.diferenciaKm     = null;
       sesion.inconsistenciaKm = false;
-      sesion.alertasKm = [];
+      sesion.alertasKm        = [];
       storage.limpiarFotosPorTipo(sesion, ['odometro', 'placa']);
       sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
       return validaciones.responderTwiml(res, '◀️ Volvemos a la placa.\n\n' + mensajes.inicio());
 
+    // Desde factura → odómetro
     case ESTADOS.ESPERANDO_FOTO_FACTURA:
       sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
       return validaciones.responderTwiml(res,
         '◀️ Volvemos al odómetro.\n\n' + mensajes.solicitarFotoOdometro(sesion.kmReferenciaMeta)
       );
 
-    case ESTADOS.ESPERANDO_FACTURA_MANUAL:
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
-      sesion.datosOcrFactura = null;
+    // Desde resumen → volver a pedir foto factura
+    case ESTADOS.CONFIRMACION_RESUMEN:
+      sesion.datosOcrFactura     = null;
+      sesion.scoreOcrGlobal      = 0;
+      sesion.tierOcr             = 3;
+      sesion.facturaNumeroOcr    = null;
+      sesion.facturaNumeroManual = null;
+      sesion.cantidadOcr         = null;
+      sesion.cantidadManual      = null;
+      sesion.valorTotal          = null;
+      sesion.conductorCorrigioDato = false;
       storage.limpiarFotosPorTipo(sesion, ['factura']);
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
       return validaciones.responderTwiml(res,
         '◀️ Volvemos al recibo.\n\n' + mensajes.solicitarFotoFactura()
       );
 
-    case ESTADOS.ESPERANDO_LITROS_MANUAL:
-      sesion.estado = ESTADOS.ESPERANDO_FACTURA_MANUAL;
+    // Desde corrección → resumen
+    case ESTADOS.CORREGIR_CAMPO:
+      sesion.facturaNumeroManual  = null;
+      sesion.conductorCorrigioDato = false;
+      sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+      var msgResumen = sesion.tierOcr === 1
+        ? mensajes.resumenOcrCompleto(sesion)
+        : mensajes.resumenOcrParcial(sesion);
+      return validaciones.responderTwiml(res, msgResumen);
+
+    // Desde cantidad manual → número factura (corrección o manual)
+    case ESTADOS.CANTIDAD_MANUAL:
+      sesion.cantidadManual = null;
+      sesion.estado = sesion.tierOcr < 3
+        ? ESTADOS.CORREGIR_CAMPO
+        : ESTADOS.FACTURA_MANUAL;
+      return validaciones.responderTwiml(res, mensajes.solicitarFacturaManualSimple());
+
+    // Desde fallback factura → volver a pedir foto
+    case ESTADOS.FALLBACK_FACTURA:
+      storage.limpiarFotosPorTipo(sesion, ['factura']);
+      sesion.datosOcrFactura = null;
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
       return validaciones.responderTwiml(res,
-        '◀️ Volvemos al número de factura.\n\n' + mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr)
+        '◀️ Volvemos al recibo.\n\n' + mensajes.solicitarFotoFactura()
       );
 
-    case ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE:
-    case ESTADOS.COMPLETAR_VALOR:
-    case ESTADOS.COMPLETAR_ESTACION:
-      sesion.estado = ESTADOS.ESPERANDO_LITROS_MANUAL;
-      return validaciones.responderTwiml(res,
-        '◀️ Volvemos a la cantidad.\n\n' + mensajes.solicitarLitrosManual(sesion.cantidadOcr, sesion.unidadMedida)
-      );
+    // Desde factura manual → fallback
+    case ESTADOS.FACTURA_MANUAL:
+      sesion.estado = ESTADOS.FALLBACK_FACTURA;
+      return validaciones.responderTwiml(res, mensajes.fallbackFactura());
 
-    case ESTADOS.CONFIRMACION_FINAL:
-      if (!sesion.estacionServicio) {
-        sesion.estado = ESTADOS.COMPLETAR_ESTACION;
-        return validaciones.responderTwiml(res, mensajes.solicitarEstacion());
-      }
-      if (!sesion.valorTotal) {
-        sesion.estado = ESTADOS.COMPLETAR_VALOR;
-        return validaciones.responderTwiml(res, mensajes.solicitarValorTotal());
-      }
-      sesion.estado = ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE;
-      return validaciones.responderTwiml(res, mensajes.solicitarTipoCombustible());
+    // Desde foto tablero → fallback
+    case ESTADOS.ESPERANDO_FOTO_TABLERO:
+      sesion.estado = ESTADOS.FALLBACK_FACTURA;
+      return validaciones.responderTwiml(res, mensajes.fallbackFactura());
 
     default:
       return validaciones.responderTwiml(res,
@@ -333,26 +360,11 @@ async function manejarTanqueo(req, res) {
 
     if (sesion.tipo !== 'tanqueo' || !sesion.estado || sesion.estado === ESTADOS.INICIO) {
       reiniciarSesionTanqueo(sesion);
-      sesion.estado = ESTADOS.TIPO_TANQUEO;
-      return validaciones.responderTwiml(res, mensajes.preguntarTipoTanqueo());
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
+      return validaciones.responderTwiml(res, mensajes.inicio());
     }
 
     switch (sesion.estado) {
-      case ESTADOS.TIPO_TANQUEO:
-        // Respuesta 1 = convenio, 2 = emergencia
-        if (msgLower === '1' || msgLower === '1️⃣') {
-          sesion.tipoTanqueo = 'convenio';
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
-          return validaciones.responderTwiml(res, mensajes.tipoTanqueoRegistrado('convenio'));
-        }
-        if (msgLower === '2' || msgLower === '2️⃣') {
-          sesion.tipoTanqueo = 'emergencia';
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
-          return validaciones.responderTwiml(res, mensajes.tipoTanqueoRegistrado('emergencia'));
-        }
-        // Respuesta inválida — repetir pregunta
-        return validaciones.responderTwiml(res, mensajes.preguntarTipoTanqueo());
-
       case ESTADOS.ESPERANDO_FOTO_PLACA:
         if (numMedia === 0) return validaciones.responderTwiml(res, mensajes.inicio());
         return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
@@ -457,7 +469,9 @@ async function manejarTanqueo(req, res) {
               s.kmLecturaFueraRango = false;
               s.fotoOdometroTemporal = null;
               s.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
-              return validaciones.responderTwiml(res2, mensajes.kilometrajeConfirmadoSolicitudRecibo(s.kilometraje));
+              return validaciones.responderTwiml(res2,
+                mensajes.kilometrajeConfirmadoPrefijo(s.kilometraje) + mensajes.solicitarFotoFactura()
+              );
             }
           }
         );
@@ -509,19 +523,24 @@ async function manejarTanqueo(req, res) {
           return validaciones.responderTwiml(res, mensajes.solicitarFotoFactura());
         }
 
-        sesion.fotoFacturaTemporal = mediaUrls[0];
+        // Guardar foto factura
         storage.guardarFotoUnica(sesion, {
-          tipo: 'factura',
-          url: mediaUrls[0],
+          tipo:        'factura',
+          url:         mediaUrls[0],
           descripcion: 'Foto del recibo de tanqueo',
-          validacion: 'Foto recibo cargada',
-          validada: true
+          validacion:  'Foto recibo cargada',
+          validada:    true
         });
+        sesion.fotoFacturaTemporal = mediaUrls[0];
 
+        // OCR
         try {
           var datosOcr = await ocr.extraerDatosFacturaCombustible(mediaUrls[0]);
           sesion.datosOcrFactura = datosOcr;
+          sesion.scoreOcrGlobal  = datosOcr.score_global  || 0;
+          sesion.tierOcr         = datosOcr.tier_ocr      || 3;
 
+          // Extraer campos a la sesión
           if (datosOcr.factura_numero && datosOcr.factura_numero.leido) {
             sesion.facturaNumeroOcr = String(datosOcr.factura_numero.valor || '').trim();
           }
@@ -532,16 +551,16 @@ async function manejarTanqueo(req, res) {
             sesion.kmOcrFactura = String(datosOcr.kilometraje.valor || '').replace(/\D/g, '') || null;
           }
           if (datosOcr.cantidad && datosOcr.cantidad.leido) {
-            sesion.cantidadOcr = parseFloat(String(datosOcr.cantidad.valor).replace(',', '.'));
-            if (isNaN(sesion.cantidadOcr)) sesion.cantidadOcr = null;
+            var cantParsed = parseFloat(String(datosOcr.cantidad.valor).replace(',', '.'));
+            sesion.cantidadOcr = isNaN(cantParsed) ? null : cantParsed;
           }
           if (datosOcr.unidad_medida && datosOcr.unidad_medida.leido) {
             var u = String(datosOcr.unidad_medida.valor || '').toLowerCase();
             sesion.unidadMedida = /gal/.test(u) ? 'galones' : 'litros';
           }
           if (datosOcr.producto && datosOcr.producto.leido) {
-            var validacionTipo = validaciones.validarTipoCombustible(datosOcr.producto.valor);
-            if (validacionTipo.ok) sesion.tipoCombustible = validacionTipo.valor;
+            var validTipo = validaciones.validarTipoCombustible(datosOcr.producto.valor);
+            if (validTipo.ok) sesion.tipoCombustible = validTipo.valor;
           }
           if (datosOcr.valor_total && datosOcr.valor_total.leido) {
             var vt = parseFloat(String(datosOcr.valor_total.valor || '').replace(/[^0-9.]/g, ''));
@@ -551,93 +570,164 @@ async function manejarTanqueo(req, res) {
             sesion.estacionServicio = String(datosOcr.estacion.valor || '').trim() || null;
           }
 
-          var camposLeidos = Object.keys(datosOcr).filter(function(k) {
-            return datosOcr[k] && datosOcr[k].leido;
-          }).length;
-          console.log('[Tanqueo] OCR factura: ' + camposLeidos + '/10 campos leídos.');
+          console.log('[Tanqueo] OCR score: ' + sesion.scoreOcrGlobal + ' tier: ' + sesion.tierOcr);
         } catch (eOcr) {
           console.error('[Tanqueo] Error OCR factura:', eOcr.message);
+          sesion.tierOcr = 3;
         }
 
-        sesion.estado = ESTADOS.ESPERANDO_FACTURA_MANUAL;
-        return validaciones.responderTwiml(res, mensajes.reciboProcesadoSolicitudFactura(sesion.facturaNumeroOcr));
-
-      case ESTADOS.ESPERANDO_FACTURA_MANUAL:
-        if (!mensaje || mensaje.length < 1) {
-          return validaciones.responderTwiml(res, mensajes.solicitarFacturaManual(sesion.facturaNumeroOcr));
+        // Enrutamiento por tier
+        if (sesion.tierOcr === 1) {
+          sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+          return validaciones.responderTwiml(res, mensajes.resumenOcrCompleto(sesion));
         }
-        sesion.facturaNumeroManual = mensaje.trim();
-        sesion.estado = ESTADOS.ESPERANDO_LITROS_MANUAL;
-        return validaciones.responderTwiml(res,
-          mensajes.facturaRegistradaPrefijo(sesion.facturaNumeroManual) +
-          mensajes.solicitarLitrosManual(sesion.cantidadOcr, sesion.unidadMedida)
-        );
-
-      case ESTADOS.ESPERANDO_LITROS_MANUAL:
-        var parsedCantidad = validaciones.parsearCantidad(mensaje);
-        if (!parsedCantidad.ok) {
-          return validaciones.responderTwiml(res, parsedCantidad.mensaje);
+        if (sesion.tierOcr === 2) {
+          sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+          return validaciones.responderTwiml(res, mensajes.resumenOcrParcial(sesion));
         }
-        sesion.cantidadManual = parsedCantidad.cantidad;
-        sesion.unidadMedida = parsedCantidad.unidadMedida;
-        sesion.estado = siguienteEstadoCompletarCampos(sesion);
+        // tier 3 — fallback
+        sesion.estado = ESTADOS.FALLBACK_FACTURA;
+        return validaciones.responderTwiml(res, mensajes.fallbackFactura());
 
-        if (sesion.estado === ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE) {
-          return validaciones.responderTwiml(res, mensajes.solicitarTipoCombustible());
-        }
-        if (sesion.estado === ESTADOS.COMPLETAR_VALOR) {
-          return validaciones.responderTwiml(res, mensajes.solicitarValorTotal());
-        }
-        if (sesion.estado === ESTADOS.COMPLETAR_ESTACION) {
-          return validaciones.responderTwiml(res, mensajes.solicitarEstacion());
-        }
-        return validaciones.responderTwiml(res, mensajes.resumenFinal(sesion));
-
-      case ESTADOS.COMPLETAR_TIPO_COMBUSTIBLE:
-        var validComb = validaciones.validarTipoCombustible(mensaje);
-        if (!validComb.ok) {
-          return validaciones.responderTwiml(res, validComb.mensaje);
-        }
-        sesion.tipoCombustible = validComb.valor;
-        sesion.estado = sesion.valorTotal
-          ? (sesion.estacionServicio ? ESTADOS.CONFIRMACION_FINAL : ESTADOS.COMPLETAR_ESTACION)
-          : ESTADOS.COMPLETAR_VALOR;
-        if (sesion.estado === ESTADOS.COMPLETAR_VALOR) return validaciones.responderTwiml(res, mensajes.solicitarValorTotal());
-        if (sesion.estado === ESTADOS.COMPLETAR_ESTACION) return validaciones.responderTwiml(res, mensajes.solicitarEstacion());
-        return validaciones.responderTwiml(res, mensajes.resumenFinal(sesion));
-
-      case ESTADOS.COMPLETAR_VALOR:
-        var valorParsed = validaciones.parsearValor(mensaje);
-        if (valorParsed === null) {
-          return validaciones.responderTwiml(res, mensajes.valorInvalido());
-        }
-        sesion.valorTotal = valorParsed;
-        sesion.estado = sesion.estacionServicio ? ESTADOS.CONFIRMACION_FINAL : ESTADOS.COMPLETAR_ESTACION;
-        if (sesion.estado === ESTADOS.COMPLETAR_ESTACION) return validaciones.responderTwiml(res, mensajes.solicitarEstacion());
-        return validaciones.responderTwiml(res, mensajes.resumenFinal(sesion));
-
-      case ESTADOS.COMPLETAR_ESTACION:
-        sesion.estacionServicio = (mensaje === '0' || /^no$/i.test(mensaje)) ? null : mensaje.trim();
-        sesion.estado = ESTADOS.CONFIRMACION_FINAL;
-        return validaciones.responderTwiml(res, mensajes.resumenFinal(sesion));
-
-      case ESTADOS.CONFIRMACION_FINAL:
+      case ESTADOS.CONFIRMACION_RESUMEN:
         if (msgLower === '1' || msgLower === '1️⃣') {
+          // Guardar
           var guardado = await cierre.guardarTanqueo(sesion, telefono);
           if (guardado.error) {
             console.error('[Tanqueo] Error guardando:', guardado.error);
-            return validaciones.responderTwiml(res, mensajes.errorGuardado());
+            return validaciones.responderTwiml(res, mensajes.errorGenericoTanqueo());
+          }
+          sesiones.eliminarSesion(telefono);
+          var esAutoValidado = guardado.estadoValidacion === 'auto_validado';
+          var msgGuardado = esAutoValidado
+            ? mensajes.tanqueoGuardadoAutoValidado(guardado.tanqueo)
+            : mensajes.tanqueoGuardadoPendiente(guardado.tanqueo, false);
+          return validaciones.responderTwiml(res, msgGuardado);
+        }
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.conductorCorrigioDato = true;
+          sesion.estado = ESTADOS.CORREGIR_CAMPO;
+          return validaciones.responderTwiml(res, mensajes.solicitarFacturaManualSimple());
+        }
+        // Respuesta inválida — repetir resumen
+        var msgRep = sesion.tierOcr === 1
+          ? mensajes.resumenOcrCompleto(sesion)
+          : mensajes.resumenOcrParcial(sesion);
+        return validaciones.responderTwiml(res, msgRep);
+
+      case ESTADOS.CORREGIR_CAMPO:
+        if (!mensaje || mensaje.length < 1) {
+          return validaciones.responderTwiml(res, mensajes.solicitarFacturaManualSimple());
+        }
+        sesion.facturaNumeroManual = mensaje.trim();
+        sesion.conductorCorrigioDato = true;
+        sesion.estado = ESTADOS.CANTIDAD_MANUAL;
+        return validaciones.responderTwiml(res, mensajes.solicitarCantidadManual());
+
+      case ESTADOS.FALLBACK_FACTURA:
+        // Si envían foto — re-procesar como nueva foto de factura
+        if (numMedia > 0) {
+          storage.limpiarFotosPorTipo(sesion, ['factura']);
+          sesion.datosOcrFactura = null;
+          sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+          storage.guardarFotoUnica(sesion, {
+            tipo: 'factura', url: mediaUrls[0],
+            descripcion: 'Foto del recibo (reintento)', validacion: 'Foto recibo cargada', validada: true
+          });
+          sesion.fotoFacturaTemporal = mediaUrls[0];
+          try {
+            var datosOcr2 = await ocr.extraerDatosFacturaCombustible(mediaUrls[0]);
+            sesion.datosOcrFactura = datosOcr2;
+            sesion.scoreOcrGlobal  = datosOcr2.score_global || 0;
+            sesion.tierOcr         = datosOcr2.tier_ocr     || 3;
+            if (datosOcr2.factura_numero && datosOcr2.factura_numero.leido) {
+              sesion.facturaNumeroOcr = String(datosOcr2.factura_numero.valor || '').trim();
+            }
+            if (datosOcr2.cantidad && datosOcr2.cantidad.leido) {
+              var cp2 = parseFloat(String(datosOcr2.cantidad.valor).replace(',', '.'));
+              sesion.cantidadOcr = isNaN(cp2) ? null : cp2;
+            }
+            if (datosOcr2.unidad_medida && datosOcr2.unidad_medida.leido) {
+              sesion.unidadMedida = /gal/.test(String(datosOcr2.unidad_medida.valor || '').toLowerCase()) ? 'galones' : 'litros';
+            }
+            if (datosOcr2.valor_total && datosOcr2.valor_total.leido) {
+              var vt2 = parseFloat(String(datosOcr2.valor_total.valor || '').replace(/[^0-9.]/g, ''));
+              if (!isNaN(vt2)) sesion.valorTotal = vt2;
+            }
+          } catch (eOcr2) {
+            console.error('[Tanqueo] Error OCR reintento:', eOcr2.message);
+            sesion.tierOcr = 3;
+          }
+          if (sesion.tierOcr === 1) {
+            sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+            return validaciones.responderTwiml(res, mensajes.resumenOcrCompleto(sesion));
+          }
+          if (sesion.tierOcr === 2) {
+            sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+            return validaciones.responderTwiml(res, mensajes.resumenOcrParcial(sesion));
+          }
+          return validaciones.responderTwiml(res, mensajes.fallbackFactura());
+        }
+        if (msgLower === '1' || msgLower === '1️⃣') {
+          storage.limpiarFotosPorTipo(sesion, ['factura']);
+          sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+          return validaciones.responderTwiml(res, mensajes.solicitarFotoFactura());
+        }
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.estado = ESTADOS.FACTURA_MANUAL;
+          return validaciones.responderTwiml(res, mensajes.solicitarFacturaManualSimple());
+        }
+        if (msgLower === '3' || msgLower === '3️⃣') {
+          sesion.estado = ESTADOS.ESPERANDO_FOTO_TABLERO;
+          return validaciones.responderTwiml(res, mensajes.solicitarFotoTablero());
+        }
+        return validaciones.responderTwiml(res, mensajes.fallbackFactura());
+
+      case ESTADOS.FACTURA_MANUAL:
+        if (!mensaje || mensaje.length < 1) {
+          return validaciones.responderTwiml(res, mensajes.solicitarFacturaManualSimple());
+        }
+        sesion.facturaNumeroManual   = mensaje.trim();
+        sesion.conductorCorrigioDato = true;
+        sesion.estado = ESTADOS.CANTIDAD_MANUAL;
+        return validaciones.responderTwiml(res, mensajes.solicitarCantidadManual());
+
+      case ESTADOS.CANTIDAD_MANUAL: {
+        var parsedCant = validaciones.parsearCantidad(mensaje);
+        if (!parsedCant.ok) {
+          return validaciones.responderTwiml(res, parsedCant.mensaje);
+        }
+        sesion.cantidadManual        = parsedCant.cantidad;
+        sesion.unidadMedida          = parsedCant.unidadMedida;
+        sesion.conductorCorrigioDato = true;
+        sesion.estado = ESTADOS.CONFIRMACION_RESUMEN;
+        return validaciones.responderTwiml(res, mensajes.resumenOcrParcial(sesion));
+      }
+
+      case ESTADOS.ESPERANDO_FOTO_TABLERO:
+        if (numMedia === 0) {
+          return validaciones.responderTwiml(res, mensajes.solicitarFotoTablero());
+        }
+        storage.guardarFotoUnica(sesion, {
+          tipo:        'tablero',
+          url:         mediaUrls[0],
+          descripcion: 'Foto del tablero de combustible',
+          validacion:  'Sin factura física — evidencia tablero',
+          validada:    true
+        });
+        sesion.fotoTableroTemporal = mediaUrls[0];
+        sesion.flagSinFactura      = true;
+        {
+          var guardadoTablero = await cierre.guardarTanqueo(sesion, telefono);
+          if (guardadoTablero.error) {
+            console.error('[Tanqueo] Error guardando (tablero):', guardadoTablero.error);
+            return validaciones.responderTwiml(res, mensajes.errorGenericoTanqueo());
           }
           sesiones.eliminarSesion(telefono);
           return validaciones.responderTwiml(res,
-            mensajes.tanqueoGuardado(guardado.tanqueo, guardado.estadoValidacion)
+            mensajes.tanqueoGuardadoPendiente(guardadoTablero.tanqueo, true)
           );
         }
-        if (msgLower === '2' || msgLower === '2️⃣') {
-          sesiones.eliminarSesion(telefono);
-          return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
-        }
-        return validaciones.responderTwiml(res, mensajes.resumenFinal(sesion));
 
       default:
         reiniciarSesionTanqueo(sesion);
