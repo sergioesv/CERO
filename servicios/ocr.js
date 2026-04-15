@@ -8,6 +8,12 @@ const MODELO_VISION = config.clean(process.env.GOOGLE_MODEL_VISION || 'gemini-2.
 const MODELO_NOVEDADES = config.clean(process.env.GOOGLE_MODEL_NOVEDADES || MODELO_VISION || 'gemini-2.5-flash');
 const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'o', 'con', 'sin', 'estado', 'visible', 'visibles']);
 
+/**
+ * Campos críticos para calcular el score OCR de factura.
+ * El score global es el promedio de confianza de estos campos (solo los leídos).
+ */
+var CAMPOS_CRITICOS_FACTURA = ['factura_numero', 'cantidad', 'valor_total', 'placa'];
+
 function sinAcentos(texto) {
   return String(texto == null ? '' : texto)
     .normalize('NFD')
@@ -505,19 +511,57 @@ function marcarTodoOK() {
 }
 
 /**
+ * Calcula el score global OCR y el tier de confianza para una factura.
+ * Score = promedio de confianza de CAMPOS_CRITICOS que tienen leido=true.
+ * Si ningún campo crítico fue leído → score = 0.
+ *
+ * @param {Object} resultado — resultado normalizado de OCR con todos los campos
+ * @returns {{ scoreGlobal: number, tierOcr: number }}
+ */
+function calcularScoreOcr(resultado) {
+  var sumaConfianza = 0;
+  var campoCriticosLeidos = 0;
+
+  for (var i = 0; i < CAMPOS_CRITICOS_FACTURA.length; i++) {
+    var campo = CAMPOS_CRITICOS_FACTURA[i];
+    if (resultado[campo] && resultado[campo].leido) {
+      sumaConfianza += typeof resultado[campo].confianza === 'number'
+        ? resultado[campo].confianza
+        : 0;
+      campoCriticosLeidos++;
+    }
+  }
+
+  var scoreGlobal = campoCriticosLeidos > 0
+    ? parseFloat((sumaConfianza / campoCriticosLeidos).toFixed(3))
+    : 0;
+
+  var tierOcr;
+  if (scoreGlobal >= 0.80)      tierOcr = 1;
+  else if (scoreGlobal >= 0.50) tierOcr = 2;
+  else                          tierOcr = 3;
+
+  console.log('[OCR Factura] Score global: ' + scoreGlobal + ' — Tier ' + tierOcr +
+    ' (' + campoCriticosLeidos + '/4 campos críticos leídos)');
+
+  return { scoreGlobal: scoreGlobal, tierOcr: tierOcr };
+}
+
+/**
  * Normaliza y valida el resultado del OCR de factura.
  * Garantiza que todos los campos tengan la estructura correcta.
  * Si un campo viene mal formado, lo marca como no leido.
  *
  * @param {Object} datos — respuesta cruda de Gemini
  * @param {Object} resultadoVacio — objeto por defecto con campos vacios
- * @returns {Object} — resultado validado con 10 campos
+ * @returns {Object} — resultado validado con 14 campos (valor, leido, confianza)
  */
 function normalizarResultadoOCR(datos, resultadoVacio) {
   var camposRequeridos = [
     'factura_numero', 'placa', 'kilometraje', 'producto',
     'cantidad', 'unidad_medida', 'precio_unitario',
-    'valor_total', 'estacion', 'fecha'
+    'valor_total', 'estacion', 'fecha',
+    'serial_ibutton', 'autorizacion', 'medio', 'nit_estacion'
   ];
 
   if (!datos || typeof datos !== 'object') {
@@ -531,56 +575,65 @@ function normalizarResultadoOCR(datos, resultadoVacio) {
     if (c && typeof c.leido === 'boolean') {
       var valorStr = String(c.valor || '').trim();
       resultado[campo] = {
-        valor: valorStr,
-        leido: c.leido && valorStr !== ''
+        valor:     valorStr,
+        leido:     c.leido && valorStr !== '',
+        confianza: typeof c.confianza === 'number' ? c.confianza : 0
       };
     } else {
-      resultado[campo] = { valor: '', leido: false };
+      resultado[campo] = { valor: '', leido: false, confianza: 0 };
     }
   }
 
   var leidos = camposRequeridos.filter(function(c) { return resultado[c].leido; }).length;
-  console.log('[OCR Factura] ' + leidos + '/10 campos leídos exitosamente');
+  console.log('[OCR Factura] ' + leidos + '/14 campos leídos exitosamente');
 
   return resultado;
 }
 
 /**
  * Extrae datos de una factura/recibo de estación de combustible usando Gemini OCR.
- * Analiza la foto y retorna 10 campos con indicador de lectura exitosa.
+ * Analiza la foto y retorna 14 campos con indicador de lectura exitosa y confianza.
  * Si un campo no es legible o no aparece, marca leido como false.
  * Nunca inventa datos — si no puede leer, no lo intenta.
  *
  * @param {string} urlFoto — URL de la imagen (Supabase Storage o Twilio media)
- * @returns {Object} — 10 campos con {valor: string, leido: boolean}
+ * @returns {Object} — 14 campos con {valor, leido, confianza}, score_global, tier_ocr
  */
 async function extraerDatosFacturaCombustible(urlFoto) {
   var resultadoVacio = {
-    factura_numero: { valor: '', leido: false },
-    placa: { valor: '', leido: false },
-    kilometraje: { valor: '', leido: false },
-    producto: { valor: '', leido: false },
-    cantidad: { valor: '', leido: false },
-    unidad_medida: { valor: '', leido: false },
-    precio_unitario: { valor: '', leido: false },
-    valor_total: { valor: '', leido: false },
-    estacion: { valor: '', leido: false },
-    fecha: { valor: '', leido: false }
+    factura_numero:  { valor: '', leido: false, confianza: 0 },
+    placa:           { valor: '', leido: false, confianza: 0 },
+    kilometraje:     { valor: '', leido: false, confianza: 0 },
+    producto:        { valor: '', leido: false, confianza: 0 },
+    cantidad:        { valor: '', leido: false, confianza: 0 },
+    unidad_medida:   { valor: '', leido: false, confianza: 0 },
+    precio_unitario: { valor: '', leido: false, confianza: 0 },
+    valor_total:     { valor: '', leido: false, confianza: 0 },
+    estacion:        { valor: '', leido: false, confianza: 0 },
+    fecha:           { valor: '', leido: false, confianza: 0 },
+    serial_ibutton:  { valor: '', leido: false, confianza: 0 },
+    autorizacion:    { valor: '', leido: false, confianza: 0 },
+    medio:           { valor: '', leido: false, confianza: 0 },
+    nit_estacion:    { valor: '', leido: false, confianza: 0 },
+    score_global:    0,
+    tier_ocr:        3
   };
 
   var camposRequeridos = [
     'factura_numero', 'placa', 'kilometraje', 'producto',
     'cantidad', 'unidad_medida', 'precio_unitario',
-    'valor_total', 'estacion', 'fecha'
+    'valor_total', 'estacion', 'fecha',
+    'serial_ibutton', 'autorizacion', 'medio', 'nit_estacion'
   ];
 
   function campoFacturaSchema() {
     return {
       type: 'OBJECT',
-      required: ['valor', 'leido'],
+      required: ['valor', 'leido', 'confianza'],
       properties: {
-        valor: { type: 'STRING' },
-        leido: { type: 'BOOLEAN' }
+        valor:     { type: 'STRING' },
+        leido:     { type: 'BOOLEAN' },
+        confianza: { type: 'NUMBER' }
       }
     };
   }
@@ -598,7 +651,11 @@ async function extraerDatosFacturaCombustible(urlFoto) {
       precio_unitario: campoFacturaSchema(),
       valor_total: campoFacturaSchema(),
       estacion: campoFacturaSchema(),
-      fecha: campoFacturaSchema()
+      fecha: campoFacturaSchema(),
+      serial_ibutton:  campoFacturaSchema(),
+      autorizacion:    campoFacturaSchema(),
+      medio:           campoFacturaSchema(),
+      nit_estacion:    campoFacturaSchema()
     }
   };
 
@@ -622,6 +679,10 @@ async function extraerDatosFacturaCombustible(urlFoto) {
       '- valor_total: total pagado (solo números, ej: 151264)',
       '- estacion: nombre de la estación de servicio (ej: EDS Centro Carros)',
       '- fecha: fecha del tanqueo en formato YYYY-MM-DD (ej: 2026-03-05)',
+      '- serial_ibutton: número serial del dispositivo iButton (ej: F0000001009F6C01) — solo en facturas Terpel convenio',
+      '- autorizacion: número de autorización de la transacción (ej: 684-1772718144369)',
+      '- medio: medio de pago usado (ej: IBUTTON, EFECTIVO, TARJETA)',
+      '- nit_estacion: NIT de la estación de servicio (ej: 900021407-9)',
       '',
       'IMPORTANTE:',
       '- En Colombia la etiqueta puede decir REMISION NRO en vez de factura.',
@@ -629,7 +690,9 @@ async function extraerDatosFacturaCombustible(urlFoto) {
       '- El kilometraje puede aparecer como KILOMETRAJE, KM, ODOMETRO.',
       '- Si dice GALONES, la unidad_medida es "galones". Si dice LITROS, es "litros".',
       '- Valores monetarios sin signos de peso ($) ni puntos de miles — solo dígitos.',
-      '- Fechas convertir siempre a YYYY-MM-DD.'
+      '- Fechas convertir siempre a YYYY-MM-DD.',
+      '- Si el campo no aparece en la factura, marcarlo leido=false con confianza=0.',
+      '- El campo confianza debe reflejar qué tan claramente legible es el valor (1.0 = perfectamente legible).'
     ].join('\n');
 
     var datos = await llamarGeminiJson({
@@ -639,9 +702,15 @@ async function extraerDatosFacturaCombustible(urlFoto) {
       modelo: MODELO_VISION
     });
 
-    return normalizarResultadoOCR(datos, resultadoVacio);
+    var resultado = normalizarResultadoOCR(datos, resultadoVacio);
+    var scoreData = calcularScoreOcr(resultado);
+    resultado.score_global = scoreData.scoreGlobal;
+    resultado.tier_ocr     = scoreData.tierOcr;
+    return resultado;
   } catch (error) {
     console.error('[OCR Factura] Error general:', error.message);
+    resultadoVacio.score_global = 0;
+    resultadoVacio.tier_ocr     = 3;
     return resultadoVacio;
   }
 }
