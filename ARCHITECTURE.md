@@ -320,6 +320,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   └── toast.js  # Notificaciones toast
 │   ├── css
 │   │   ├── components.css
+│   │   ├── landing.css
 │   │   ├── layout.css
 │   │   ├── theme-dark.css
 │   │   ├── theme-light.css
@@ -339,6 +340,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │       ├── odometro-wds340.jpg
 │   │       └── placa-wds340.jpg
 │   ├── js
+│   │   ├── landing
+│   │   │   └── landing.js
 │   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
 │   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
 │   │   ├── login-init.js
