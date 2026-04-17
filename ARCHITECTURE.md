@@ -330,21 +330,14 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── theme-light.css
 │   │   └── variables.css
 │   ├── files
-│   │   └── preop_WDS340_demo.pdf
+│   │   └── preop_AAA123_demo.pdf
 │   ├── img
 │   │   └── landing
-│   │       ├── chat-01.jpg
-│   │       ├── chat-02.jpg
-│   │       ├── chat-03.jpg
-│   │       ├── chat-04.jpg
-│   │       ├── chat-05.jpg
-│   │       ├── chat-06.jpg
-│   │       ├── chat-07.jpg
-│   │       ├── chat-08.jpg
-│   │       ├── odometro-wds340.jpg
-│   │       └── placa-wds340.jpg
+│   │       ├── odometro-aaa123.jpg
+│   │       └── placa-aaa123.jpg
 │   ├── js
 │   │   ├── landing
+│   │   │   ├── chat-demo.js
 │   │   │   └── landing.js
 │   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
 │   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
