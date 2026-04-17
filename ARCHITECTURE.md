@@ -5,6 +5,8 @@ Field operations management SaaS via WhatsApp + AI.
 **Regulatory framework:** PESV (Colombia road safety)
 **Deploy:** [cero-production.up.railway.app](https://cero-production.up.railway.app)
 
+> **Empresa:** dialk S.A.S. (en constitución). **Producto:** CERO.
+
 ---
 
 ## How to start a session with Claude Chat
@@ -201,6 +203,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 17/04/2026 | Rebranding a dialk — eliminar referencias a EDEMSA e Inteligencia de Ciudad | EDEMSA no es cliente firmado; Inteligencia de Ciudad no pertenece a Sergio. Riesgo legal. dialk S.A.S. es la empresa en constitución. |
+| 17/04/2026 | Landing relanzada con caso demostrativo ficticio (AAA 123, Toyota Hilux, Carlos Ramírez) | Eliminar caso real WDS340 por riesgo de derechos de autor y uso no autorizado de marca |
 | 15/04/2026 | Refactor módulo panel `public/modules/tanqueos.js` en 4 objetos (TanqueosAPI, TanqueosLogic, TanqueosRender, Tanqueos) | Separar responsabilidades (datos, lógica, render y orquestación), mejorar mantenibilidad y eliminar mezcla de UI/lógica |
 | 15/04/2026 | UX tanqueos ajustada: filtros reducidos (Todos/Pendientes/Revisados), drawer sin rechazar y lightbox inline con ESC | Simplificar operación diaria del panel, reducir errores de revisión y mejorar experiencia móvil |
 | 15/04/2026 | Backend tanqueos: stats por período filtrado + soporte `estado_validacion=revisados` combinado | Alinear tarjetas y tabla con los filtros activos, evitando métricas fijas de "hoy" |

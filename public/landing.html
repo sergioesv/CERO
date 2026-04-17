@@ -1,24 +1,10 @@
 <!DOCTYPE html>
 <!-- ═══════════════════════════════════════════════════════════════
  * public/landing.html
- * Landing pública de CERO.
+ * Landing pública de CERO — producto de dialk S.A.S.
  *
- * Estructura:
- *   <header>           — logo + CTA "Agendar demo"
- *   <main>
- *     .lp-hero         — copy + chat simulado en teléfono
- *     .lp-gallery      — 8 capturas reales del chat
- *     .lp-pdf          — PDF embebido + descarga
- *     .lp-features     — 6 capacidades del sistema
- *     .lp-compliance   — banner PESV
- *     .lp-cta          — cierre con botones de contacto
- *   <footer>
- *
- * Dependencias:
- *   - /css/landing.css
- *   - /js/landing/chat-demo.js
- *   - /js/landing/landing.js
- *   - /js/transitions.js (ya existente en el proyecto)
+ * Caso demostrativo: Toyota Hilux AAA 123, Carlos Ramírez.
+ * Todos los datos son ficticios — material de demostración.
  * ═══════════════════════════════════════════════════════════════ -->
 <html lang="es">
 <head>
@@ -27,20 +13,16 @@
   <title>CERO — Cero papel. Cero accidentes.</title>
   <meta name="description" content="Gestión de operaciones de campo por WhatsApp. Preoperacionales, alertas de documentos y PDFs firmados digitalmente. Cumplimiento PESV — Resolución 40595 de 2022.">
 
-  <!-- Preconnect a Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- CSS de la landing -->
   <link rel="stylesheet" href="/css/landing.css">
 </head>
 
 <body class="lp-body">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       HEADER sticky
-       ═══════════════════════════════════════════════════════════ -->
+  <!-- HEADER sticky -->
   <header class="lp-header">
     <div class="lp-container lp-header__inner">
       <div class="lp-logo">
@@ -54,60 +36,55 @@
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       HERO — copy + teléfono con chat animado
-       ═══════════════════════════════════════════════════════════ -->
   <main>
+
+    <!-- HERO -->
     <section class="lp-section lp-section--hero">
       <div class="lp-container">
         <div class="lp-hero">
 
-          <!-- COLUMNA IZQUIERDA: copy + chips + alerta + pilares + CTA -->
           <div class="lp-reveal">
             <div class="lp-hero__badge">
               <span class="lp-pulse"></span>
-              Caso real · 15 Abr 2026
+              Demostración · 15 Abr 2026
             </div>
 
             <h1 class="lp-hero__title">
-              Este es un preoperacional <span class="lp-accent">real</span>.<br>
-              WDS340, hoy, 11:37 a.m.
+              Así funciona un preoperacional <span class="lp-accent">real</span>.<br>
+              AAA 123, 11:37 a.m.
             </h1>
 
             <p class="lp-hero__lead">
-              No es un mockup ni una demo de laboratorio. Son las fotos que Sergio Estrada tomó esta mañana, el salto de 273 km que CERO detectó automáticamente, y el PDF firmado digitalmente que llegó directo por WhatsApp.
+              Mira cómo Carlos Ramírez completó su preoperacional desde WhatsApp — dos fotos, cero papel. CERO detectó un salto de 273 km en el odómetro, lo marcó para revisión y generó el PDF firmado digitalmente. Todo en dos minutos.
             </p>
 
-            <!-- Chips con datos del caso -->
             <div class="lp-chips">
               <div class="lp-chip">
                 <div class="lp-chip__label">Vehículo</div>
-                <div class="lp-chip__value">WDS340 · Renault Kangoo</div>
+                <div class="lp-chip__value">AAA 123 · Toyota Hilux</div>
               </div>
               <div class="lp-chip">
                 <div class="lp-chip__label">Odómetro</div>
-                <div class="lp-chip__value">48.486 km <span class="lp-chip__alert">(+273 ⚠️)</span></div>
+                <div class="lp-chip__value">38.999 km <span class="lp-chip__alert">(+273 ⚠️)</span></div>
               </div>
               <div class="lp-chip">
                 <div class="lp-chip__label">Conductor</div>
-                <div class="lp-chip__value">Sergio Estrada</div>
+                <div class="lp-chip__value">Carlos Ramírez</div>
               </div>
             </div>
 
-            <!-- Alerta automática detectada -->
             <div class="lp-alert">
               <div class="lp-alert__row">
                 <div class="lp-alert__icon">⚠️</div>
                 <div>
                   <div class="lp-alert__title">Alerta automática detectada</div>
                   <p class="lp-alert__body">
-                    CERO detectó un salto de 273 km sobre el último registro (48.213 km). Lo marcó para revisión, solicitó confirmación al conductor y continuó el flujo sin fricción ni llamadas al supervisor.
+                    CERO detectó un salto de 273 km sobre el último registro (38.726 km). Lo marcó para revisión, solicitó confirmación al conductor y continuó el flujo sin fricción ni llamadas al supervisor.
                   </p>
                 </div>
               </div>
             </div>
 
-            <!-- Pilares -->
             <div class="lp-pillars">
               <div class="lp-pillar">
                 <div class="lp-pillar__icon">📸</div>
@@ -127,12 +104,12 @@
             </div>
 
             <div class="lp-hero__cta-row">
-              <a href="#demo" class="lp-btn lp-btn--primary">▶ Ver conversación real</a>
+              <a href="#demo" class="lp-btn lp-btn--primary">▶ Ver conversación</a>
               <a href="#pdf" class="lp-btn lp-btn--secondary">📄 Abrir PDF</a>
             </div>
           </div>
 
-          <!-- COLUMNA DERECHA: teléfono con chat -->
+          <!-- Teléfono -->
           <div class="lp-phone-wrap" id="demo">
             <div class="lp-phone">
               <div class="lp-phone__frame">
@@ -140,13 +117,11 @@
 
                 <div class="lp-phone__screen">
 
-                  <!-- Status bar Android -->
                   <div class="lp-wa-statusbar">
                     <span class="lp-wa-statusbar__time">11:34</span>
                     <span>4G 60%</span>
                   </div>
 
-                  <!-- Header WhatsApp -->
                   <div class="lp-wa-header">
                     <div class="lp-wa-header__avatar">C</div>
                     <div class="lp-wa-header__meta">
@@ -155,33 +130,28 @@
                     </div>
                   </div>
 
-                  <!-- Zona de chat con overlay inicial -->
                   <div class="lp-wa-chat">
                     <div class="lp-wa-chat__scroll" data-chat="feed">
                       <div class="lp-wa-date">
                         <span class="lp-wa-date__pill">HOY</span>
                       </div>
-                      <!-- Las burbujas se inyectan acá desde chat-demo.js -->
                     </div>
 
-                    <!-- Overlay inicial con botón "Ver conversación" -->
                     <div class="lp-overlay" data-chat="overlay">
                       <div class="lp-overlay__card">
                         <div class="lp-overlay__emoji">💬</div>
-                        <h3 class="lp-overlay__title">Conversación real</h3>
-                        <p class="lp-overlay__desc">Reproduce exactamente lo que pasó el 15 de abril.</p>
+                        <h3 class="lp-overlay__title">Demostración interactiva</h3>
+                        <p class="lp-overlay__desc">Pulsa para reproducir la conversación completa.</p>
                         <button type="button" class="lp-overlay__btn" data-chat="start">
                           ▶ Ver conversación
                         </button>
-                        <div class="lp-overlay__foot">Fotos y PDF 100% reales</div>
+                        <div class="lp-overlay__foot">Caso demostrativo — datos ficticios</div>
                       </div>
                     </div>
 
-                    <!-- Zona de botones de acción del chat -->
                     <div class="lp-actions" data-chat="actions"></div>
                   </div>
 
-                  <!-- Input decorativo WhatsApp -->
                   <div class="lp-wa-input">
                     <div class="lp-wa-input__field">Mensaje</div>
                     <div class="lp-wa-input__mic">🎤</div>
@@ -189,8 +159,7 @@
 
                 </div>
               </div>
-
-              <div class="lp-phone__hint">Desliza el chat para ver el historial completo</div>
+              <div class="lp-phone__hint">Pulsa "Ver conversación" para iniciar</div>
             </div>
           </div>
 
@@ -200,56 +169,13 @@
 
     <hr class="lp-divider">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         GALERÍA — 8 screenshots reales del chat
-         ═══════════════════════════════════════════════════════════ -->
-    <section class="lp-section">
-      <div class="lp-container">
-        <div class="lp-section__head lp-reveal">
-          <div class="lp-section__kicker">Capturas reales del chat</div>
-          <h2 class="lp-section__title">El flujo completo, tal como llegó al celular</h2>
-        </div>
-
-        <div class="lp-gallery lp-reveal">
-          <div class="lp-gallery__item" data-gallery-index="0">
-            <img class="lp-gallery__img" src="/img/landing/chat-01.jpg" alt="Paso 1: solicitud de foto de placa" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="1">
-            <img class="lp-gallery__img" src="/img/landing/chat-02.jpg" alt="Paso 2: vehículo identificado, solicitud de foto del odómetro" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="2">
-            <img class="lp-gallery__img" src="/img/landing/chat-03.jpg" alt="Alerta: odómetro fuera de rango, confirmación manual" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="3">
-            <img class="lp-gallery__img" src="/img/landing/chat-04.jpg" alt="Checklist eléctrico y luces, frenos y llantas" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="4">
-            <img class="lp-gallery__img" src="/img/landing/chat-05.jpg" alt="Cabina y equipo, resumen con todo OK" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="5">
-            <img class="lp-gallery__img" src="/img/landing/chat-06.jpg" alt="Observación final y botón firmar y cerrar" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="6">
-            <img class="lp-gallery__img" src="/img/landing/chat-07.jpg" alt="PDF generado y enviado por WhatsApp" loading="lazy">
-          </div>
-          <div class="lp-gallery__item" data-gallery-index="7">
-            <img class="lp-gallery__img" src="/img/landing/chat-08.jpg" alt="Preoperacional firmado y cerrado" loading="lazy">
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <hr class="lp-divider">
-
-    <!-- ═══════════════════════════════════════════════════════════
-         PDF REAL — preview + descarga
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- PDF -->
     <section class="lp-section" id="pdf">
       <div class="lp-container">
         <div class="lp-pdf">
 
           <div class="lp-reveal">
-            <div class="lp-section__kicker">Documento real generado</div>
+            <div class="lp-section__kicker">Documento generado automáticamente</div>
             <h2 class="lp-pdf__title">PDF firmado digitalmente.<br>Válido ante el PESV.</h2>
             <p class="lp-pdf__lead">
               CERO genera el PDF al cerrar el preoperacional y lo entrega por WhatsApp en segundos. Incluye evidencia fotográfica, firma electrónica y trazabilidad legal según la Ley 527 de 1999 y el Decreto 2364 de 2012.
@@ -266,7 +192,7 @@
               </div>
               <div class="lp-pdf__item">
                 <div class="lp-pdf__check">🔗</div>
-                <span class="lp-pdf__text">URL firmada en Supabase Storage — trazable</span>
+                <span class="lp-pdf__text">Almacenamiento seguro con URLs firmadas</span>
               </div>
               <div class="lp-pdf__item">
                 <div class="lp-pdf__check">⚖️</div>
@@ -274,13 +200,13 @@
               </div>
             </div>
 
-            <a href="/files/preop_WDS340_demo.pdf" download="preop_WDS340_demo.pdf" class="lp-btn lp-btn--primary">
-              ⬇ Descargar PDF real
+            <a href="/files/preop_AAA123_demo.pdf" download="preop_AAA123_demo.pdf" class="lp-btn lp-btn--primary">
+              ⬇ Descargar PDF de ejemplo
             </a>
           </div>
 
           <div class="lp-pdf__viewer lp-reveal">
-            <iframe src="/files/preop_WDS340_demo.pdf#view=FitH" title="Preoperacional WDS340 del 15 de abril de 2026"></iframe>
+            <iframe src="/files/preop_AAA123_demo.pdf#view=FitH" title="Ejemplo de preoperacional firmado"></iframe>
           </div>
 
         </div>
@@ -289,9 +215,7 @@
 
     <hr class="lp-divider">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         FEATURES — 6 capacidades del sistema
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- FEATURES -->
     <section class="lp-section">
       <div class="lp-container">
         <div class="lp-section__head lp-reveal">
@@ -344,9 +268,7 @@
 
     <hr class="lp-divider">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         CTA final
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- CTA -->
     <section id="contacto">
       <div class="lp-container">
         <div class="lp-cta lp-reveal">
@@ -356,10 +278,10 @@
             Agenda una demo de 30 minutos. Te mostramos el sistema funcionando con tu flota — sin compromisos.
           </p>
           <div class="lp-cta__row">
-            <a href="https://wa.me/573026801968?text=Hola%2C%20quiero%20una%20demo%20de%20CERO" target="_blank" rel="noopener" class="lp-btn lp-btn--primary">
+            <a href="https://wa.me/573001112233?text=Hola%2C%20quiero%20una%20demo%20de%20CERO" target="_blank" rel="noopener" class="lp-btn lp-btn--primary">
               💬 Escribir por WhatsApp
             </a>
-            <a href="mailto:sergio@inteligenciaciudad.co?subject=Demo%20CERO" class="lp-btn lp-btn--secondary">
+            <a href="mailto:hola@dialk.co?subject=Demo%20CERO" class="lp-btn lp-btn--secondary">
               ✉ Enviar correo
             </a>
           </div>
@@ -368,38 +290,20 @@
     </section>
   </main>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       FOOTER
-       ═══════════════════════════════════════════════════════════ -->
+  <!-- FOOTER -->
   <footer class="lp-footer">
     <div class="lp-footer__inner">
       <div class="lp-footer__brand">
         <div class="lp-footer__mark">C</div>
         <span class="lp-footer__name">CERO</span>
-        <span class="lp-footer__bylaw">· Inteligencia de Ciudad S.A.S.</span>
+        <span class="lp-footer__bylaw">· by dialk</span>
       </div>
-      <div class="lp-footer__note">Popayán, Colombia · Piloto EDEMSA 2026</div>
+      <div class="lp-footer__note">Colombia · 2026</div>
       <div class="lp-footer__note">Resolución 40595 de 2022 (PESV)</div>
     </div>
   </footer>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       LIGHTBOX — controlado por landing.js
-       ═══════════════════════════════════════════════════════════ -->
-  <div class="lp-lightbox" data-lightbox="root">
-    <button type="button" class="lp-lightbox__btn lp-lightbox__btn--close" data-lightbox="close" aria-label="Cerrar">×</button>
-    <button type="button" class="lp-lightbox__btn lp-lightbox__btn--prev"  data-lightbox="prev"  aria-label="Anterior">‹</button>
-    <img class="lp-lightbox__img" data-lightbox="img" src="" alt="">
-    <button type="button" class="lp-lightbox__btn lp-lightbox__btn--next"  data-lightbox="next"  aria-label="Siguiente">›</button>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       SCRIPTS
-       Orden importante:
-         1. chat-demo.js expone window.CeroChatDemo
-         2. landing.js usa CeroChatDemo.init() y engancha todo
-         3. transitions.js intercepta los <a href="/…"> internos
-       ═══════════════════════════════════════════════════════════ -->
+  <!-- Scripts -->
   <script src="/js/landing/chat-demo.js"></script>
   <script src="/js/landing/landing.js"></script>
   <script src="/js/transitions.js"></script>
