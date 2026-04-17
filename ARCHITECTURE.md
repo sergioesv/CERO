@@ -242,7 +242,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-15 -->
+<!-- Última actualización: 2026-04-17 -->
 
 ## Folder structure
 
@@ -324,6 +324,20 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── theme-dark.css
 │   │   ├── theme-light.css
 │   │   └── variables.css
+│   ├── files
+│   │   └── preop_WDS340_demo.pdf
+│   ├── img
+│   │   └── landing
+│   │       ├── chat-01.jpg
+│   │       ├── chat-02.jpg
+│   │       ├── chat-03.jpg
+│   │       ├── chat-04.jpg
+│   │       ├── chat-05.jpg
+│   │       ├── chat-06.jpg
+│   │       ├── chat-07.jpg
+│   │       ├── chat-08.jpg
+│   │       ├── odometro-wds340.jpg
+│   │       └── placa-wds340.jpg
 │   ├── js
 │   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
 │   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
