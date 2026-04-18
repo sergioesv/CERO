@@ -1,0 +1,34 @@
+=== grep -rn 'api/usuarios' --include='*.js' . ===
+./canales/dashboard.js:151:// GET /api/usuarios
+./canales/dashboard.js:166:// POST /api/usuarios
+./canales/dashboard.js:189:// PUT /api/usuarios/:id
+./canales/dashboard.js:211:// PATCH /api/usuarios/:id/estado
+./canales/dashboard.js:231:// PATCH /api/usuarios/:id/password
+./canales/dashboard.js:270:// GET /api/usuarios/:id/roles
+./canales/dashboard.js:286:// POST /api/usuarios/:id/roles
+./canales/dashboard.js:305:// DELETE /api/usuarios_roles/:id
+./canales/dashboard.js:333:  app.get('/api/usuarios',                    verificarToken, verificarPermiso('usuarios', 'ver'), listarUsuarios);
+./canales/dashboard.js:334:  app.post('/api/usuarios',                   verificarToken, verificarPermiso('usuarios', 'ver'), crearUsuario);
+./canales/dashboard.js:335:  app.put('/api/usuarios/:id',                verificarToken, verificarPermiso('usuarios', 'ver'), actualizarUsuario);
+./canales/dashboard.js:336:  app.patch('/api/usuarios/:id/estado',       verificarToken, cambiarEstadoUsuario);
+./canales/dashboard.js:337:  app.patch('/api/usuarios/:id/password',     verificarToken, cambiarPasswordUsuario);
+./canales/dashboard.js:341:  app.get('/api/usuarios/:id/roles',          verificarToken, listarRolesUsuario);
+./canales/dashboard.js:342:  app.post('/api/usuarios/:id/roles',         verificarToken, asignarRolUsuario);
+./canales/dashboard.js:343:  app.delete('/api/usuarios_roles/:id',       verificarToken, eliminarAsignacionRol);
+./public/modules/usuarios.js:97:        fetch('/api/usuarios', { headers: authHeaders() }),
+./public/modules/usuarios.js:308:      const res = await fetch(`/api/usuarios/${usuarioId}/roles`, { headers: authHeaders() });
+./public/modules/usuarios.js:338:      const res = await fetch(`/api/usuarios/${usuarioId}/roles`, {
+./public/modules/usuarios.js:357:      const res = await fetch(`/api/usuarios_roles/${asignacionId}`, {
+./public/modules/usuarios.js:444:      const url    = esEdicion ? `/api/usuarios/${id}` : '/api/usuarios';
+./public/modules/usuarios.js:473:      const res = await fetch(`/api/usuarios/${id}/estado`, {
+./public/modules/usuarios.js:530:      const res = await fetch(`/api/usuarios/${id}/password`, {
+
+=== grep -rn 'api/roles' --include='*.js' . ===
+./canales/dashboard.js:255:// GET /api/roles
+./canales/dashboard.js:340:  app.get('/api/roles',                       verificarToken, listarRoles);
+./public/modules/usuarios.js:13:  let rolesCatalogo  = []; // cache de GET /api/roles
+./public/modules/usuarios.js:98:        fetch('/api/roles',    { headers: authHeaders() })
+
+=== router.get|post|put|patch|delete en canales/ rutas/ index.js | grep usuario|rol ===
+
+=== grep -n 'usuarios|roles' index.js ===
