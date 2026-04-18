@@ -272,6 +272,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 ├── instrucciones
 │   ├── fix-badge-rol-header.txt
 │   ├── fix-ci-frontend-eslint.txt
+│   ├── fix-drawer-labels-spacing.txt
 │   └── usuarios-panel-v1.txt
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
