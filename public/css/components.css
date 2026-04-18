@@ -291,6 +291,29 @@ body {
   color: var(--text-primary);
 }
 
+/* Grid de detalles (usado en drawer de usuarios) */
+.detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+.detail-item {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--spacing-sm);
+  align-items: start;
+}
+.detail-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+.detail-value {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
 /* Novedades */
 .drawer-novedad {
   background: var(--warning-bg);
