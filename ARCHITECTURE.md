@@ -270,6 +270,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── tanqueos.js  # Tanqueos — registro de combustible
 │   └── vehiculos.js  # Vehiculos — flota, buscar por telefono, bloqueos
 ├── instrucciones
+│   ├── fix-badge-rol-header.txt
 │   ├── fix-ci-frontend-eslint.txt
 │   └── usuarios-panel-v1.txt
 ├── middlewares
