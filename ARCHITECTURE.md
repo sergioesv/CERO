@@ -254,6 +254,9 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | 27/03/2026 | Camino B — tablas separadas por tipo de inspección | Fase 1 intacta, sin riesgo |
 | 27/03/2026 | KPIs financieros como "susurro" en dashboard | Ejecutivos leen dinero primero |
 | 27/03/2026 | Seguridad personal visible en demo, oculta en prod | Estrategia comercial |
+| 18/04/2026 | Refactor iniciadorFlujo — centralizar validación placa/km | Eliminar duplicación entre preoperacional/tanqueo/posoperacional (3 copias → 1 factory). Factory pattern con opciones por flujo. Reduce mantenimiento y asegura consistencia. |
+| 18/04/2026 | obtenerReferenciaKilometraje en data/inspecciones | Lógica de referencia de km unificada con prioridad por tipo de flujo: preoperacional día > tanqueo/posoperacional según contexto > último preoperacional > vehículo > sin referencia. |
+| 18/04/2026 | Posoperacional v2 — flujo alineado con preoperacional/tanqueo | Pide placa y km al inicio del flujo usando iniciadorFlujo factory. PDF omite placa del vehículo pero mantiene km final, fotos, documentos, novedades y firma digital. |
 
 ## Cursor — cómo usar las reglas especializadas
 
