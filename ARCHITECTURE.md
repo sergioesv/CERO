@@ -405,10 +405,14 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── usuariosRoles.js
 │   └── vehiculos.js
 ├── scripts
+│   ├── test-pdf.js
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
 ├── servicios
 │   ├── pdf
 │   │   ├── base.js  # Motor PDF compartido — nunca duplicar logica aqui
+│   │   ├── GeneradorPDFBase.js
+│   │   ├── GeneradorPDFPosoperacional.js
+│   │   ├── GeneradorPDFPreoperacional.js
 │   │   ├── posoperacional.js  # Generador PDF posoperacional
 │   │   └── preoperacional.js  # Generador PDF preoperacional
 │   ├── logo.js  # Logo CERO en base64 para PDFs
@@ -421,6 +425,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   └── v26-usuarios-panel-auth.sql
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
+├── grep-resultado.txt
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
 └── package.json
 ```
