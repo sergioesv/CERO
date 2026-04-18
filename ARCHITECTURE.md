@@ -246,7 +246,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-17 -->
+<!-- Última actualización: 2026-04-18 -->
 
 ## Folder structure
 
@@ -269,6 +269,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
 │   ├── tanqueos.js  # Tanqueos — registro de combustible
 │   └── vehiculos.js  # Vehiculos — flota, buscar por telefono, bloqueos
+├── instrucciones
+│   └── usuarios-panel-v1.txt
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
 ├── modulos
@@ -368,7 +370,10 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── conductores.js
 │   ├── dashboard.js  # Rutas del dashboard operativo
 │   ├── preoperacionales.js
+│   ├── roles.js
 │   ├── tanqueos.js
+│   ├── usuarios.js
+│   ├── usuariosRoles.js
 │   └── vehiculos.js
 ├── scripts
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
@@ -379,10 +384,12 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   └── preoperacional.js  # Generador PDF preoperacional
 │   ├── logo.js  # Logo CERO en base64 para PDFs
 │   ├── ocr.js  # OCR via Gemini — lectura de placas y odometros
+│   ├── passwords.js
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── sql
-│   └── v24-dia5-tanqueos-vehiculos.sql
+│   ├── v24-dia5-tanqueos-vehiculos.sql
+│   └── v26-usuarios-panel-auth.sql
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
