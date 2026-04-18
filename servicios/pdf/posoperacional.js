@@ -45,7 +45,7 @@ async function generarPDF(datosSesion) {
         if (y + needed > PAGE_H - 50) {
           numPagina++;
           doc.addPage({ size: 'LETTER', margins: { top: M, bottom: M, left: M, right: M } });
-          base.agregarHeaderSecundaria(doc, datosSesion.placa, fecha);
+          base.agregarHeaderSecundaria(doc, 'POSOPERACIONAL', fecha);
           base.agregarFooter(doc, numPagina);
           return 46;
         }
@@ -59,9 +59,6 @@ async function generarPDF(datosSesion) {
         codDoc:     'COD: POSOP-001',
         resolucion: 'RES: 40595 DE 2022 (PESV)'
       });
-
-      // Hero del vehículo
-      y = base.agregarHeroVehiculo(doc, y + 5, datosSesion.vehiculo, datosSesion.placa);
 
       // Tarjetas de info: Conductor, Cédula, Km final, Fecha
       var kmFinal = (datosSesion.kilometrajeFinal || 0).toLocaleString('es-CO') + ' km';
@@ -185,8 +182,8 @@ async function generarPDF(datosSesion) {
         nombre:   datosSesion.conductorNombre,
         cedula:   datosSesion.conductorCedula,
         telefono: datosSesion.conductorTelefono,
-        fecha:    ahora,
-        placa:    datosSesion.placa
+        fecha:    ahora
+        // placa removida intencionalmente - posoperacional no muestra placa en PDF
       });
 
       doc.end();
