@@ -15,8 +15,36 @@ var PIE_MENU = nav.PIE_MENU;
 function mensajeInicioPosoperacional() {
   return (
     '🏁 *Posoperacional*\n\n' +
-    'Escribe la *placa del vehículo* para cerrar la jornada.' +
+    '📸 Envía una *foto de la placa* o escríbela para cerrar la jornada.' +
     PIE_NAV
+  );
+}
+
+/**
+ * Confirmación cuando la lectura OCR de placa difiere un poco de la base de datos.
+ */
+function mensajeConfirmacionPlacaSugerida(sesion, mensaje) {
+  var textoAdicional = mensaje ? '\n\n' + mensaje : '';
+  return (
+    '🔎 Detecté la placa: *' + (sesion.placaDetectada || '') + '*\n' +
+    '¿Quisiste decir *' + (sesion.placaSugerida || '') + '*?' + textoAdicional + '\n\n' +
+    '1️⃣ Confirmar ' + (sesion.placaSugerida || '') + '\n' +
+    '2️⃣ Tomar otra foto\n' +
+    '3️⃣ Ingresar manualmente' +
+    nav.PIE_NAV
+  );
+}
+
+/**
+ * Fallback cuando la placa no se pudo leer o no existe.
+ */
+function mensajeFallbackPlaca(sesion, motivo) {
+  var m = motivo || 'No pude validar la placa.';
+  return (
+    '⚠️ ' + m + '\n\n' +
+    '1️⃣ Tomar otra foto\n' +
+    '2️⃣ Ingresar manualmente' +
+    nav.PIE_NAV
   );
 }
 
@@ -226,5 +254,7 @@ module.exports = {
   mensajeFirmaPosoperacional,
   mensajeFotoEstadoGeneral,
   mensajeFotoNovedad,
-  mensajeGravedadNovedad
+  mensajeGravedadNovedad,
+  mensajeConfirmacionPlacaSugerida,
+  mensajeFallbackPlaca
 };

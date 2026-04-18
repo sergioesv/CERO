@@ -9,6 +9,8 @@
 var vehiculosData = require('../../../data/vehiculos');
 var inspeccionesData = require('../../../data/inspecciones');
 var kmCompartido = require('./kilometraje');
+var ocr = require('../../../servicios/ocr');
+var storage = require('../../../servicios/storage');
 
 /**
  * Crea manejador de placa configurado para un flujo específico.
@@ -142,7 +144,85 @@ function crearProcesadorFotoOdometro(opciones) {
   };
 }
 
+/**
+ * Crea un procesador para extraer y validar la placa desde una foto.
+ *
+ * @param {Object} opciones
+ * @param {Object} opciones.ESTADOS - Constantes de estado del flujo
+ * @param {Object} opciones.mensajes - Módulo de mensajes del flujo
+ * @param {Object} opciones.validaciones - Módulo de validaciones del flujo
+ * @param {Function} opciones.manejarPlacaCompartido - Función generada por crearManejadorPlaca
+ *
+ * @returns {Function} async (res, sesion, telefono, fotoUrl) -> TwilML response
+ */
+function crearProcesadorFotoPlaca(opciones) {
+  var ESTADOS = opciones.ESTADOS;
+  var mensajes = opciones.mensajes;
+  var validaciones = opciones.validaciones;
+  var manejarPlacaCompartido = opciones.manejarPlacaCompartido;
+
+  function respuestaExitoAlIniciarPlaca(msg) {
+    return typeof msg === 'string' && msg.length > 0 && msg.charCodeAt(0) === 0x2705;
+  }
+
+  function respuestaVehiculoBloqueadoPlaca(msg) {
+    return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg));
+  }
+
+  return async function(res, sesion, telefono, fotoUrl) {
+    var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
+    var placaDetectada = validaciones.normalizarPlaca(lecturaPlaca.placa || '');
+
+    if (lecturaPlaca.valida && placaDetectada) {
+      var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
+      if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+        if (typeof opciones.onExitoPlaca === 'function') {
+           opciones.onExitoPlaca(sesion);
+        }
+        storage.guardarFotoUnica(sesion, {
+          tipo: opciones.tipoFotoPlaca || 'inicio_placa',
+          url: fotoUrl,
+          validacion: 'Placa validada por foto: ' + placaDetectada,
+          descripcion: 'Placa OCR: ' + placaDetectada,
+          validada: true
+        });
+        sesion.placaOcrFoto = placaDetectada; // Para tanqueo o uso futuro
+        return validaciones.responderTwiml(res, mensajeInicio);
+      }
+      if (respuestaVehiculoBloqueadoPlaca(mensajeInicio)) {
+        return validaciones.responderTwiml(res, mensajeInicio);
+      }
+    }
+
+    sesion.fotoPlacaTemporal = fotoUrl;
+    sesion.placaDetectada = placaDetectada || null;
+    sesion.placaSugerida = null;
+
+    if (placaDetectada) {
+      var placaSugerida = await vehiculosData.buscarPlacaSugerida(placaDetectada);
+      if (placaSugerida && placaSugerida !== placaDetectada) {
+        sesion.placaSugerida = placaSugerida;
+        sesion.estado = ESTADOS.PLACA_CONFIRMACION_SUGERIDA || 'PLACA_CONFIRMACION_SUGERIDA';
+        var msjSugerida = mensajes.mensajeConfirmacionPlacaSugerida || mensajes.confirmarPlacaSugerida;
+        return validaciones.responderTwiml(
+          res,
+          msjSugerida(sesion, 'La lectura no coincide exactamente con la base. Confirma la placa si es correcta.')
+        );
+      }
+    }
+
+    sesion.estado = ESTADOS.PLACA_FALLBACK || 'PLACA_FALLBACK';
+    var motivo = lecturaPlaca.razon || 'La placa no se pudo validar con seguridad.';
+    if (placaDetectada && lecturaPlaca.valida) {
+      motivo = 'La placa *' + placaDetectada + '* no existe en la base.';
+    }
+    var msjFallback = mensajes.mensajeFallbackPlaca || mensajes.fallbackPlaca;
+    return validaciones.responderTwiml(res, msjFallback(sesion, motivo));
+  };
+}
+
 module.exports = {
   crearManejadorPlaca,
-  crearProcesadorFotoOdometro
+  crearProcesadorFotoOdometro,
+  crearProcesadorFotoPlaca
 };

@@ -108,6 +108,17 @@ var manejarPlacaCompartido = iniciadorFlujo.crearManejadorPlaca({
   }
 });
 
+var procesarFotoPlacaCompartido = iniciadorFlujo.crearProcesadorFotoPlaca({
+  ESTADOS: ESTADOS,
+  mensajes: {
+    mensajeConfirmacionPlacaSugerida: mensajes.confirmarPlacaSugerida,
+    mensajeFallbackPlaca: mensajes.fallbackPlaca
+  },
+  validaciones: validaciones,
+  manejarPlacaCompartido: manejarPlacaCompartido,
+  tipoFotoPlaca: 'placa'
+});
+
 var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro({
   ESTADOS: ESTADOS,
   mensajes: {
@@ -122,13 +133,7 @@ var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro(
   config: config
 });
 
-function respuestaExitoAlIniciarPlaca(msg) {
-  return typeof msg === 'string' && msg.length > 0 && msg.charCodeAt(0) === 0x2705;
-}
 
-function respuestaVehiculoBloqueadoPlaca(msg) {
-  return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg));
-}
 
 function reiniciarSesionTanqueo(sesion) {
   sesion.tipo   = 'tanqueo';
@@ -181,47 +186,7 @@ function reiniciarSesionTanqueo(sesion) {
   sesion.fotos = [];
 }
 
-async function procesarFotoPlaca(res, sesion, telefono, fotoUrl) {
-  var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
-  var placaDetectada = validaciones.normalizarPlaca(lecturaPlaca.placa || '');
 
-  if (lecturaPlaca.valida && placaDetectada) {
-    var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
-    if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
-      storage.guardarFotoUnica(sesion, {
-        tipo: 'placa',
-        url: fotoUrl,
-        descripcion: 'Placa OCR: ' + placaDetectada,
-        validada: true
-      });
-      sesion.placaOcrFoto = placaDetectada;
-      return validaciones.responderTwiml(res, mensajeInicio);
-    }
-    if (respuestaVehiculoBloqueadoPlaca(mensajeInicio)) {
-      return validaciones.responderTwiml(res, mensajeInicio);
-    }
-  }
-
-  sesion.fotoPlacaTemporal = fotoUrl;
-  sesion.placaDetectada = placaDetectada || null;
-  sesion.placaSugerida = null;
-
-  if (placaDetectada) {
-    var sugerida = await vehiculosData.buscarPlacaSugerida(placaDetectada);
-    if (sugerida && sugerida !== placaDetectada) {
-      sesion.placaSugerida = sugerida;
-      sesion.estado = ESTADOS.PLACA_CONFIRMACION_SUGERIDA;
-      return validaciones.responderTwiml(res, mensajes.confirmarPlacaSugerida(sesion));
-    }
-  }
-
-  sesion.estado = ESTADOS.PLACA_FALLBACK;
-  var motivo = lecturaPlaca.razon || 'La placa no se pudo validar con seguridad.';
-  if (placaDetectada && lecturaPlaca.valida) {
-    motivo = 'La placa *' + placaDetectada + '* no existe en la base.';
-  }
-  return validaciones.responderTwiml(res, mensajes.fallbackPlaca(sesion, motivo));
-}
 
 async function procesarFotoOdometroTanqueo(res, sesion, fotoUrl) {
   return await procesarFotoOdometroCompartido(res, sesion, fotoUrl);
@@ -365,10 +330,10 @@ async function manejarTanqueo(req, res) {
     switch (sesion.estado) {
       case ESTADOS.ESPERANDO_FOTO_PLACA:
         if (numMedia === 0) return validaciones.responderTwiml(res, mensajes.inicio());
-        return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
+        return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
 
       case ESTADOS.PLACA_CONFIRMACION_SUGERIDA:
-        if (numMedia > 0) return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
+        if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
 
         if (msgLower === '1' || msgLower === '1️⃣') {
           if (!sesion.placaSugerida) {
@@ -388,7 +353,8 @@ async function manejarTanqueo(req, res) {
             sesion.placaOcrFoto = sesion.placaSugerida;
             return validaciones.responderTwiml(res, mensajeSug);
           }
-          if (respuestaVehiculoBloqueadoPlaca(mensajeSug)) {
+          var esBloqueado = typeof mensajeSug === 'string' && (mensajeSug.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(mensajeSug));
+          if (esBloqueado) {
             return validaciones.responderTwiml(res, mensajeSug);
           }
           return validaciones.responderTwiml(res, mensajeSug || mensajes.confirmarPlacaSugerida(sesion));
@@ -404,7 +370,7 @@ async function manejarTanqueo(req, res) {
         return validaciones.responderTwiml(res, mensajes.confirmarPlacaSugerida(sesion));
 
       case ESTADOS.PLACA_FALLBACK:
-        if (numMedia > 0) return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
+        if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
         if (msgLower === '1' || msgLower === '1️⃣') {
           sesion.estado = ESTADOS.ESPERANDO_FOTO_PLACA;
           return validaciones.responderTwiml(res, mensajes.inicio());
@@ -416,7 +382,7 @@ async function manejarTanqueo(req, res) {
         return validaciones.responderTwiml(res, mensajes.fallbackPlaca(sesion));
 
       case ESTADOS.PLACA_MANUAL:
-        if (numMedia > 0 && mediaUrls[0]) return await procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
+        if (numMedia > 0 && mediaUrls[0]) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
         if (nav.esOpcion(msgLower, ['0', '0️⃣'])) return manejarAtras(res, sesion);
         if (nav.esOpcion(msgLower, ['9', '9️⃣'])) return volverMenuPrincipal(res, telefono);
 
@@ -431,8 +397,9 @@ async function manejarTanqueo(req, res) {
 
         var fotoPlacaManual = sesion.fotoPlacaTemporal;
         var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaManual);
-
-        if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+        
+        var esExitoManual = typeof mensajeInicio === 'string' && mensajeInicio.length > 0 && mensajeInicio.charCodeAt(0) === 0x2705;
+        if (esExitoManual) {
           if (fotoPlacaManual) {
             storage.guardarFotoUnica(sesion, {
               tipo: 'placa',

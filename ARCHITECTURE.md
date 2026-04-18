@@ -259,6 +259,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | 18/04/2026 | obtenerReferenciaKilometraje en data/inspecciones | Lógica de referencia de km unificada con prioridad por tipo de flujo: preoperacional día > tanqueo/posoperacional según contexto > último preoperacional > vehículo > sin referencia. |
 | 18/04/2026 | Posoperacional v2 — flujo alineado con preoperacional/tanqueo | Pide placa y km al inicio del flujo usando iniciadorFlujo factory. PDF omite placa del vehículo pero mantiene km final, fotos, documentos, novedades y firma digital. |
 | 18/04/2026 | Refactor integral Frontend (Fases 1-4) | Implementación de `Drawer.js` y `Filters.js` genéricos. Estandarización de módulos en 4 capas (API/Logic/Render/Orquestador). Cierre de vulnerabilidades XSS en inyecciones DOM con `Utils.escaparHTML()`. Centralización de decodificación JWT. |
+| 18/04/2026 | Unificación OCR Placa en WhatsApp | Se extrajo la lógica de `procesarFotoFrontal` (preoperacional) y `procesarFotoPlaca` (tanqueo) a `iniciadorFlujo.crearProcesadorFotoPlaca`. Posoperacional ahora soporta fotos de placa con OCR, igualando 100% la experiencia entre los 3 flujos. |
 
 ## Cursor — cómo usar las reglas especializadas
 

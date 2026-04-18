@@ -30,6 +30,23 @@ var manejarPlacaCompartido = iniciadorFlujo.crearManejadorPlaca({
   }
 });
 
+var procesarFotoPlacaCompartido = iniciadorFlujo.crearProcesadorFotoPlaca({
+  ESTADOS: {
+    PLACA_CONFIRMACION_SUGERIDA: 'PLACA_CONFIRMACION_SUGERIDA',
+    PLACA_FALLBACK: 'PLACA_FALLBACK'
+  },
+  mensajes: {
+    mensajeConfirmacionPlacaSugerida: mensajes.mensajeConfirmacionPlacaSugerida,
+    mensajeFallbackPlaca: mensajes.mensajeFallbackPlaca
+  },
+  validaciones: preop,
+  manejarPlacaCompartido: manejarPlacaCompartido,
+  tipoFotoPlaca: 'inicio_placa',
+  onExitoPlaca: function(sesion) {
+    estadoPreop.reiniciarDatosOperativos(sesion);
+  }
+});
+
 var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro({
   ESTADOS: { ODOMETRO_CONFIRMACION: 'ODOMETRO_CONFIRMACION' },
   mensajes: {
@@ -42,13 +59,7 @@ var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro(
   config: config
 });
 
-function respuestaExitoAlIniciarPlaca(msg) {
-  return typeof msg === 'string' && msg.length > 0 && msg.charCodeAt(0) === 0x2705;
-}
 
-function respuestaVehiculoBloqueadoPlaca(msg) {
-  return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg));
-}
 
 function volverAMenuPrincipal(res, telefono) {
   sesiones.eliminarSesion(telefono);
@@ -227,50 +238,7 @@ function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   return preop.responderTwiml(res, mensaje);
 }
 
-async function procesarFotoFrontal(res, sesion, telefono, fotoUrl) {
-  var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
-  var placaDetectada = preop.normalizarPlaca(lecturaPlaca.placa || '');
 
-  if (lecturaPlaca.valida && placaDetectada) {
-    var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
-    if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
-      estadoPreop.reiniciarDatosOperativos(sesion);
-      storage.guardarFotoUnica(sesion, {
-        tipo: 'inicio_placa',
-        url: fotoUrl,
-        validacion: 'Placa validada por foto: ' + placaDetectada,
-        validada: true
-      });
-      return preop.responderTwiml(res, mensajeInicio);
-    }
-    if (respuestaVehiculoBloqueadoPlaca(mensajeInicio)) {
-      return preop.responderTwiml(res, mensajeInicio);
-    }
-  }
-
-  sesion.fotoPlacaTemporal = fotoUrl;
-  sesion.placaDetectada = placaDetectada || null;
-  sesion.placaSugerida = null;
-
-  if (placaDetectada) {
-    var placaSugerida = await vehiculosData.buscarPlacaSugerida(placaDetectada);
-    if (placaSugerida && placaSugerida !== placaDetectada) {
-      sesion.placaSugerida = placaSugerida;
-      sesion.estado = 'PLACA_CONFIRMACION_SUGERIDA';
-      return preop.responderTwiml(
-        res,
-        mensajes.mensajeConfirmacionPlacaSugerida(sesion, 'La lectura no coincide exactamente con la base. Confirma la placa si es correcta.')
-      );
-    }
-  }
-
-  sesion.estado = 'PLACA_FALLBACK';
-  var motivo = lecturaPlaca.razon || 'La placa no se pudo validar con seguridad.';
-  if (placaDetectada && lecturaPlaca.valida) {
-    motivo = 'La placa *' + placaDetectada + '* no existe en la base.';
-  }
-  return preop.responderTwiml(res, mensajes.mensajeFallbackPlaca(sesion, motivo));
-}
 
 /**
  * OCR de odómetro + validación de rango (lógica en compartido/kilometraje.js).
@@ -410,11 +378,11 @@ async function manejarPreoperacional(req, res) {
           }
           if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
           if (numMedia === 0) return preop.responderTwiml(res, mensajes.mensajeInicio());
-          return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+          return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
         }
 
         case 'PLACA_CONFIRMACION_SUGERIDA': {
-          if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
 
           if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
             return volverAMenuPrincipal(res, telefono);
@@ -435,7 +403,8 @@ async function manejarPreoperacional(req, res) {
               }
               return preop.responderTwiml(res, mensajeSugerido);
             }
-            if (respuestaVehiculoBloqueadoPlaca(mensajeSugerido)) {
+            var esBloqueado = typeof mensajeSugerido === 'string' && (mensajeSugerido.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(mensajeSugerido));
+            if (esBloqueado) {
               return preop.responderTwiml(res, mensajeSugerido);
             }
             return preop.responderTwiml(res, mensajeSugerido);
@@ -455,7 +424,7 @@ async function manejarPreoperacional(req, res) {
         }
 
         case 'PLACA_FALLBACK': {
-          if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
           if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
           if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'foto') {
             sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
@@ -469,7 +438,7 @@ async function manejarPreoperacional(req, res) {
         }
 
         case 'PLACA_MANUAL': {
-          if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
+          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
           if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
 
           var placaManual = preop.normalizarPlaca(mensaje);
@@ -482,7 +451,8 @@ async function manejarPreoperacional(req, res) {
 
           var fotoPlacaManual = sesion.fotoPlacaTemporal;
           var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaManual);
-          if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+          var esExito = typeof mensajeInicio === 'string' && mensajeInicio.length > 0 && mensajeInicio.charCodeAt(0) === 0x2705;
+          if (esExito) {
             estadoPreop.reiniciarDatosOperativos(sesion);
             if (fotoPlacaManual) {
               storage.guardarFotoUnica(sesion, {

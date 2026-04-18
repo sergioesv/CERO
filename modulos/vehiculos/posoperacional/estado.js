@@ -11,6 +11,9 @@ var storage = require('../../../servicios/storage');
 var ESTADOS = {
   INICIO:                   'POSOP_INICIO',
   ESPERANDO_PLACA:          'POSOP_ESPERANDO_PLACA',
+  PLACA_CONFIRMACION_SUGERIDA: 'POSOP_PLACA_CONFIRMACION_SUGERIDA',
+  PLACA_FALLBACK:           'POSOP_PLACA_FALLBACK',
+  PLACA_MANUAL:             'POSOP_PLACA_MANUAL',
   ESPERANDO_FOTO_ODOMETRO:  'POSOP_ESPERANDO_FOTO_ODOMETRO',
   ODOMETRO_CONFIRMACION:    'POSOP_ODOMETRO_CONFIRMACION',
   ODOMETRO_MANUAL:          'POSOP_ODOMETRO_MANUAL',
@@ -44,6 +47,9 @@ function reiniciarDatosOperativos(sesion) {
   sesion.kilometrajeConfirmado = false;
   sesion.fotoOdometroTemporal = null;
   sesion.kmLecturaFueraRango = false;
+  sesion.fotoPlacaTemporal = null;
+  sesion.placaDetectada = null;
+  sesion.placaSugerida = null;
   sesion.novedades = [];
   sesion.novedadesTexto = null;
   sesion.novedadTexto = null;

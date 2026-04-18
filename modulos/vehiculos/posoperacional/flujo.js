@@ -28,6 +28,14 @@ var manejarPlacaCompartido = iniciadorFlujo.crearManejadorPlaca({
   mensajeConfirmacion: mensajes.mensajeVehiculoConfirmado
 });
 
+var procesarFotoPlacaCompartido = iniciadorFlujo.crearProcesadorFotoPlaca({
+  ESTADOS: ESTADOS,
+  mensajes: mensajes,
+  validaciones: validaciones,
+  manejarPlacaCompartido: manejarPlacaCompartido,
+  tipoFotoPlaca: 'inicio_placa'
+});
+
 var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro({
   ESTADOS: ESTADOS,
   mensajes: mensajes,
@@ -181,6 +189,9 @@ async function manejarKilometrajeManual(sesion, mensaje) {
 async function manejarAtras(res, sesion) {
   switch (sesion.estado) {
     case ESTADOS.ESPERANDO_PLACA:
+    case ESTADOS.PLACA_CONFIRMACION_SUGERIDA:
+    case ESTADOS.PLACA_FALLBACK:
+    case ESTADOS.PLACA_MANUAL:
       sesion.estado = ESTADOS.INICIO;
       return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
 
@@ -303,15 +314,110 @@ async function manejarPosoperacional(req, res) {
 
     switch (sesion.estado) {
       case ESTADOS.INICIO:
-        sesion.estado = ESTADOS.ESPERANDO_PLACA;
-        return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
-
       case ESTADOS.ESPERANDO_PLACA:
-        if (mediaUrl) {
-          return validaciones.responderTwiml(res, 'En este paso necesito texto.\n\nEscribe la placa del vehículo.');
+        if (numMedia > 0 && mediaUrl) {
+           return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrl);
+        }
+        if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
+        if (!mensaje || sesion.estado === ESTADOS.INICIO) {
+           sesion.estado = ESTADOS.ESPERANDO_PLACA;
+           return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
         }
         var mensajePlaca = await manejarPlacaCompartido(sesion, telefono, mensaje);
         return validaciones.responderTwiml(res, mensajePlaca);
+
+      case ESTADOS.PLACA_CONFIRMACION_SUGERIDA:
+        if (numMedia > 0 && mediaUrl) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrl);
+        if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
+          sesiones.eliminarSesion(telefono);
+          sesiones.guardarCambios();
+          return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
+        }
+
+        if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') {
+          if (!sesion.placaSugerida) return validaciones.responderTwiml(res, mensajes.mensajeConfirmacionPlacaSugerida(sesion));
+          
+          var fotoPlacaRef = sesion.fotoPlacaTemporal;
+          var mensajeSugerido = await manejarPlacaCompartido(sesion, telefono, sesion.placaSugerida);
+          var esExito = typeof mensajeSugerido === 'string' && mensajeSugerido.length > 0 && mensajeSugerido.charCodeAt(0) === 0x2705;
+          if (esExito) {
+            estadoPosop.reiniciarDatosOperativos(sesion);
+            if (fotoPlacaRef) {
+              storage.guardarFotoUnica(sesion, {
+                tipo: 'inicio_placa',
+                url: fotoPlacaRef,
+                validacion: 'Placa confirmada desde sugerencia: ' + sesion.placaSugerida,
+                descripcion: 'Placa OCR: ' + sesion.placaSugerida,
+                validada: true
+              });
+            }
+          }
+          return validaciones.responderTwiml(res, mensajeSugerido);
+        }
+
+        if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
+          sesion.estado = ESTADOS.ESPERANDO_PLACA;
+          return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
+        }
+
+        if (msgLower === '3' || msgLower === '3️⃣') {
+          sesion.estado = ESTADOS.PLACA_MANUAL;
+          return validaciones.responderTwiml(res, '⌨️ Escribe la placa manualmente.\nEjemplo: *IDL354*');
+        }
+
+        return validaciones.responderTwiml(res, mensajes.mensajeConfirmacionPlacaSugerida(sesion));
+
+      case ESTADOS.PLACA_FALLBACK:
+        if (numMedia > 0 && mediaUrl) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrl);
+        if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
+          sesiones.eliminarSesion(telefono);
+          sesiones.guardarCambios();
+          return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
+        }
+        
+        if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'foto') {
+          sesion.estado = ESTADOS.ESPERANDO_PLACA;
+          return validaciones.responderTwiml(res, mensajes.mensajeInicioPosoperacional());
+        }
+        if (msgLower === '2' || msgLower === '2️⃣') {
+          sesion.estado = ESTADOS.PLACA_MANUAL;
+          return validaciones.responderTwiml(res, '⌨️ Escribe la placa manualmente.\nEjemplo: *IDL354*');
+        }
+        return validaciones.responderTwiml(res, mensajes.mensajeFallbackPlaca(sesion));
+
+      case ESTADOS.PLACA_MANUAL:
+        if (numMedia > 0 && mediaUrl) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrl);
+        if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
+          sesiones.eliminarSesion(telefono);
+          sesiones.guardarCambios();
+          return validaciones.responderTwiml(res, nav.textoMenuPrincipal());
+        }
+
+        var placaManual = validaciones.normalizarPlaca(mensaje);
+        if (!placaManual) return validaciones.responderTwiml(res, '⌨️ Escribe la placa sin espacios.\nEjemplo: *IDL354*');
+
+        var FORMATO_PLACA = /^[A-Z]{3}[0-9]{3}$/;
+        if (!FORMATO_PLACA.test(placaManual)) {
+          return validaciones.responderTwiml(res, '⚠️ Formato de placa inválido.\nEjemplo: *ABC123*');
+        }
+
+        var fotoPlacaManual = sesion.fotoPlacaTemporal;
+        var mensajeInicioManual = await manejarPlacaCompartido(sesion, telefono, placaManual);
+        var esExitoManual = typeof mensajeInicioManual === 'string' && mensajeInicioManual.length > 0 && mensajeInicioManual.charCodeAt(0) === 0x2705;
+        
+        if (esExitoManual) {
+          estadoPosop.reiniciarDatosOperativos(sesion);
+          if (fotoPlacaManual) {
+            storage.guardarFotoUnica(sesion, {
+              tipo: 'inicio_placa',
+              url: fotoPlacaManual,
+              validacion: 'Placa registrada manualmente: ' + placaManual,
+              descripcion: 'Placa OCR: ' + placaManual,
+              validada: true
+            });
+          }
+        }
+        return validaciones.responderTwiml(res, mensajeInicioManual);
 
       case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
         return await procesarFotoOdometroPosop(res, sesion, mediaUrl);
