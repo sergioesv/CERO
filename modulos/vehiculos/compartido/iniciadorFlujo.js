@@ -45,14 +45,15 @@ function crearManejadorPlaca(opciones) {
       return '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*';
     }
 
-    // 3. Buscar vehículo
-    var resultado = await vehiculosData.buscarVehiculo(placa);
-    if (resultado.error || !resultado.data) {
+    // 3. Buscar vehículo y conductor (función combinada)
+    var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
+    if (carga.error || !carga.vehiculo) {
       console.log('[iniciadorFlujo] Vehículo no encontrado: ' + placa);
       return 'Vehículo *' + placa + '* no encontrado.\n\nVerifica la placa y vuelve a intentarlo.';
     }
 
-    var vehiculo = resultado.data;
+    var vehiculo = carga.vehiculo;
+    var conductor = carga.conductor;
 
     // 4. Validar no bloqueado
     if (vehiculo.bloqueado) {
@@ -62,9 +63,8 @@ function crearManejadorPlaca(opciones) {
         '\n\nContacta al supervisor.';
     }
 
-    // 5. Buscar conductor
-    var conductor = await vehiculosData.buscarConductorPorTelefono(telefono);
-    if (conductor.error || !conductor.data) {
+    // 5. Validar conductor encontrado
+    if (!conductor) {
       console.log('[iniciadorFlujo] Conductor no encontrado: ' + telefono);
       return '\u26A0\uFE0F Tu número no está registrado como conductor.\n\nContacta al administrador.';
     }
@@ -76,7 +76,7 @@ function crearManejadorPlaca(opciones) {
     // 7. Actualizar sesión
     sesion.placa = placa;
     sesion.vehiculo = vehiculo;
-    sesion.conductor = conductor.data;
+    sesion.conductor = conductor;
     sesion.kmReferencia = refKm.kilometraje;
     sesion.kmReferenciaMeta = refKm;
 
