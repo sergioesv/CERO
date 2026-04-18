@@ -1,0 +1,171 @@
+===============================================================================
+CERO — FIX BADGE ROL USUARIO — Header dinámico
+Fecha: 18/04/2026
+Branch: desarrollo (commit directo)
+Archivo: instrucciones/fix-badge-rol-header.txt
+===============================================================================
+
+OBJETIVO
+────────
+Corregir el badge del header que muestra el rol del usuario.
+
+PROBLEMA ACTUAL:
+- public/index.html línea 20 tiene hardcodeado: <div class="header-user">Administrador</div>
+- Nunca se actualiza con el rol real del usuario logueado
+- Usuario con rol 'supervisor' ve "Administrador" incorrectamente
+
+SOLUCIÓN:
+- Agregar función App.actualizarHeaderUsuario() que lea el JWT y actualice el badge
+- Llamarla desde App.init() después de Sidebar.render()
+- Capitalizar y traducir nombres de roles correctamente
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1 — Modificar public/js/app.js
+═══════════════════════════════════════════════════════════════════════════════
+
+Abrir archivo: public/js/app.js
+
+UBICACIÓN: Después de la línea 32 (antes de debeCambiarPassword())
+
+INSERTAR estas líneas:
+
+  actualizarHeaderUsuario() {
+    const headerUser = document.getElementById('header-user');
+    if (!headerUser) return;
+
+    const token = sessionStorage.getItem('cero_token');
+    if (!token) {
+      headerUser.textContent = 'Usuario';
+      return;
+    }
+
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
+      
+      const nombre = payload.nombre || 'Usuario';
+      const roles = payload.roles || [];
+      
+      // Tomar el primer rol y capitalizarlo
+      let rolDisplay = 'Usuario';
+      if (roles.length > 0) {
+        const rol = roles[0];
+        // Mapeo de roles técnicos a nombres legibles
+        const mapeoRoles = {
+          'superadmin_plataforma': 'Superadmin',
+          'superadmin_emp': 'Superadmin Empresa',
+          'administrador': 'Administrador',
+          'supervisor': 'Supervisor',
+          'conductor': 'Conductor',
+          'mantenimiento': 'Mantenimiento',
+          'sst': 'SST',
+          'auditor_interno': 'Auditor Interno',
+          'auditor_externo': 'Auditor Externo',
+          'reportes': 'Reportes'
+        };
+        
+        rolDisplay = mapeoRoles[rol] || rol.charAt(0).toUpperCase() + rol.slice(1).replace(/_/g, ' ');
+      }
+      
+      headerUser.textContent = rolDisplay;
+      headerUser.title = `${nombre} · ${rolDisplay}`;
+    } catch (e) {
+      console.error('Error actualizando header usuario:', e);
+      headerUser.textContent = 'Usuario';
+    }
+  },
+
+RESULTADO: La función queda insertada entre init() y debeCambiarPassword()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2 — Llamar la función desde App.init()
+═══════════════════════════════════════════════════════════════════════════════
+
+En la función App.init() (líneas 21-32), MODIFICAR para que quede así:
+
+  async init() {
+    console.log('CERO Panel iniciando...');
+    Theme.init();
+    this.registerRoutes();
+    Sidebar.render();
+    this.actualizarHeaderUsuario();  // ← NUEVA LÍNEA
+    Router.init();
+    // Bloquear panel si el usuario debe cambiar su password
+    if (this.debeCambiarPassword()) {
+      this.mostrarModalCambiarPassword();
+    }
+    console.log('CERO Panel listo');
+  },
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3 — Validación local (opcional)
+═══════════════════════════════════════════════════════════════════════════════
+
+Si quieres probar antes de commitear:
+
+1. Abre el panel en el navegador
+2. F12 → Console → ejecuta:
+   App.actualizarHeaderUsuario()
+3. El badge arriba a la derecha debe cambiar al rol correcto
+
+O simplemente commitea y prueba en Railway (el riesgo es bajo, es solo frontend).
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 4 — Commit y push
+═══════════════════════════════════════════════════════════════════════════════
+
+git status
+git diff public/js/app.js
+
+# Mostrar diff antes de commitear
+
+git add public/js/app.js
+git add instrucciones/fix-badge-rol-header.txt
+git commit -m "fix(ui): badge header muestra rol real del usuario
+
+- Agregada función App.actualizarHeaderUsuario() que lee JWT
+- Badge se actualiza dinámicamente en App.init()
+- Mapeo de roles técnicos a nombres legibles
+- Tooltip muestra nombre completo + rol
+
+Antes: badge hardcodeado 'Administrador' en todos los casos
+Ahora: supervisor ve 'Supervisor', admin ve 'Administrador', etc."
+
+git push
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 5 — Verificación post-deploy
+═══════════════════════════════════════════════════════════════════════════════
+
+Sergio debe verificar:
+
+1. Login con usuario 'prueba01@cero.com' (rol: supervisor)
+   → Badge arriba a la derecha debe decir "Supervisor"
+
+2. Login con usuario 'sergio@cero.com' (rol: superadmin_plataforma)
+   → Badge debe decir "Superadmin"
+
+3. Hover sobre el badge → tooltip debe mostrar "Nombre Usuario · Rol"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+NOTAS
+═══════════════════════════════════════════════════════════════════════════════
+
+- El hardcode "Administrador" en index.html línea 20 se mantiene como placeholder
+  inicial (antes de que JS cargue), pero se sobrescribe inmediatamente al iniciar
+  
+- Si el usuario tiene múltiples roles, se muestra el primero del array
+  (esto es consistente con el comportamiento del sidebar)
+
+- Los nombres de roles son capitalizados y legibles en español
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FIN DE LA INSTRUCCIÓN
+═══════════════════════════════════════════════════════════════════════════════

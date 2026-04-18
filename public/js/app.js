@@ -23,12 +23,59 @@ const App = {
     Theme.init();
     this.registerRoutes();
     Sidebar.render();
+    this.actualizarHeaderUsuario();
     Router.init();
     // Bloquear panel si el usuario debe cambiar su password
     if (this.debeCambiarPassword()) {
       this.mostrarModalCambiarPassword();
     }
     console.log('CERO Panel listo');
+  },
+
+  actualizarHeaderUsuario() {
+    const headerUser = document.getElementById('header-user');
+    if (!headerUser) return;
+
+    const token = sessionStorage.getItem('cero_token');
+    if (!token) {
+      headerUser.textContent = 'Usuario';
+      return;
+    }
+
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
+
+      const nombre = payload.nombre || 'Usuario';
+      const roles = payload.roles || [];
+
+      // Tomar el primer rol y capitalizarlo
+      let rolDisplay = 'Usuario';
+      if (roles.length > 0) {
+        const rol = roles[0];
+        // Mapeo de roles técnicos a nombres legibles
+        const mapeoRoles = {
+          'superadmin_plataforma': 'Superadmin',
+          'superadmin_emp': 'Superadmin Empresa',
+          'administrador': 'Administrador',
+          'supervisor': 'Supervisor',
+          'conductor': 'Conductor',
+          'mantenimiento': 'Mantenimiento',
+          'sst': 'SST',
+          'auditor_interno': 'Auditor Interno',
+          'auditor_externo': 'Auditor Externo',
+          'reportes': 'Reportes'
+        };
+
+        rolDisplay = mapeoRoles[rol] || rol.charAt(0).toUpperCase() + rol.slice(1).replace(/_/g, ' ');
+      }
+
+      headerUser.textContent = rolDisplay;
+      headerUser.title = `${nombre} · ${rolDisplay}`;
+    } catch (e) {
+      console.error('Error actualizando header usuario:', e);
+      headerUser.textContent = 'Usuario';
+    }
   },
 
   debeCambiarPassword() {
