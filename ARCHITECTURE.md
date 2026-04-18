@@ -351,6 +351,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── components
 │   │   ├── badge.js  # Componente Badge — estados y alertas
 │   │   ├── card.js  # Componente Card — stat cards del panel
+│   │   ├── drawer.js
+│   │   ├── filters.js
 │   │   ├── modal.js  # Componente Modal — detalle y formularios
 │   │   ├── sidebar.js  # Sidebar dinamico con filtro por rol
 │   │   ├── table.js  # Tabla reutilizable con ordenamiento y paginacion
@@ -422,9 +424,6 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── passwords.js
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
-├── sql
-│   ├── v24-dia5-tanqueos-vehiculos.sql
-│   └── v26-usuarios-panel-auth.sql
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
 ├── grep-resultado.txt
