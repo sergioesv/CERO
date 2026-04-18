@@ -1,0 +1,119 @@
+===============================================================================
+CERO — FIX TRUST PROXY — Corregir rate limiting bypass
+Fecha: 18/04/2026
+Branch: desarrollo (commit directo)
+Archivo: instrucciones/fix-trust-proxy-security.txt
+===============================================================================
+
+OBJETIVO
+────────
+Corregir la configuración de 'trust proxy' para evitar bypass de rate limiting.
+
+PROBLEMA ACTUAL:
+- index.js línea 35: app.set('trust proxy', true)
+- Con true, Express confía en CUALQUIER header X-Forwarded-For
+- Un atacante puede manipular ese header y hacer infinitos intentos de login
+- express-rate-limit genera warning: ERR_ERL_PERMISSIVE_TRUST_PROXY
+
+SOLUCIÓN:
+- Cambiar true a 1 (confiar en exactamente 1 proxy = Railway)
+- El rate limiter del login (10 intentos/15min) funcionará correctamente
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1 — Modificar index.js
+═══════════════════════════════════════════════════════════════════════════════
+
+Abrir archivo: index.js
+
+UBICACIÓN: Línea 35
+
+CAMBIAR:
+app.set('trust proxy', true);
+
+POR:
+app.set('trust proxy', 1);
+
+
+EXPLICACIÓN:
+- true = confiar en cualquier proxy (inseguro)
+- 1 = confiar solo en el primer proxy (Railway)
+- 'loopback, 10.0.0.0/8' = confiar en localhost + red privada (otra opción)
+
+Para Railway, el valor 1 es correcto porque hay exactamente 1 proxy delante.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2 — Commit y push
+═══════════════════════════════════════════════════════════════════════════════
+
+git status
+git diff index.js
+
+# Mostrar diff antes de commitear (debe ser 1 línea cambiada)
+
+git add index.js
+git add instrucciones/fix-trust-proxy-security.txt
+git commit -m "fix(security): trust proxy limitado a 1 proxy (Railway)
+
+- Cambiado app.set('trust proxy', true) a app.set('trust proxy', 1)
+- Evita bypass de rate limiting manipulando X-Forwarded-For
+- El rate limiter del login (10 intentos/15min) ahora funciona correctamente
+- Elimina warning ERR_ERL_PERMISSIVE_TRUST_PROXY en logs de Railway
+
+Antes: trust proxy = true (cualquier proxy)
+Ahora: trust proxy = 1 (solo Railway)"
+
+git push
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3 — Verificación post-deploy
+═══════════════════════════════════════════════════════════════════════════════
+
+Sergio debe verificar en Railway → Logs:
+
+1. Redeploy o siguiente deploy debe arrancar sin el warning:
+   ValidationError: ERR_ERL_PERMISSIVE_TRUST_PROXY
+
+2. El login sigue funcionando normal
+
+3. Si alguien intenta 10+ logins fallidos desde la misma IP, debe bloquearse
+   (antes podían evadir esto manipulando headers)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+CONTEXTO TÉCNICO
+═══════════════════════════════════════════════════════════════════════════════
+
+El rate limiter en rutas/auth.js usa express-rate-limit:
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutos
+  max: 10,                    // 10 intentos
+  skipSuccessfulRequests: true
+});
+
+Con trust proxy = true, un atacante puede hacer:
+
+fetch('/auth/login', {
+  headers: { 'X-Forwarded-For': '1.2.3.4' }  // IP falsa
+})
+
+Y cambiar la IP falsa en cada request, evadiendo el límite.
+
+Con trust proxy = 1, Express solo confía en el header que pone Railway
+(el primer proxy), no en headers manipulados por el cliente.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+REFERENCIAS
+═══════════════════════════════════════════════════════════════════════════════
+
+- Express trust proxy docs: https://expressjs.com/en/guide/behind-proxies.html
+- express-rate-limit warning: https://express-rate-limit.github.io/ERR_ERL_PERMISSIVE_TRUST_PROXY/
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FIN DE LA INSTRUCCIÓN
+═══════════════════════════════════════════════════════════════════════════════

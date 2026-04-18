@@ -32,7 +32,7 @@ app.use(helmet({
 }));
 const PORT = process.env.PORT || 8080;
 
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
