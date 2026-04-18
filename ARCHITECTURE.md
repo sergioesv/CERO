@@ -315,6 +315,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   └── vehiculos
 │       ├── compartido
 │       │   ├── baseFlujo.js  # Base compartida para maquinas de estado de flujos WhatsApp
+│       │   ├── iniciadorFlujo.js
 │       │   ├── kilometraje.js  # Validacion y logica de kilometraje entre turnos
 │       │   ├── navegacion.js  # Textos de navegacion — menu principal, 0=atras, 9=menu
 │       │   └── validacionVisual.js  # Validacion de fotos via Gemini OCR
