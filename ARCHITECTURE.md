@@ -70,7 +70,7 @@ Three workflows run in parallel on every push to `desarrollo`:
 - Authorization system v12 (INFORMATIVO / ALERTA / BLOQUEO)
 
 ### Phase 2 — Dashboard & admin panel 🔄 IN PROGRESS
-- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos — todos COMPLETE
+- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos, Sedes, Usuarios — todos COMPLETE
 - 2.2 Operational dashboard — complete
 - 2.3 History and reports — pending
 - 2.4 Power BI integration — future
@@ -98,7 +98,7 @@ Three workflows run in parallel on every push to `desarrollo`:
 | `activos` | Assets (vehicles migrated here for dashboard) |
 | `historial_estado_activo` | Asset state change history |
 | `autorizaciones_novedad` | Supervisor authorizations |
-| `empresas / sedes / usuarios_panel` | Multi-company schema |
+| `empresas / sedes / usuarios_panel` | Multi-company schema · usuarios_panel con auditoría (creado_por, actualizado_en, debe_cambiar_password) |
 | `sesiones_activas` | Active WhatsApp sessions |
 
 ---
@@ -161,6 +161,8 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] Signed URL regeneration at query time (Supabase Storage)
 - [ ] Helmet installed and active ✅
 - [ ] CSP configurado con scriptSrc/scriptSrcElem/scriptSrcAttr ✅
+- [x] Trust proxy = 1 (Railway) — rate limiting seguro ✅
+- [x] Timing attack en login corregido (maybeSingle + hash dummy) ✅
 
 ---
 
@@ -171,7 +173,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] Twilio webhook signature validation
 - [ ] Migrar onclick inline a addEventListener (CSP scriptSrcAttr → 'none')
 - [ ] Dominio propio configurado
-- [ ] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio
+- [x] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio ✅
 
 ### Importante — antes de segundo cliente
 - [ ] Tests integración flujos WhatsApp críticos
@@ -180,12 +182,12 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [ ] Zona horaria UTC-5 en queries de "hoy"
 - [ ] Foto recibo en drawer tanqueos — URLs firmadas Supabase Storage
 - [ ] Mover /api/dashboard/resumen de index.js a rutas/dashboard.js
-- [ ] Flujo de creación de usuarios del panel — admin crea desde UI, no inserción manual en BD
-- [ ] Servicio de email (SendGrid o similar) — envío de contraseña temporal al crear usuario
-- [ ] Campo `debe_cambiar_password` en `usuarios_panel` — forzar cambio en primer login
-- [ ] Endpoint `POST /auth/cambiar-password` — verificar contraseña actual antes de cambiar
-- [ ] UI cambio de contraseña — accesible desde perfil del usuario en el panel
-- [ ] Endpoint `POST /auth/reset-password` — admin puede resetear contraseña de cualquier usuario
+- [x] Flujo de creación de usuarios del panel — admin crea desde UI, no inserción manual en BD ✅
+- [x] Servicio de email (SendGrid o similar) — envío de contraseña temporal al crear usuario — PENDIENTE envío por email (password se muestra en modal por ahora)
+- [x] Campo `debe_cambiar_password` en `usuarios_panel` — forzar cambio en primer login ✅
+- [x] Endpoint `POST /auth/cambiar-password` — verificar contraseña actual antes de cambiar ✅
+- [x] UI cambio de contraseña — accesible desde perfil del usuario en el panel ✅
+- [x] Endpoint `POST /auth/reset-password` — admin puede resetear contraseña de cualquier usuario ✅
 
 ### Deuda aceptada conscientemente
 - unsafe-inline en CSP — temporal para demo, revertir antes de producción
@@ -196,6 +198,13 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 - [x] index.js refactorizado — 925 líneas → ~190, 6 archivos de rutas ✅
 - [x] Bug rendimiento primer tanqueo — es_primer_tanqueo flag ✅
 - [x] CSP Helmet — 3 directivas configuradas, panel completamente funcional ✅
+- [x] Sistema de usuarios panel — password temporal autogenerada, scope multi-empresa, auditoría ✅
+- [x] 6 bugs seguridad backend usuarios — permisos incorrectos en POST/PUT/PATCH corregidos ✅
+- [x] Timing attack login — maybeSingle + hash dummy ✅
+- [x] CI frontend verde — ESLint configurado para public/ con max-warnings=50 ✅
+- [x] Badge rol usuario dinámico — lee JWT y muestra rol real ✅
+- [x] Drawer labels espaciado — CSS grid 2 columnas para detalles ✅
+- [x] Trust proxy = 1 — rate limiting funcional sin bypass ✅
 
 ---
 
@@ -203,6 +212,17 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 | Date | Decision | Reason |
 |---|---|---|
+| 18/04/2026 | Trust proxy = 1 en vez de true | Con true, Express confía en cualquier header X-Forwarded-For permitiendo bypass del rate limiter. Con 1, solo confía en Railway (primer proxy). Corrige warning ERR_ERL_PERMISSIVE_TRUST_PROXY. |
+| 18/04/2026 | CI frontend: ESLint sobre public/ con max-warnings=50 | Workflow fallaba con "all files ignored" porque eslint.config.cjs ignoraba public/**. Solución: quitar ignore, cambiar sourceType a 'script', agregar globals.browser. Max warnings en 50 por código legacy. |
+| 18/04/2026 | Badge header usuario dinámico — lee JWT en App.init() | Antes hardcodeado "Administrador" en index.html. Ahora App.actualizarHeaderUsuario() lee roles del JWT y muestra rol real capitalizado con mapeo técnico→legible. |
+| 18/04/2026 | Drawer usuarios: CSS grid para .detail-* | Labels y valores aparecían pegados sin espacios. Agregado CSS .detail-grid (flex column), .detail-item (grid 2 columnas 140px + 1fr), .detail-label (secundario), .detail-value (primario). |
+| 18/04/2026 | Arquitectura usuarios separada en rutas propias — usuarios.js, roles.js, usuariosRoles.js | Endpoints estaban mezclados en canales/dashboard.js con bugs de seguridad. Extraídos a rutas/ con verificarPermiso correcto, scope multi-empresa y auditoría. |
+| 18/04/2026 | Timing attack login corregido — maybeSingle + hash dummy | Login con .single() + bcrypt permitía enumerar emails (email no existe = error rápido, email existe + password mala = 100ms bcrypt). Solución: siempre ejecutar bcrypt.compare con hash dummy si usuario no existe. |
+| 18/04/2026 | Scope multi-empresa en usuarios — superadmin_plataforma vs superadmin_emp | superadmin_plataforma crea/edita usuarios en cualquier empresa. superadmin_emp solo en su empresa_id. Helper empresaPermitida(usuario, empresaTarget) valida en cada endpoint. Nadie asigna rol superadmin_plataforma desde UI. |
+| 18/04/2026 | Password temporal autogenerada al crear usuario — 12 chars criptográficamente seguros | Backend genera con crypto.randomBytes, charset sin ambiguos (sin 0/O/l/1/I). Modal muestra password 1 sola vez con botón copiar. Admin entrega al usuario manualmente (email SendGrid pendiente fase futura). |
+| 18/04/2026 | Flujo de primer login forzado — modal bloqueante cambiar contraseña | Columna debe_cambiar_password en usuarios_panel (default false). Al crear usuario o resetear password, se setea true. Login incluye flag en JWT. App.init() detecta flag y muestra modal bloqueante. POST /auth/cambiar-password valida actual, limpia flag, fuerza logout para refrescar JWT. |
+| 18/04/2026 | Auditoría usuarios panel — creado_por, actualizado_en | Columnas agregadas en SQL v26. creado_por = UUID del admin que creó. actualizado_en = timestamp de última modificación. Soft-delete únicamente (activo=false), nunca hard-delete. |
+| 18/04/2026 | 6 bugs de seguridad usuarios corregidos | B1: POST validaba 'ver' en vez de 'crear'. B2: PUT validaba 'ver' en vez de 'editar'. B3: PATCH estado sin verificarPermiso. B4: PATCH password sin verificarPermiso (CRÍTICO). B5: POST/DELETE roles sin verificarPermiso. B6: Sin validación scope multi-empresa. Todos corregidos con verificarPermiso + scope helpers. |
 | 17/04/2026 | Rebranding a dialk — eliminar referencias a EDEMSA e Inteligencia de Ciudad | EDEMSA no es cliente firmado; Inteligencia de Ciudad no pertenece a Sergio. Riesgo legal. dialk S.A.S. es la empresa en constitución. |
 | 17/04/2026 | Landing relanzada con caso demostrativo ficticio (AAA 123, Toyota Hilux, Carlos Ramírez) | Eliminar caso real WDS340 por riesgo de derechos de autor y uso no autorizado de marca |
 | 15/04/2026 | Refactor módulo panel `public/modules/tanqueos.js` en 4 objetos (TanqueosAPI, TanqueosLogic, TanqueosRender, Tanqueos) | Separar responsabilidades (datos, lógica, render y orquestación), mejorar mantenibilidad y eliminar mezcla de UI/lógica |

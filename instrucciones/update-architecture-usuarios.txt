@@ -1,0 +1,148 @@
+===============================================================================
+CERO — ACTUALIZAR ARCHITECTURE.md — Usuarios panel + fixes
+Fecha: 18/04/2026
+Branch: desarrollo (commit directo)
+Archivo: instrucciones/update-architecture-usuarios.txt
+===============================================================================
+
+OBJETIVO
+────────
+Actualizar ARCHITECTURE.md con todo lo implementado en la sesión del 18/04/2026:
+- Sistema de usuarios del panel completo
+- 10 bugs corregidos (6 seguridad + 4 UX/infra)
+- Marcar items completados del checklist
+- Agregar decisiones al decision log
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1 — Actualizar Phase 2.1 (línea 73)
+═══════════════════════════════════════════════════════════════════════════════
+
+CAMBIAR:
+- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos — todos COMPLETE
+
+POR:
+- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos, Sedes, Usuarios — todos COMPLETE
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2 — Actualizar tabla Database (línea 101)
+═══════════════════════════════════════════════════════════════════════════════
+
+CAMBIAR:
+| `empresas / sedes / usuarios_panel` | Multi-company schema |
+
+POR:
+| `empresas / sedes / usuarios_panel` | Multi-company schema · usuarios_panel con auditoría (creado_por, actualizado_en, debe_cambiar_password) |
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3 — Actualizar Security checklist (líneas 153-164)
+═══════════════════════════════════════════════════════════════════════════════
+
+AGREGAR después de línea 163 (CSP configurado):
+- [x] Trust proxy = 1 (Railway) — rate limiting seguro ✅
+- [x] Timing attack en login corregido (maybeSingle + hash dummy) ✅
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 4 — Actualizar "Crítico — antes de producción real" (líneas 169-174)
+═══════════════════════════════════════════════════════════════════════════════
+
+ELIMINAR línea 174 (ya completado):
+- [ ] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio
+
+AGREGAR en su lugar:
+- [x] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio ✅
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 5 — Actualizar "Importante — antes de segundo cliente" (líneas 176-189)
+═══════════════════════════════════════════════════════════════════════════════
+
+CAMBIAR estas líneas de [ ] a [x]:
+
+- [x] Flujo de creación de usuarios del panel — admin crea desde UI, no inserción manual en BD ✅
+- [x] Servicio de email (SendGrid o similar) — envío de contraseña temporal al crear usuario — PENDIENTE envío por email (password se muestra en modal por ahora)
+- [x] Campo `debe_cambiar_password` en `usuarios_panel` — forzar cambio en primer login ✅
+- [x] Endpoint `POST /auth/cambiar-password` — verificar contraseña actual antes de cambiar ✅
+- [x] UI cambio de contraseña — accesible desde perfil del usuario en el panel ✅
+- [x] Endpoint `POST /auth/reset-password` — admin puede resetear contraseña de cualquier usuario ✅
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 6 — Actualizar "Resuelto hoy" (línea 195)
+═══════════════════════════════════════════════════════════════════════════════
+
+AGREGAR después de la línea 198:
+- [x] Sistema de usuarios panel — password temporal autogenerada, scope multi-empresa, auditoría ✅
+- [x] 6 bugs seguridad backend usuarios — permisos incorrectos en POST/PUT/PATCH corregidos ✅
+- [x] Timing attack login — maybeSingle + hash dummy ✅
+- [x] CI frontend verde — ESLint configurado para public/ con max-warnings=50 ✅
+- [x] Badge rol usuario dinámico — lee JWT y muestra rol real ✅
+- [x] Drawer labels espaciado — CSS grid 2 columnas para detalles ✅
+- [x] Trust proxy = 1 — rate limiting funcional sin bypass ✅
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 7 — Agregar al Decision log (después línea 236)
+═══════════════════════════════════════════════════════════════════════════════
+
+INSERTAR estas decisiones AL PRINCIPIO del decision log (después de la línea "| Date | Decision | Reason |"):
+
+| 18/04/2026 | Trust proxy = 1 en vez de true | Con true, Express confía en cualquier header X-Forwarded-For permitiendo bypass del rate limiter. Con 1, solo confía en Railway (primer proxy). Corrige warning ERR_ERL_PERMISSIVE_TRUST_PROXY. |
+| 18/04/2026 | CI frontend: ESLint sobre public/ con max-warnings=50 | Workflow fallaba con "all files ignored" porque eslint.config.cjs ignoraba public/**. Solución: quitar ignore, cambiar sourceType a 'script', agregar globals.browser. Max warnings en 50 por código legacy. |
+| 18/04/2026 | Badge header usuario dinámico — lee JWT en App.init() | Antes hardcodeado "Administrador" en index.html. Ahora App.actualizarHeaderUsuario() lee roles del JWT y muestra rol real capitalizado con mapeo técnico→legible. |
+| 18/04/2026 | Drawer usuarios: CSS grid para .detail-* | Labels y valores aparecían pegados sin espacios. Agregado CSS .detail-grid (flex column), .detail-item (grid 2 columnas 140px + 1fr), .detail-label (secundario), .detail-value (primario). |
+| 18/04/2026 | Arquitectura usuarios separada en rutas propias — usuarios.js, roles.js, usuariosRoles.js | Endpoints estaban mezclados en canales/dashboard.js con bugs de seguridad. Extraídos a rutas/ con verificarPermiso correcto, scope multi-empresa y auditoría. |
+| 18/04/2026 | Timing attack login corregido — maybeSingle + hash dummy | Login con .single() + bcrypt permitía enumerar emails (email no existe = error rápido, email existe + password mala = 100ms bcrypt). Solución: siempre ejecutar bcrypt.compare con hash dummy si usuario no existe. |
+| 18/04/2026 | Scope multi-empresa en usuarios — superadmin_plataforma vs superadmin_emp | superadmin_plataforma crea/edita usuarios en cualquier empresa. superadmin_emp solo en su empresa_id. Helper empresaPermitida(usuario, empresaTarget) valida en cada endpoint. Nadie asigna rol superadmin_plataforma desde UI. |
+| 18/04/2026 | Password temporal autogenerada al crear usuario — 12 chars criptográficamente seguros | Backend genera con crypto.randomBytes, charset sin ambiguos (sin 0/O/l/1/I). Modal muestra password 1 sola vez con botón copiar. Admin entrega al usuario manualmente (email SendGrid pendiente fase futura). |
+| 18/04/2026 | Flujo de primer login forzado — modal bloqueante cambiar contraseña | Columna debe_cambiar_password en usuarios_panel (default false). Al crear usuario o resetear password, se setea true. Login incluye flag en JWT. App.init() detecta flag y muestra modal bloqueante. POST /auth/cambiar-password valida actual, limpia flag, fuerza logout para refrescar JWT. |
+| 18/04/2026 | Auditoría usuarios panel — creado_por, actualizado_en | Columnas agregadas en SQL v26. creado_por = UUID del admin que creó. actualizado_en = timestamp de última modificación. Soft-delete únicamente (activo=false), nunca hard-delete. |
+| 18/04/2026 | 6 bugs de seguridad usuarios corregidos | B1: POST validaba 'ver' en vez de 'crear'. B2: PUT validaba 'ver' en vez de 'editar'. B3: PATCH estado sin verificarPermiso. B4: PATCH password sin verificarPermiso (CRÍTICO). B5: POST/DELETE roles sin verificarPermiso. B6: Sin validación scope multi-empresa. Todos corregidos con verificarPermiso + scope helpers. |
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 8 — Commit y push
+═══════════════════════════════════════════════════════════════════════════════
+
+git status
+git diff ARCHITECTURE.md
+
+# Mostrar diff antes de commitear
+
+git add ARCHITECTURE.md
+git add instrucciones/update-architecture-usuarios.txt
+git commit -m "docs: actualizar ARCHITECTURE.md con sistema usuarios y fixes
+
+- Phase 2.1: agregado Sedes y Usuarios a lista de módulos completos
+- Database: usuarios_panel con columnas auditoría documentadas
+- Security checklist: 8 items completados marcados con ✅
+- Decision log: 11 decisiones nuevas del 18/04/2026
+  * Sistema usuarios completo
+  * 6 bugs seguridad corregidos
+  * Timing attack login
+  * CI frontend verde
+  * Badge rol dinámico
+  * Drawer spacing
+  * Trust proxy seguro
+
+El documento ahora refleja estado real del proyecto post-sesión usuarios."
+
+git push
+
+
+═══════════════════════════════════════════════════════════════════════════════
+NOTAS
+═══════════════════════════════════════════════════════════════════════════════
+
+- Las fechas en decision log son YYYY/MM/DD por convención del archivo
+- Los items del checklist usan [x] para completado y [ ] para pendiente
+- El símbolo ✅ se usa solo al final de items completados para visibilidad
+- SendGrid está marcado como pendiente porque el modal funciona pero el envío por email no
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FIN DE LA INSTRUCCIÓN
+═══════════════════════════════════════════════════════════════════════════════
