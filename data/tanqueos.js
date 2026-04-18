@@ -268,7 +268,7 @@ async function obtenerTanqueo(id) {
       return Object.assign({}, foto, {
         url_firmada: signed.data ? signed.data.signedUrl : foto.foto_url
       });
-    } catch (e) {
+    } catch (_e) {
       return Object.assign({}, foto, { url_firmada: foto.foto_url });
     }
   }));

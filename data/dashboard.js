@@ -182,7 +182,7 @@ async function obtenerPesosIndice(sedeId) {
   if (typeof raw === 'string') {
     try {
       obj = JSON.parse(raw);
-    } catch (e) {
+    } catch (_e) {
       return Object.assign({}, PESOS_INDICE_DEFAULT);
     }
   }
@@ -239,7 +239,7 @@ function parsearNovedades(novedades) {
     try {
       var p = JSON.parse(novedades);
       return Array.isArray(p) ? p : [];
-    } catch (e) {
+    } catch (_e) {
       return [];
     }
   }

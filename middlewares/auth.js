@@ -18,7 +18,7 @@ const verificarToken = async (req, res, next) => {
     const payload = jwt.verify(token, jwtSecret);
     req.usuario = payload;
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(401).json({ error: 'Token invalido o expirado' });
   }
 };

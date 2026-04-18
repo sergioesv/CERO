@@ -391,7 +391,8 @@ async function manejarPreoperacional(req, res) {
           if ((msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') && sesion.placaSugerida) {
             var fotoPlacaRef = sesion.fotoPlacaTemporal;
             var mensajeSugerido = await manejarPlacaCompartido(sesion, telefono, sesion.placaSugerida);
-            if (respuestaExitoAlIniciarPlaca(mensajeSugerido)) {
+            var esExito = typeof mensajeSugerido === 'string' && mensajeSugerido.length > 0 && mensajeSugerido.charCodeAt(0) === 0x2705;
+            if (esExito) {
               estadoPreop.reiniciarDatosOperativos(sesion);
               if (fotoPlacaRef) {
                 storage.guardarFotoUnica(sesion, {

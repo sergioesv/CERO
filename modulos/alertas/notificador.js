@@ -57,8 +57,8 @@ async function enviarAlertaADestinatarios(mensaje, clasificacion, conductorTelef
 
   // Enviar al conductor directamente (para alertas urgentes de licencia)
   if (conductorTelefono) {
-    var enviado = await enviarWhatsApp(conductorTelefono, mensaje);
-    if (enviado) enviados++;
+    var notifConductor = await enviarWhatsApp(conductorTelefono, mensaje);
+    if (notifConductor) enviados++;
   }
 
   return enviados;

@@ -341,7 +341,8 @@ async function manejarTanqueo(req, res) {
           }
           var fotoSug = sesion.fotoPlacaTemporal;
           var mensajeSug = await manejarPlacaCompartido(sesion, telefono, sesion.placaSugerida);
-          if (respuestaExitoAlIniciarPlaca(mensajeSug)) {
+          var esExito = typeof mensajeSug === 'string' && mensajeSug.length > 0 && mensajeSug.charCodeAt(0) === 0x2705;
+          if (esExito) {
             if (fotoSug) {
               storage.guardarFotoUnica(sesion, {
                 tipo: 'placa',

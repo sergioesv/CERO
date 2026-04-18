@@ -12,6 +12,8 @@
 'use strict';
 
 const GeneradorPDFPosoperacional = require('./GeneradorPDFPosoperacional');
+const base = require('./base');
+const config = require('../../config/config');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Genera el buffer PDF del posoperacional
