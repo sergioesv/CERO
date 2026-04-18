@@ -11,7 +11,44 @@ var storage = require('../../../servicios/storage');
 var vehiculosData = require('../../../data/vehiculos');
 var kilometrajeCompartido = require('../compartido/kilometraje');
 var nav = require('../compartido/navegacion');
+var iniciadorFlujo = require('../compartido/iniciadorFlujo');
 
+// Manejadores configurados con factory
+var manejarPlacaCompartido = iniciadorFlujo.crearManejadorPlaca({
+  ESTADOS: { ESPERANDO_FOTO_ODOMETRO: 'ESPERANDO_FOTO_ODOMETRO' },
+  mensajes: mensajes,
+  validaciones: preop,
+  tipoFlujo: 'preoperacional',
+  mensajeConfirmacion: function(vehiculo) {
+    return '\u2705 *' + vehiculo.placa + '*\n' +
+      [vehiculo.tipo, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') +
+      '\n\n' + mensajes.mensajeInicioOdometro(vehiculo);
+  },
+  validadorFormato: function(placa) {
+    var FORMATO_PLACA_CO = /^[A-Z]{3}[0-9]{3}$/;
+    return FORMATO_PLACA_CO.test(placa);
+  }
+});
+
+var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro({
+  ESTADOS: { ODOMETRO_CONFIRMACION: 'ODOMETRO_CONFIRMACION' },
+  mensajes: {
+    mensajeConfirmacionOdometro: mensajes.mensajeConfirmacionOdometro,
+    mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango,
+    primerMensajeInspeccion: mensajes.primerMensajeInspeccion
+  },
+  validaciones: preop,
+  tipoFlujo: 'preoperacional',
+  config: config
+});
+
+function respuestaExitoAlIniciarPlaca(msg) {
+  return typeof msg === 'string' && msg.length > 0 && msg.charCodeAt(0) === 0x2705;
+}
+
+function respuestaVehiculoBloqueadoPlaca(msg) {
+  return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg));
+}
 
 function volverAMenuPrincipal(res, telefono) {
   sesiones.eliminarSesion(telefono);
@@ -190,49 +227,25 @@ function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   return preop.responderTwiml(res, mensaje);
 }
 
-async function iniciarSesionConVehiculo(sesion, telefono, placa, fotoUrl, validacionTexto) {
-  var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
-
-  if (carga.error || !carga.vehiculo) {
-    return { ok: false, tipo: 'no_encontrado' };
-  }
-
-  if (carga.vehiculo.bloqueado) {
-    return {
-      ok: false,
-      tipo: 'bloqueado',
-      mensaje: '🚫 *Vehiculo BLOQUEADO*\n' + placa + '\n' + (carga.vehiculo.motivo_bloqueo || 'Contacte al supervisor')
-    };
-  }
-
-  sesion.placa = placa;
-  sesion.vehiculo = carga.vehiculo;
-  sesion.conductor = carga.conductor;
-  estadoPreop.reiniciarDatosOperativos(sesion);
-  storage.guardarFotoUnica(sesion, {
-    tipo: 'inicio_placa',
-    url: fotoUrl,
-    descripcion: 'Foto frontal con placa',
-    validacion: validacionTexto || ('Placa registrada: ' + placa),
-    validada: true
-  });
-  sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
-
-  return {
-    ok: true,
-    mensaje: '✅ *' + placa + '*\n' + [carga.vehiculo.tipo, carga.vehiculo.marca, carga.vehiculo.modelo].filter(Boolean).join(' ') +
-      '\n\n' + mensajes.mensajeInicioOdometro(carga.vehiculo)
-  };
-}
-
 async function procesarFotoFrontal(res, sesion, telefono, fotoUrl) {
   var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
   var placaDetectada = preop.normalizarPlaca(lecturaPlaca.placa || '');
 
   if (lecturaPlaca.valida && placaDetectada) {
-    var inicio = await iniciarSesionConVehiculo(sesion, telefono, placaDetectada, fotoUrl, 'Placa validada por foto: ' + placaDetectada);
-    if (inicio.ok) return preop.responderTwiml(res, inicio.mensaje);
-    if (inicio.tipo === 'bloqueado') return preop.responderTwiml(res, inicio.mensaje);
+    var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
+    if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+      estadoPreop.reiniciarDatosOperativos(sesion);
+      storage.guardarFotoUnica(sesion, {
+        tipo: 'inicio_placa',
+        url: fotoUrl,
+        validacion: 'Placa validada por foto: ' + placaDetectada,
+        validada: true
+      });
+      return preop.responderTwiml(res, mensajeInicio);
+    }
+    if (respuestaVehiculoBloqueadoPlaca(mensajeInicio)) {
+      return preop.responderTwiml(res, mensajeInicio);
+    }
   }
 
   sesion.fotoPlacaTemporal = fotoUrl;
@@ -263,13 +276,7 @@ async function procesarFotoFrontal(res, sesion, telefono, fotoUrl) {
  * OCR de odómetro + validación de rango (lógica en compartido/kilometraje.js).
  */
 async function procesarFotoOdometroPreoperacional(res, sesion, fotoUrl) {
-  return await kilometrajeCompartido.procesarFotoOdometro(res, sesion, fotoUrl, {
-    tipoFlujo: 'preoperacional',
-    estadoConfirmacion: 'ODOMETRO_CONFIRMACION',
-    responderFn: preop.responderTwiml,
-    mensajesModulo: mensajes,
-    maxKmSalto: config.MAX_KM_SALTO
-  });
+  return await procesarFotoOdometroCompartido(res, sesion, fotoUrl);
 }
 
 function manejarAtras(res, sesion) {
@@ -414,16 +421,24 @@ async function manejarPreoperacional(req, res) {
           }
 
           if ((msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') && sesion.placaSugerida) {
-            // FIX: restaurar la inicializacion con placa sugerida que se perdió al unir el archivo.
-            var inicioSugerido = await iniciarSesionConVehiculo(
-              sesion,
-              telefono,
-              sesion.placaSugerida,
-              sesion.fotoPlacaTemporal,
-              'Placa confirmada desde sugerencia: ' + sesion.placaSugerida + (sesion.placaDetectada ? (' (lectura inicial: ' + sesion.placaDetectada + ')') : '')
-            );
-            if (inicioSugerido.ok) return preop.responderTwiml(res, inicioSugerido.mensaje);
-            if (inicioSugerido.tipo === 'bloqueado') return preop.responderTwiml(res, inicioSugerido.mensaje);
+            var fotoPlacaRef = sesion.fotoPlacaTemporal;
+            var mensajeSugerido = await manejarPlacaCompartido(sesion, telefono, sesion.placaSugerida);
+            if (respuestaExitoAlIniciarPlaca(mensajeSugerido)) {
+              estadoPreop.reiniciarDatosOperativos(sesion);
+              if (fotoPlacaRef) {
+                storage.guardarFotoUnica(sesion, {
+                  tipo: 'inicio_placa',
+                  url: fotoPlacaRef,
+                  validacion: 'Placa confirmada desde sugerencia: ' + sesion.placaSugerida + (sesion.placaDetectada ? (' (lectura inicial: ' + sesion.placaDetectada + ')') : ''),
+                  validada: true
+                });
+              }
+              return preop.responderTwiml(res, mensajeSugerido);
+            }
+            if (respuestaVehiculoBloqueadoPlaca(mensajeSugerido)) {
+              return preop.responderTwiml(res, mensajeSugerido);
+            }
+            return preop.responderTwiml(res, mensajeSugerido);
           }
 
           if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
@@ -456,26 +471,29 @@ async function manejarPreoperacional(req, res) {
         case 'PLACA_MANUAL': {
           if (numMedia > 0) return await procesarFotoFrontal(res, sesion, telefono, mediaUrls[0]);
           if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
+
           var placaManual = preop.normalizarPlaca(mensaje);
-          if (!placaManual) return preop.responderTwiml(res, '⌨️ Escribe la placa sin espacios.\nEjemplo: *IDL354*');
-          // FIX: validar el formato de la placa manual antes de consultar el vehiculo en la base.
+          if (!placaManual) return preop.responderTwiml(res, '\u2328\uFE0F Escribe la placa sin espacios.\nEjemplo: *IDL354*');
+
           var FORMATO_PLACA_CO = /^[A-Z]{3}[0-9]{3}$/;
-          // FIX: rechazar placas que no cumplan el patron 3 letras + 3 numeros.
           if (!FORMATO_PLACA_CO.test(placaManual)) {
-            return preop.responderTwiml(res,
-              'Formato inválido. La placa debe ser 3 letras + 3 números (ej: ABC123).');
+            return preop.responderTwiml(res, '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*');
           }
 
-          var inicioManual = await iniciarSesionConVehiculo(
-            sesion,
-            telefono,
-            placaManual,
-            sesion.fotoPlacaTemporal,
-            'Placa registrada manualmente: ' + placaManual
-          );
-          if (inicioManual.ok) return preop.responderTwiml(res, inicioManual.mensaje);
-          if (inicioManual.tipo === 'bloqueado') return preop.responderTwiml(res, inicioManual.mensaje);
-          return preop.responderTwiml(res, '❌ La placa *' + placaManual + '* no existe en la base.\nRevisa con el supervisor o envia otra foto.');
+          var fotoPlacaManual = sesion.fotoPlacaTemporal;
+          var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaManual);
+          if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+            estadoPreop.reiniciarDatosOperativos(sesion);
+            if (fotoPlacaManual) {
+              storage.guardarFotoUnica(sesion, {
+                tipo: 'inicio_placa',
+                url: fotoPlacaManual,
+                validacion: 'Placa registrada manualmente: ' + placaManual,
+                validada: true
+              });
+            }
+          }
+          return preop.responderTwiml(res, mensajeInicio);
         }
 
         case 'ESPERANDO_FOTO_ODOMETRO': {

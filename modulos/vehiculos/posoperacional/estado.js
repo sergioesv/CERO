@@ -32,6 +32,7 @@ function reiniciarDatosOperativos(sesion) {
   sesion.vehiculo = null;
   sesion.conductor = null;
   sesion.kilometrajeFinal = null;
+  sesion.kilometrajeInicial = null;
   sesion.kmDetectado = null;
   sesion.kmReferencia = null;
   sesion.kmReferenciaMeta = null;
@@ -42,6 +43,7 @@ function reiniciarDatosOperativos(sesion) {
   sesion.origenKilometrajePendiente = null;
   sesion.kilometrajeConfirmado = false;
   sesion.fotoOdometroTemporal = null;
+  sesion.kmLecturaFueraRango = false;
   sesion.novedades = [];
   sesion.novedadesTexto = null;
   sesion.novedadTexto = null;
@@ -63,6 +65,7 @@ function volverAKilometraje(sesion) {
   sesion.origenKilometraje = null;
   sesion.origenKilometrajePendiente = null;
   sesion.kilometrajeConfirmado = false;
+  sesion.kmLecturaFueraRango = false;
   storage.limpiarFotosPorTipo(sesion, ['odometro']);
   sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
 }
