@@ -135,14 +135,15 @@ modulos/vehiculos/<module>/
 
 ## Frontend pattern
 
-Each panel module exports a global object:
+Cada módulo del panel web debe separarse estrictamente en 4 objetos para evitar mezclar lógica, peticiones y UI (anti-XSS):
 
 ```js
+const ModuleNameAPI = { ... }    // Fetch from API (rutas backend)
+const ModuleNameLogic = { ... }  // Lógica de negocio y transformación de datos puros
+const ModuleNameRender = { ... } // Generación de HTML (uso estricto de Utils.escaparHTML)
 const ModuleName = {
-  render()        // Mount HTML into main container
-  cargarDatos()   // Fetch from API and populate
-  renderStats()   // Update stat cards
-  renderTabla()   // Render reusable Table component
+  render()        // Orquesta componentes genéricos (Drawer.open, Filters.render)
+  cargarDatos()   // Coordina la API, Logic y Render
 }
 ```
 
@@ -257,6 +258,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 | 18/04/2026 | Refactor iniciadorFlujo — centralizar validación placa/km | Eliminar duplicación entre preoperacional/tanqueo/posoperacional (3 copias → 1 factory). Factory pattern con opciones por flujo. Reduce mantenimiento y asegura consistencia. |
 | 18/04/2026 | obtenerReferenciaKilometraje en data/inspecciones | Lógica de referencia de km unificada con prioridad por tipo de flujo: preoperacional día > tanqueo/posoperacional según contexto > último preoperacional > vehículo > sin referencia. |
 | 18/04/2026 | Posoperacional v2 — flujo alineado con preoperacional/tanqueo | Pide placa y km al inicio del flujo usando iniciadorFlujo factory. PDF omite placa del vehículo pero mantiene km final, fotos, documentos, novedades y firma digital. |
+| 18/04/2026 | Refactor integral Frontend (Fases 1-4) | Implementación de `Drawer.js` y `Filters.js` genéricos. Estandarización de módulos en 4 capas (API/Logic/Render/Orquestador). Cierre de vulnerabilidades XSS en inyecciones DOM con `Utils.escaparHTML()`. Centralización de decodificación JWT. |
 
 ## Cursor — cómo usar las reglas especializadas
 

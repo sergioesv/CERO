@@ -77,7 +77,7 @@ const TanqueosLogic = {
       revisado: '<span class="badge badge-success">Revisado</span>',
       validado: '<span class="badge badge-success">Revisado</span>'
     };
-    return mapa[estado] || '<span class="badge">' + (estado || '-') + '</span>';
+    return mapa[estado] || '<span class="badge">' + Utils.escaparHTML(estado || '-') + '</span>';
   },
 
   proxyUrl(foto) {
@@ -103,7 +103,7 @@ const TanqueosLogic = {
 
   formatearCantidad(cantidad, unidad) {
     if (!cantidad) return '-';
-    return parseFloat(cantidad).toFixed(3) + ' ' + (unidad || 'L');
+    return parseFloat(cantidad).toFixed(3) + ' ' + Utils.escaparHTML(unidad || 'L');
   },
 
   formatearRendimiento(t) {
@@ -145,16 +145,16 @@ const TanqueosRender = {
     var conductor = t.conductores ? t.conductores.nombre : '-';
     var alerta = TanqueosLogic.tieneDiscrepancias(t) ? ' <span title="Con discrepancias">⚠</span>' : '';
     var check = (t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado')
-      ? '<input type="checkbox" class="tanq-check" data-id="' + t.id + '" onchange="Tanqueos.toggleSeleccion(\'' + t.id + '\')">'
+      ? '<input type="checkbox" class="tanq-check" data-id="' + Utils.escaparHTML(t.id) + '" onchange="Tanqueos.toggleSeleccion(\'' + Utils.escaparHTML(t.id) + '\')">'
       : '';
 
-    return '<tr class="table-row-clickable" onclick="Tanqueos.abrirDrawer(\'' + t.id + '\')" style="cursor:pointer;">' +
+    return '<tr class="table-row-clickable" onclick="Tanqueos.abrirDetalle(\'' + Utils.escaparHTML(t.id) + '\')" style="cursor:pointer;" data-testid="row-tanqueo-' + Utils.escaparHTML(t.id) + '">' +
       '<td onclick="event.stopPropagation()" style="width:36px;">' + check + '</td>' +
-      '<td>' + fecha + '</td>' +
-      '<td><strong>' + (t.vehiculo_placa || '-') + '</strong></td>' +
-      '<td>' + conductor + '</td>' +
-      '<td>' + TanqueosLogic.formatearCantidad(t.cantidad, t.unidad_medida) + '</td>' +
-      '<td>' + TanqueosLogic.formatearValor(t.valor_total) + '</td>' +
+      '<td>' + Utils.escaparHTML(fecha) + '</td>' +
+      '<td><strong>' + Utils.escaparHTML(t.vehiculo_placa || '-') + '</strong></td>' +
+      '<td>' + Utils.escaparHTML(conductor) + '</td>' +
+      '<td>' + Utils.escaparHTML(TanqueosLogic.formatearCantidad(t.cantidad, t.unidad_medida)) + '</td>' +
+      '<td>' + Utils.escaparHTML(TanqueosLogic.formatearValor(t.valor_total)) + '</td>' +
       '<td>' + TanqueosLogic.badgeEstado(t.estado_validacion) + alerta + '</td>' +
       '</tr>';
   },
@@ -168,9 +168,9 @@ const TanqueosRender = {
     var haySeleccionables = datos.some(function(t) {
       return t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado';
     });
-    return '<table class="table">' +
+    return '<table class="table" data-testid="tabla-tanqueos">' +
       '<thead><tr>' +
-      '<th style="width:36px;">' + (haySeleccionables ? '<input type="checkbox" onchange="Tanqueos.toggleTodos(this.checked)">' : '') + '</th>' +
+      '<th style="width:36px;">' + (haySeleccionables ? '<input type="checkbox" onchange="Tanqueos.toggleTodos(this.checked)" data-testid="check-todos">' : '') + '</th>' +
       '<th>Fecha</th><th>Placa</th><th>Conductor</th><th>Cantidad</th><th>Valor</th><th>Estado</th>' +
       '</tr></thead>' +
       '<tbody>' + filas + '</tbody>' +
@@ -187,29 +187,29 @@ const TanqueosRender = {
     var puedeRevisar = t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado';
     var kmOcrFact = t.km_ocr_factura != null && t.km_ocr_factura !== '' ? String(t.km_ocr_factura) : '-';
     var kmOdom = t.km_ocr_odometro != null && t.km_ocr_odometro !== '' ? String(t.km_ocr_odometro) : '-';
-    var camposDisc = disc.map(function(d) { return d.campo; }).join(', ');
+    var camposDisc = disc.map(function(d) { return Utils.escaparHTML(d.campo); }).join(', ');
 
     var html = '';
 
     html += '<div style="padding:14px;border-bottom:1px solid var(--border-color);position:sticky;top:0;background:var(--bg-primary);z-index:2;">';
     html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
     html += '<span style="font-size:1.05rem;">' + TanqueosLogic.badgeEstado(t.estado_validacion) + '</span>';
-    if (puedeRevisar) html += '<button id="tanq-btn-revisado" class="btn btn-success btn-sm">Marcar revisado</button>';
-    html += '<button id="tanq-btn-notas" class="btn btn-secondary btn-sm">+ Notas</button>';
+    if (puedeRevisar) html += '<button id="tanq-btn-revisado" class="btn btn-success btn-sm" data-testid="btn-marcar-revisado">Marcar revisado</button>';
+    html += '<button id="tanq-btn-notas" class="btn btn-secondary btn-sm" data-testid="btn-add-notas">+ Notas</button>';
     html += '</div></div>';
 
     html += '<div style="padding:16px;">';
     html += '<div style="margin-bottom:16px;">';
     html += '<div class="text-xs text-secondary" style="margin-bottom:6px;">FOTO FACTURA</div>';
     if (urlFact) {
-      html += '<img id="tanq-foto-factura" data-url="' + urlFact + '" src="' + urlFact + '" style="width:100%;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;" />';
+      html += '<img id="tanq-foto-factura" data-url="' + Utils.escaparHTML(urlFact) + '" src="' + Utils.escaparHTML(urlFact) + '" style="width:100%;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;" />';
     } else {
       html += '<div style="padding:18px;border:1px dashed var(--border-color);border-radius:8px;text-align:center;" class="text-secondary">Sin foto de recibo</div>';
     }
     if (urlOdom) {
       html += '<div style="margin-top:8px;">';
       html += '<div class="text-xs text-secondary" style="margin-bottom:6px;">Odómetro</div>';
-      html += '<img id="tanq-foto-odometro" data-url="' + urlOdom + '" src="' + urlOdom + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border-color);cursor:zoom-in;" />';
+      html += '<img id="tanq-foto-odometro" data-url="' + Utils.escaparHTML(urlOdom) + '" src="' + Utils.escaparHTML(urlOdom) + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border-color);cursor:zoom-in;" />';
       html += '</div>';
     }
     html += '</div>';
@@ -217,12 +217,12 @@ const TanqueosRender = {
     html += '<div style="margin-bottom:16px;">';
     html += '<div style="font-size:0.78rem;letter-spacing:.08em;color:var(--text-secondary);font-weight:700;margin-bottom:8px;">CRUCE TERPEL</div>';
     html += '<table class="table"><tbody>';
-    html += '<tr><td>Placa recibo OCR</td><td><strong>' + (t.placa_ocr_factura || '-') + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'placa') + '</td></tr>';
-    html += '<tr><td>Placa BD</td><td><strong>' + (t.vehiculo_placa || '-') + '</strong></td></tr>';
-    html += '<tr><td>Km recibo OCR</td><td><strong>' + kmOcrFact + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'kilometraje') + '</td></tr>';
-    html += '<tr><td>Km odómetro foto</td><td><strong>' + kmOdom + '</strong></td></tr>';
-    html += '<tr><td>Cantidad OCR</td><td><strong>' + TanqueosLogic.formatearCantidad(t.cantidad_ocr, t.unidad_medida) + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'cantidad') + '</td></tr>';
-    html += '<tr><td>Valor total</td><td><strong>' + TanqueosLogic.formatearValor(t.valor_total) + '</strong></td></tr>';
+    html += '<tr><td>Placa recibo OCR</td><td><strong>' + Utils.escaparHTML(t.placa_ocr_factura || '-') + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'placa') + '</td></tr>';
+    html += '<tr><td>Placa BD</td><td><strong>' + Utils.escaparHTML(t.vehiculo_placa || '-') + '</strong></td></tr>';
+    html += '<tr><td>Km recibo OCR</td><td><strong>' + Utils.escaparHTML(kmOcrFact) + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'kilometraje') + '</td></tr>';
+    html += '<tr><td>Km odómetro foto</td><td><strong>' + Utils.escaparHTML(kmOdom) + '</strong></td></tr>';
+    html += '<tr><td>Cantidad OCR</td><td><strong>' + Utils.escaparHTML(TanqueosLogic.formatearCantidad(t.cantidad_ocr, t.unidad_medida)) + '</strong> ' + TanqueosLogic.indicadorCruce(disc, 'cantidad') + '</td></tr>';
+    html += '<tr><td>Valor total</td><td><strong>' + Utils.escaparHTML(TanqueosLogic.formatearValor(t.valor_total)) + '</strong></td></tr>';
     html += '</tbody></table>';
     if (disc.length) {
       html += '<div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(239,68,68,.12);color:var(--color-danger);font-size:.85rem;">Conflictos detectados: ' + camposDisc + '</div>';
@@ -237,17 +237,17 @@ const TanqueosRender = {
     html += '<div style="margin-bottom:16px;">';
     html += '<button id="tanq-toggle-adicionales" class="btn btn-secondary btn-sm">Datos adicionales ▼</button>';
     html += '<div id="tanq-datos-adicionales" style="display:none;margin-top:10px;">';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Conductor</span><strong>' + (t.conductores ? t.conductores.nombre : '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Fecha</span><strong>' + (t.created_at ? t.created_at.substring(0, 10) : '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tipo tanqueo</span><strong>' + (t.tipo_tanqueo || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número factura OCR</span><strong>' + (t.factura_numero_ocr || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número manual</span><strong>' + (t.factura_numero_manual || t.factura_numero || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Score OCR</span><strong>' + (t.ocr_score || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tier OCR</span><strong>' + (t.ocr_tier || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Serial iButton</span><strong>' + (t.ibutton_serial || '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Rendimiento calculado</span><strong>' + TanqueosLogic.formatearRendimiento(t) + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Conductor</span><strong>' + Utils.escaparHTML(t.conductores ? t.conductores.nombre : '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Fecha</span><strong>' + Utils.escaparHTML(t.created_at ? t.created_at.substring(0, 10) : '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tipo tanqueo</span><strong>' + Utils.escaparHTML(t.tipo_tanqueo || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número factura OCR</span><strong>' + Utils.escaparHTML(t.factura_numero_ocr || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número manual</span><strong>' + Utils.escaparHTML(t.factura_numero_manual || t.factura_numero || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Score OCR</span><strong>' + Utils.escaparHTML(t.ocr_score || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tier OCR</span><strong>' + Utils.escaparHTML(t.ocr_tier || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Serial iButton</span><strong>' + Utils.escaparHTML(t.ibutton_serial || '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Rendimiento calculado</span><strong>' + Utils.escaparHTML(TanqueosLogic.formatearRendimiento(t)) + '</strong></div>';
     if (t.vehiculos && t.vehiculos.rendimiento_min && t.vehiculos.rendimiento_max) {
-      html += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:180px;">Rango esperado</span><strong>' + t.vehiculos.rendimiento_min + ' - ' + t.vehiculos.rendimiento_max + ' km/u</strong></div>';
+      html += '<div class="flex gap-sm"><span class="text-secondary" style="min-width:180px;">Rango esperado</span><strong>' + Utils.escaparHTML(t.vehiculos.rendimiento_min) + ' - ' + Utils.escaparHTML(t.vehiculos.rendimiento_max) + ' km/u</strong></div>';
     }
     html += '</div></div>';
 
@@ -268,18 +268,18 @@ const TanqueosRender = {
     var html = '';
     html += '<div class="flex gap-sm items-center" style="margin-bottom:16px;">';
     html += '<label class="text-xs text-secondary">Mes</label>';
-    html += '<input type="month" class="input input-sm" value="' + mes + '" id="tanq-consolidado-mes" style="width:160px;">';
+    html += '<input type="month" class="input input-sm" value="' + Utils.escaparHTML(mes) + '" id="tanq-consolidado-mes" style="width:160px;">';
     html += '<button type="button" class="btn btn-secondary btn-sm" onclick="Tanqueos.exportarCsvConsolidado()">⬇️ Exportar CSV</button>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">';
-    html += Tanqueos._cardResumen('Total tanqueos', r.total_tanqueos || 0);
-    html += Tanqueos._cardResumen('Total galones', (r.total_galones || 0).toFixed(1));
-    html += Tanqueos._cardResumen('Total pesos', TanqueosLogic.formatearValor(r.total_pesos));
-    html += Tanqueos._cardResumen('Precio prom./gal', r.precio_promedio_galon ? TanqueosLogic.formatearValor(r.precio_promedio_galon) : '-');
+    html += Tanqueos._cardResumen('Total tanqueos', Utils.escaparHTML(r.total_tanqueos || 0));
+    html += Tanqueos._cardResumen('Total galones', Utils.escaparHTML((r.total_galones || 0).toFixed(1)));
+    html += Tanqueos._cardResumen('Total pesos', Utils.escaparHTML(TanqueosLogic.formatearValor(r.total_pesos)));
+    html += Tanqueos._cardResumen('Precio prom./gal', r.precio_promedio_galon ? Utils.escaparHTML(TanqueosLogic.formatearValor(r.precio_promedio_galon)) : '-');
     html += '</div>';
     html += '<div class="flex gap-sm" style="margin-bottom:16px;">';
-    html += '<span class="badge badge-info">Convenio: ' + (r.convenio || 0) + '</span>';
-    html += '<span class="badge badge-warning">Emergencia: ' + (r.emergencia || 0) + '</span>';
+    html += '<span class="badge badge-info">Convenio: ' + Utils.escaparHTML(r.convenio || 0) + '</span>';
+    html += '<span class="badge badge-warning">Emergencia: ' + Utils.escaparHTML(r.emergencia || 0) + '</span>';
     html += '</div>';
     if (veh.length === 0) {
       html += '<div class="text-secondary" style="text-align:center;padding:24px;">Sin tanqueos validados en este período.</div>';
@@ -290,13 +290,13 @@ const TanqueosRender = {
     html += '</tr></thead><tbody>';
     veh.forEach(function(v) {
       html += '<tr>';
-      html += '<td><strong>' + v.placa + '</strong></td>';
-      html += '<td>' + [v.marca, v.modelo].filter(Boolean).join(' ') + '</td>';
-      html += '<td>' + v.tanqueos + '</td>';
-      html += '<td>' + (v.total_galones || 0).toFixed(1) + '</td>';
-      html += '<td>' + (v.total_litros || 0).toFixed(1) + '</td>';
-      html += '<td>' + TanqueosLogic.formatearValor(v.total_pesos) + '</td>';
-      html += '<td>' + (v.rendimiento_promedio ? v.rendimiento_promedio + ' km/u' : '-') + '</td>';
+      html += '<td><strong>' + Utils.escaparHTML(v.placa) + '</strong></td>';
+      html += '<td>' + Utils.escaparHTML([v.marca, v.modelo].filter(Boolean).join(' ')) + '</td>';
+      html += '<td>' + Utils.escaparHTML(v.tanqueos) + '</td>';
+      html += '<td>' + Utils.escaparHTML((v.total_galones || 0).toFixed(1)) + '</td>';
+      html += '<td>' + Utils.escaparHTML((v.total_litros || 0).toFixed(1)) + '</td>';
+      html += '<td>' + Utils.escaparHTML(TanqueosLogic.formatearValor(v.total_pesos)) + '</td>';
+      html += '<td>' + Utils.escaparHTML(v.rendimiento_promedio ? v.rendimiento_promedio + ' km/u' : '-') + '</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
@@ -313,7 +313,6 @@ const Tanqueos = {
     placa: '',
     estado_validacion: 'todos'
   },
-  drawerAbierto: false,
   detalleActual: null,
   seleccionados: [],
   consolidadoMes: '',
@@ -338,31 +337,12 @@ const Tanqueos = {
       '</div></div>' +
       '<div class="main-content">' +
       '<div id="tanq-stats"></div>' +
-      '<div class="filters-row">' +
-      '<div class="flex gap-sm items-center">' +
-      '<label class="text-xs text-secondary">Desde</label>' +
-      '<input type="date" class="input input-sm" id="tanq-desde" value="' + this.filtros.fecha_inicio + '" style="width:140px;">' +
-      '<label class="text-xs text-secondary">Hasta</label>' +
-      '<input type="date" class="input input-sm" id="tanq-hasta" value="' + this.filtros.fecha_fin + '" style="width:140px;">' +
-      '</div>' +
-      '<div class="search-box" style="min-width:130px;max-width:160px;">' +
-      '<input type="text" class="input input-sm" placeholder="Placa..." id="tanq-placa" value="' + this.filtros.placa + '" style="text-transform:uppercase;">' +
-      '</div>' +
-      '<div class="flex gap-sm">' +
-      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'todos' ? 'btn-primary' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'todos\')">Todos</button>' +
-      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'pendiente_revision' ? 'btn-warning' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'pendiente_revision\')">Pendientes</button>' +
-      '<button class="btn btn-sm ' + (this.filtros.estado_validacion === 'revisados' ? 'btn-success' : 'btn-secondary') + '" onclick="Tanqueos.filtrarEstado(\'revisados\')">Revisados</button>' +
-      '</div></div>' +
+      '<div id="tanq-filters"></div>' +
       '<div id="tanq-acciones-lote" class="flex gap-sm" style="display:none;margin-bottom:8px;">' +
       '<span id="tanq-seleccionados-count" class="text-sm text-secondary"></span>' +
       '<button class="btn btn-sm btn-success" onclick="Tanqueos.validarLote()">Marcar revisados</button>' +
       '</div>' +
       '<div id="tanq-tabla"><div style="text-align:center;padding:40px;"><span class="text-secondary">Cargando tanqueos...</span></div></div>' +
-      '</div>' +
-      '<div class="drawer-backdrop" id="drawer-backdrop" onclick="Tanqueos.cerrarDrawer()"></div>' +
-      '<div class="drawer" id="drawer-panel" style="width:min(780px,95vw);">' +
-      '<div class="drawer-header"><h3 class="drawer-title" id="drawer-titulo">Detalle del tanqueo</h3><button class="modal-close" onclick="Tanqueos.cerrarDrawer()">&times;</button></div>' +
-      '<div class="drawer-body" id="drawer-contenido" style="padding:0;"></div>' +
       '</div>' +
       '<div class="modal-overlay" id="modal-consolidado" style="display:none;" onclick="if(event.target===this)Tanqueos.cerrarConsolidado()">' +
       '<div class="modal" style="max-width:860px;width:95vw;">' +
@@ -375,18 +355,25 @@ const Tanqueos = {
     }
     this._bindLightboxEvents();
 
-    document.getElementById('tanq-desde').addEventListener('change', function() {
-      Tanqueos.filtros.fecha_inicio = this.value;
-      Tanqueos.cargarDatos();
+    Filters.render({
+      containerId: 'tanq-filters',
+      onFilterChange: (key, value) => {
+        if (key === 'desde') this.filtros.fecha_inicio = value;
+        if (key === 'hasta') this.filtros.fecha_fin = value;
+        if (key === 'busqueda') this.filtros.placa = value;
+        if (key === 'estado') this.filtros.estado_validacion = value;
+        
+        this.cargarDatos();
+      },
+      defaultState: this.filtros.estado_validacion,
+      dateValues: { desde: this.filtros.fecha_inicio, hasta: this.filtros.fecha_fin, busqueda: this.filtros.placa },
+      searchPlaceholder: 'Buscar placa...',
+      states: [
+        { value: 'todos', label: 'Todos', colorClass: 'btn-primary' },
+        { value: 'pendiente_revision', label: 'Pendientes', colorClass: 'btn-warning' },
+        { value: 'revisados', label: 'Revisados', colorClass: 'btn-success' }
+      ]
     });
-    document.getElementById('tanq-hasta').addEventListener('change', function() {
-      Tanqueos.filtros.fecha_fin = this.value;
-      Tanqueos.cargarDatos();
-    });
-    document.getElementById('tanq-placa').addEventListener('input', Utils.debounce(function(e) {
-      Tanqueos.filtros.placa = e.target.value.toUpperCase();
-      Tanqueos.cargarDatos();
-    }, 400));
 
     await this.cargarDatos();
   },
@@ -420,43 +407,24 @@ const Tanqueos = {
     }
   },
 
-  filtrarEstado(estado) {
-    this.filtros.estado_validacion = estado;
-    this.cargarDatos();
-    var botones = document.querySelectorAll('.filters-row .flex.gap-sm button');
-    botones.forEach(function(btn) {
-      var texto = (btn.textContent || '').trim();
-      var activo = (texto === 'Todos' && estado === 'todos') ||
-        (texto === 'Pendientes' && estado === 'pendiente_revision') ||
-        (texto === 'Revisados' && estado === 'revisados');
-      btn.className = 'btn btn-sm ' + (activo ? (texto === 'Pendientes' ? 'btn-warning' : (texto === 'Revisados' ? 'btn-success' : 'btn-primary')) : 'btn-secondary');
-    });
-  },
-
   resetFiltros() {
     this.filtros = { fecha_inicio: '', fecha_fin: '', placa: '', estado_validacion: 'todos' };
     this.render();
   },
 
-  async abrirDrawer(id) {
-    var drawer = document.getElementById('drawer-panel');
-    var backdrop = document.getElementById('drawer-backdrop');
-    var contenido = document.getElementById('drawer-contenido');
-    var titulo = document.getElementById('drawer-titulo');
-    if (!drawer) return;
-
-    titulo.textContent = 'Cargando...';
-    contenido.innerHTML = '<div style="padding:40px;text-align:center;"><span class="text-secondary">Cargando detalle...</span></div>';
-    drawer.classList.add('open');
-    if (backdrop) backdrop.classList.add('active');
-    this.drawerAbierto = true;
+  async abrirDetalle(id) {
+    Drawer.setLoading('Cargando detalle...');
     this.notasDrawer = '';
 
     try {
       var t = await TanqueosAPI.obtenerDetalle(id);
       this.detalleActual = t;
-      titulo.textContent = 'Tanqueo — ' + (t.vehiculo_placa || '-');
-      contenido.innerHTML = TanqueosRender.drawer(t);
+
+      Drawer.open({
+        title: 'Tanqueo — ' + Utils.escaparHTML(t.vehiculo_placa || '-'),
+        content: TanqueosRender.drawer(t),
+        width: '780px'
+      });
 
       var btnRevisado = document.getElementById('tanq-btn-revisado');
       var btnNotas = document.getElementById('tanq-btn-notas');
@@ -499,18 +467,8 @@ const Tanqueos = {
         });
       }
     } catch (e) {
-      contenido.innerHTML = '<div style="padding:24px;"><span class="badge badge-danger">Error cargando detalle</span></div>';
+      Drawer.open({ title: 'Error', content: '<div style="padding:24px;"><span class="badge badge-danger">Error cargando detalle</span></div>' });
     }
-  },
-
-  cerrarDrawer() {
-    var drawer = document.getElementById('drawer-panel');
-    var backdrop = document.getElementById('drawer-backdrop');
-    if (drawer) drawer.classList.remove('open');
-    if (backdrop) backdrop.classList.remove('active');
-    this.drawerAbierto = false;
-    this.detalleActual = null;
-    this.notasDrawer = '';
   },
 
   abrirLightbox(url) {
@@ -541,7 +499,7 @@ const Tanqueos = {
     try {
       await TanqueosAPI.marcarRevisado(id, notas);
       Toast.success('Tanqueo marcado como revisado');
-      this.cerrarDrawer();
+      Drawer.close();
       await this.cargarDatos();
     } catch (e) {
       Toast.error('Error al procesar la acción');

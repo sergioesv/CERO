@@ -51,6 +51,31 @@ const Utils = {
       clearTimeout(timeout);
       timeout = setTimeout(() => func(...args), wait);
     };
+  },
+  
+  getJwtPayload() {
+    const token = sessionStorage.getItem('cero_token');
+    if (!token) return null;
+    try {
+      const payloadBase64 = token.split('.')[1];
+      if (!payloadBase64) return null;
+      const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      return JSON.parse(atob(padded));
+    } catch (e) {
+      console.error('Error decodificando JWT:', e);
+      return null;
+    }
+  },
+
+  getRoles() {
+    const payload = this.getJwtPayload();
+    return payload && Array.isArray(payload.roles) ? payload.roles : [];
+  },
+
+  getEmpresaId() {
+    const payload = this.getJwtPayload();
+    return payload ? payload.empresa_id : null;
   }
 };
 

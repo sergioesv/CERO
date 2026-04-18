@@ -36,16 +36,13 @@ const App = {
     const headerUser = document.getElementById('header-user');
     if (!headerUser) return;
 
-    const token = sessionStorage.getItem('cero_token');
-    if (!token) {
+    const payload = Utils.getJwtPayload();
+    if (!payload) {
       headerUser.textContent = 'Usuario';
       return;
     }
 
     try {
-      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
-
       const nombre = payload.nombre || 'Usuario';
       const roles = payload.roles || [];
 
@@ -79,15 +76,8 @@ const App = {
   },
 
   debeCambiarPassword() {
-    const token = sessionStorage.getItem('cero_token');
-    if (!token) return false;
-    try {
-      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
-      return !!payload.debe_cambiar_password;
-    } catch (e) {
-      return false;
-    }
+    const payload = Utils.getJwtPayload();
+    return payload ? !!payload.debe_cambiar_password : false;
   },
 
   mostrarModalCambiarPassword() {
@@ -245,40 +235,12 @@ function classifyRole(role) {
   return null;
 }
 
-function getRolesFromToken() {
-  const token = sessionStorage.getItem('cero_token');
-  if (!token) return [];
-
-  try {
-    const payloadBase64 = token.split('.')[1];
-    if (!payloadBase64) return [];
-
-    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const payload = JSON.parse(atob(padded));
-    return Array.isArray(payload.roles) ? payload.roles : [];
-  } catch (error) {
-    console.error('No se pudo decodificar el token:', error);
-    return [];
-  }
-}
-
-App.getRolesFromToken = getRolesFromToken;
-App.getEmpresaId = function getEmpresaId() {
-  const token = sessionStorage.getItem('cero_token');
-  if (!token) return null;
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
-    return payload.empresa_id || null;
-  } catch (e) {
-    return null;
-  }
-};
+App.getRolesFromToken = function() { return Utils.getRoles(); };
+App.getEmpresaId = function() { return Utils.getEmpresaId(); };
 App.normalizeRoleName = normalizeRoleName;
 App.classifyRole = classifyRole;
 App.getCanonicalRoles = function getCanonicalRoles() {
-  const roles = this.getRolesFromToken();
+  const roles = Utils.getRoles();
   return [...new Set(roles.map((role) => this.classifyRole(role)).filter(Boolean))];
 };
 
@@ -295,7 +257,6 @@ App.canAccessRoute = function canAccessRoute(path) {
   return this.canAccessItem(itemId);
 };
 
-window.getRolesFromToken = getRolesFromToken;
 document.addEventListener('DOMContentLoaded', () => App.init());
 window.App = App;
-window.CeroApp = App;
+window.CeroApp = App; // Utilizado en index.html para cerrar sesión
