@@ -31,7 +31,7 @@ jobs:
       - name: ESLint — frontend
         run: |
           npx eslint public/js/ public/components/ public/modules/ \
-            --max-warnings=10
+            --max-warnings=50
 
       - name: Detectar credenciales en JS cliente
         run: |

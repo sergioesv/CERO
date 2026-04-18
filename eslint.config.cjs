@@ -2,13 +2,16 @@ const js = require('@eslint/js');
 const globals = require('globals');
 
 module.exports = [
-  { ignores: ['node_modules/**', 'public/**'] },
+  { ignores: ['node_modules/**'] },
   js.configs.recommended,
   {
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'commonjs',
-      globals: { ...globals.node },
+      sourceType: 'script',
+      globals: {
+        ...globals.node,
+        ...globals.browser
+      },
     },
     rules: {
       // ASCII art / tablas en comentarios (p. ej. canales/whatsapp.js)
@@ -21,6 +24,13 @@ module.exports = [
       'no-empty': 'warn',
       'no-prototype-builtins': 'warn',
       'preserve-caught-error': 'warn',
+    },
+  },
+  {
+    files: ['public/**/*.js'],
+    rules: {
+      // Carga vía <script>: símbolos globales entre archivos (sin módulos)
+      'no-undef': 'off',
     },
   },
 ];
