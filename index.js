@@ -144,6 +144,15 @@ app.use('/api/autorizaciones', rutasAutorizaciones);
 const rutasTanqueos = require('./rutas/tanqueos');
 app.use('/api/tanqueos', rutasTanqueos);
 
+const rutasUsuarios = require('./rutas/usuarios');
+app.use('/api/usuarios', rutasUsuarios);
+
+const rutasRoles = require('./rutas/roles');
+app.use('/api/roles', rutasRoles);
+
+const rutasUsuariosRoles = require('./rutas/usuariosRoles');
+app.use('/api/usuarios_roles', rutasUsuariosRoles);
+
 // ═══════════════════════════════════════════════════════════
 // MIDDLEWARE GLOBAL DE ERRORES — debe ir al final del stack
 // ═══════════════════════════════════════════════════════════

@@ -24,7 +24,75 @@ const App = {
     this.registerRoutes();
     Sidebar.render();
     Router.init();
+    // Bloquear panel si el usuario debe cambiar su password
+    if (this.debeCambiarPassword()) {
+      this.mostrarModalCambiarPassword();
+    }
     console.log('CERO Panel listo');
+  },
+
+  debeCambiarPassword() {
+    const token = sessionStorage.getItem('cero_token');
+    if (!token) return false;
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
+      return !!payload.debe_cambiar_password;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  mostrarModalCambiarPassword() {
+    document.getElementById('modal-cambiar-pass')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'modal-cambiar-pass';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+      <div style="background:var(--bg-primary,#1a1a2e);border:1px solid var(--border-color,#333);border-radius:12px;padding:32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <h2 style="margin:0 0 8px;font-size:20px;">Cambiar contrasena</h2>
+        <p style="margin:0 0 24px;font-size:14px;opacity:0.7;">Tu cuenta tiene una contrasena temporal. Debes cambiarla para continuar.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <input type="password" id="cp-actual" class="input" placeholder="Contrasena actual" />
+          <input type="password" id="cp-nueva" class="input" placeholder="Nueva contrasena (min. 8 caracteres)" />
+          <input type="password" id="cp-confirmar" class="input" placeholder="Confirmar nueva contrasena" />
+          <div id="cp-error" style="color:#ef4444;font-size:13px;display:none;"></div>
+          <button class="btn btn-primary" onclick="App.guardarNuevaPassword()" style="margin-top:4px;">Cambiar contrasena</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async guardarNuevaPassword() {
+    const actual     = document.getElementById('cp-actual')?.value;
+    const nueva      = document.getElementById('cp-nueva')?.value;
+    const confirmar  = document.getElementById('cp-confirmar')?.value;
+    const errorEl    = document.getElementById('cp-error');
+
+    const mostrarError = (msg) => { if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; } };
+    if (errorEl) errorEl.style.display = 'none';
+
+    if (!actual || !nueva || !confirmar) return mostrarError('Todos los campos son obligatorios');
+    if (nueva.length < 8)               return mostrarError('La nueva contrasena debe tener al menos 8 caracteres');
+    if (nueva !== confirmar)             return mostrarError('Las contrasenas no coinciden');
+    if (actual === nueva)               return mostrarError('La nueva contrasena debe ser diferente a la actual');
+
+    try {
+      const res = await fetch('/auth/cambiar-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('cero_token') },
+        body: JSON.stringify({ password_actual: actual, password_nueva: nueva })
+      });
+      const data = await res.json();
+      if (!res.ok) return mostrarError(data.error || 'Error al cambiar contrasena');
+
+      // Exito: cerrar sesion para forzar login con nuevo JWT sin el flag
+      sessionStorage.removeItem('cero_token');
+      window.location.href = '/login';
+    } catch (err) {
+      mostrarError('Error de conexion');
+    }
   },
 
   cerrarSesion: function() {
@@ -68,6 +136,7 @@ const App = {
     Router.register('conductores', () => ConductoresModule.render());
     Router.register('sedes', () => SedesModule.render());
     Router.register('usuarios', () => UsuariosModule.render());
+    Router.register('cambiar-password', () => App.mostrarModalCambiarPassword());
 
     Router.register('equipos', () =>
       App.renderPlaceholder('Inspección de equipos', 'Escaleras, arnés, taladros, EPP'));
@@ -148,6 +217,17 @@ function getRolesFromToken() {
 }
 
 App.getRolesFromToken = getRolesFromToken;
+App.getEmpresaId = function getEmpresaId() {
+  const token = sessionStorage.getItem('cero_token');
+  if (!token) return null;
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=')));
+    return payload.empresa_id || null;
+  } catch (e) {
+    return null;
+  }
+};
 App.normalizeRoleName = normalizeRoleName;
 App.classifyRole = classifyRole;
 App.getCanonicalRoles = function getCanonicalRoles() {

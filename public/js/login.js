@@ -36,8 +36,10 @@ form.addEventListener('submit', async function (e) {
 
     if (res.ok && data.token) {
       sessionStorage.setItem('cero_token', data.token);
-      // Transición animada hacia el panel
-      CeroTransitions.ir('/panel#dashboard');
+      const destino = data.usuario?.debe_cambiar_password
+        ? '/panel#cambiar-password'
+        : '/panel#dashboard';
+      CeroTransitions.ir(destino);
     } else {
       errorMsg.classList.add('visible');
       btn.disabled = false;

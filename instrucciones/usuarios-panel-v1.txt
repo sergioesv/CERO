@@ -1,0 +1,3 @@
+Instruccion archivada — ver git log para detalle completo.
+Implementada el 17/04/2026 en branch desarrollo.
+Commit: feat(usuarios): sistema completo de gestion con password temporal y seguridad
