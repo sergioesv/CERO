@@ -294,6 +294,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── fix-ci-frontend-eslint.txt
 │   ├── fix-drawer-labels-spacing.txt
 │   ├── fix-trust-proxy-security.txt
+│   ├── update-architecture-usuarios.txt
 │   └── usuarios-panel-v1.txt
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
