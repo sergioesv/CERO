@@ -100,8 +100,8 @@ const VehiculosFlota = {
       columns: [
         { key: 'codigo', label: 'Código / Placa', width: '130px', render: (_, row) => row.placa || row.codigo },
         { key: 'nombre', label: 'Nombre', render: (_, row) => row.nombre || '—' },
-        { key: 'soat_vencimiento', label: 'SOAT', render: (_, row) => Badge.documento(row.documentos?.soat_vencimiento) },
-        { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: (_, row) => Badge.documento(row.documentos?.tecnomecanica_vencimiento) },
+        { key: 'soat_vencimiento', label: 'SOAT', render: (_, row) => Badge.documento(row.soat_vencimiento) },
+        { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: (_, row) => Badge.documento(row.tecnomecanica_vencimiento) },
         { key: 'estado', label: 'Estado', render: v => this.badgeEstado(v) },
         { key: 'acciones', label: '', width: '80px', render: (_, row) => `
           <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.id}')">Editar</button>
@@ -175,15 +175,15 @@ const VehiculosFlota = {
         </div>
         <div class="mb-md">
           <label class="text-sm text-secondary">Marca</label>
-          <input type="text" class="input" id="edit-marca" value="${activo.datos?.marca || ''}">
+          <input type="text" class="input" id="edit-marca" value="${activo.marca || ''}">
         </div>
         <div class="mb-md">
           <label class="text-sm text-secondary">SOAT vencimiento</label>
-          <input type="date" class="input" id="edit-soat" value="${activo.documentos?.soat_vencimiento || ''}">
+          <input type="date" class="input" id="edit-soat" value="${activo.soat_vencimiento || ''}">
         </div>
         <div class="mb-md">
           <label class="text-sm text-secondary">Tecnomecánica vencimiento</label>
-          <input type="date" class="input" id="edit-tecno" value="${activo.documentos?.tecnomecanica_vencimiento || ''}">
+          <input type="date" class="input" id="edit-tecno" value="${activo.tecnomecanica_vencimiento || ''}">
         </div>
       `,
       footer: `
@@ -202,11 +202,9 @@ const VehiculosFlota = {
       nombre: document.getElementById('edit-nombre').value,
       codigo: document.getElementById('edit-codigo').value,
       estado: document.getElementById('edit-estado').value,
-      datos: { marca },
-      documentos: { 
-        soat_vencimiento: soat, 
-        tecnomecanica_vencimiento: tecno 
-      }
+      marca: marca,
+      soat_vencimiento: soat,
+      tecnomecanica_vencimiento: tecno
     };
     
     try {
