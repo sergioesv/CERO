@@ -62,22 +62,28 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
     var data = (resultado.data || []).map(function (registro) {
       var novedades = registro.novedades || [];
       var totalNovedades = novedades.length;
-      var novedadesCriticas = novedades.filter(function (n) { return n.critico === true; }).length;
+      // Fix 1: contar criticos usando severidad real (no solo el flag critico)
+      var novedadesCriticas = novedades.filter(function (n) { return n.critico === true || n.severidad === 'bloqueo'; }).length;
       var activo = registro.activos || {};
-      var datosActivo = activo.datos || {};
 
       return {
         id: registro.id,
         fecha: registro.fecha,
         hora: registro.hora,
+        created_at: registro.created_at,
         activo_id: registro.activo_id,
-        vehiculo_placa: activo.placa || null,
-        vehiculo_marca: datosActivo.marca || null,
-        vehiculo_modelo: datosActivo.modelo || null,
+        // Fix 1: incluir objeto activos completo para que el panel lea activos.placa y activos.nombre
+        activos: activo.id ? {
+          id: activo.id,
+          placa: activo.placa || null,
+          nombre: activo.nombre || null,
+          codigo: activo.codigo || null
+        } : null,
         conductor_id: registro.conductor_id,
         conductor_nombre: registro.conductores ? registro.conductores.nombre : null,
         conductor_cedula: registro.conductores ? registro.conductores.cedula : null,
         kilometraje: registro.kilometraje,
+        horometro: registro.horometro || null,
         km_referencia: registro.km_referencia,
         diferencia_km: registro.diferencia_km,
         novedades: novedades,
