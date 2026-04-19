@@ -291,6 +291,10 @@ async function registrarCambioEstado(activoIdOrPlaca, estadoNuevo, motivo, categ
       return { ok: false, error: resActualizar.error.message };
     }
 
+    // Validar que cambiadoPor sea UUID válido — strings como 'panel' o 'sistema' se convierten a null
+    var UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    var cambiadoPorId = (cambiadoPor && UUID_REGEX.test(String(cambiadoPor))) ? cambiadoPor : null;
+
     // Insertar en historial_estado_activo
     var registroHistorial = {
       activo_id: activoId,
@@ -300,7 +304,7 @@ async function registrarCambioEstado(activoIdOrPlaca, estadoNuevo, motivo, categ
       categoria_motivo: categoriaMotivo || null,
       referencia_id: referenciaId || null,
       referencia_tipo: referenciaTipo || null,
-      cambiado_por: cambiadoPor || 'sistema'
+      cambiado_por: cambiadoPorId
     };
 
     var resHistorial = await supabase
