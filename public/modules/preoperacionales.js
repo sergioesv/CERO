@@ -243,7 +243,7 @@ const PreopRender = {
         var datos = respuestas[grupoId];
         // Preferir nombre_grupo persistido en backend (Fix bloques UUID vs nombre)
         var nombreGrupo = datos.nombre_grupo || datos.nombre || datos.grupo || grupoId;
-        var tieneNovedad = datos.estado && datos.estado !== 'ok';
+        var tieneNovedad = datos.estado && datos.estado.toUpperCase() !== 'OK';
         
         var iconBloque = tieneNovedad ? '⚠️' : '✓';
         var claseBloque = tieneNovedad ? 'drawer-bloque con-novedad' : 'drawer-bloque';
