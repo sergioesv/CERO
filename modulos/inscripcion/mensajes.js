@@ -9,9 +9,11 @@
 
 'use strict';
 
-// ── Pie de navegación estándar ────────────────────────────────────────────────
+var nav = require('../inspecciones/compartido/navegacion');
 
-var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+// ── Pie de navegación estándar (misma fuente que preop / posop / tanqueo) ─────
+
+var PIE_NAV = nav.PIE_NAV;
 
 // ============================================================================
 // BIENVENIDA / INICIO
