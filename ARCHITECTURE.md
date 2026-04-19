@@ -282,12 +282,15 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── autorizaciones.js
 │   ├── conductores.js
 │   ├── dashboard.js  # Rutas del dashboard operativo
+│   ├── plantillas.js
 │   ├── preoperacionales.js
 │   ├── roles.js
 │   ├── tanqueos.js
 │   ├── usuarios.js
 │   └── usuariosRoles.js
 ├── scripts
+│   ├── inspect_db.js
+│   ├── seed-templates.js
 │   ├── test-flujos.js
 │   ├── test-pdf.js
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
