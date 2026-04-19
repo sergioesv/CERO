@@ -311,9 +311,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 ├── grep-resultado.txt
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
 ├── original_prompt.txt
-├── package.json
-├── posop_test_clase.pdf
-└── preop_test_clase.pdf
+└── package.json
 ```
 
 ## Dependencies
