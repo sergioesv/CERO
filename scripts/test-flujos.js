@@ -42,7 +42,7 @@ console.log('\n\u2550\u2550\u2550 Test Flujos WhatsApp \u2550\u2550\u2550\n');
 
 // ── 1. Módulo compartido: twiml ──
 console.log('1. compartido/twiml.js');
-var twiml = require('../modulos/vehiculos/compartido/twiml');
+var twiml = require('../modulos/inspecciones/compartido/twiml');
 
 test('exporta responderTwiml', function() {
   assert(typeof twiml.responderTwiml === 'function');
@@ -62,7 +62,7 @@ test('escaparXml funciona correctamente', function() {
 
 // ── 2. Módulo compartido: baseFlujo ──
 console.log('\n2. compartido/baseFlujo.js');
-var FlujoBase = require('../modulos/vehiculos/compartido/baseFlujo');
+var FlujoBase = require('../modulos/inspecciones/compartido/baseFlujo');
 
 test('exporta constructor FlujoBase', function() {
   assert(typeof FlujoBase === 'function');
@@ -78,7 +78,7 @@ test('FlujoBase tiene prototype.procesarEstadoCompartido', function() {
 
 // ── 3. Módulo compartido: navegación ──
 console.log('\n3. compartido/navegacion.js');
-var nav = require('../modulos/vehiculos/compartido/navegacion');
+var nav = require('../modulos/inspecciones/compartido/navegacion');
 
 test('exporta textoMenuPrincipal', function() {
   assert(typeof nav.textoMenuPrincipal === 'function');
@@ -99,7 +99,7 @@ test('esMenu detecta 9', function() {
 
 // ── 4. Tanqueo ──
 console.log('\n4. tanqueo/flujo.js');
-var tanqueo = require('../modulos/vehiculos/tanqueo/flujo');
+var tanqueo = require('../modulos/tanqueo/flujo');
 
 test('exporta manejarTanqueo', function() {
   assert(typeof tanqueo.manejarTanqueo === 'function');
@@ -117,7 +117,7 @@ test('exporta ESTADOS', function() {
 
 // ── 5. Posoperacional ──
 console.log('\n5. posoperacional/flujo.js');
-var posop = require('../modulos/vehiculos/posoperacional/flujo');
+var posop = require('../modulos/inspecciones/posoperacional/flujo');
 
 test('exporta manejarPosoperacional', function() {
   assert(typeof posop.manejarPosoperacional === 'function');
@@ -134,7 +134,7 @@ test('exporta ESTADOS', function() {
 
 // ── 6. Preoperacional ──
 console.log('\n6. preoperacional/flujo.js');
-var preop = require('../modulos/vehiculos/preoperacional/flujo');
+var preop = require('../modulos/inspecciones/preoperacional/flujo');
 
 test('exporta manejarPreoperacional', function() {
   assert(typeof preop.manejarPreoperacional === 'function');
@@ -150,9 +150,9 @@ test('exporta registrarPreoperacional', function() {
 
 // ── 7. Validaciones sin duplicados ──
 console.log('\n7. Validaciones sin TwiML duplicado');
-var valTanqueo = require('../modulos/vehiculos/tanqueo/validaciones');
-var valPosop   = require('../modulos/vehiculos/posoperacional/validaciones');
-var valPreop   = require('../modulos/vehiculos/preoperacional/validaciones');
+var valTanqueo = require('../modulos/tanqueo/validaciones');
+var valPosop   = require('../modulos/inspecciones/posoperacional/validaciones');
+var valPreop   = require('../modulos/inspecciones/preoperacional/validaciones');
 
 test('tanqueo/validaciones usa twiml compartido', function() {
   assert(typeof valTanqueo.responderTwiml === 'function');
@@ -183,7 +183,7 @@ test('exporta webhookWhatsApp', function() {
 
 // ── 9. interpretacion.js ──
 console.log('\n9. preoperacional/interpretacion.js');
-var interp = require('../modulos/vehiculos/preoperacional/interpretacion');
+var interp = require('../modulos/inspecciones/preoperacional/interpretacion');
 
 test('exporta normalizarTextoBase', function() {
   assert(typeof interp.normalizarTextoBase === 'function');

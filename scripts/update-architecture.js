@@ -58,35 +58,41 @@ const DESCRIPCIONES = {
   'modulos/seguridad-campo/riesgos-locativos/flujo.js':        'Flujo riesgos locativos (Fase 3)',
   'modulos/seguridad-campo/riesgos-locativos/validaciones.js': 'Validaciones riesgos locativos (Fase 3)',
 
-  // Modulos — vehiculos compartido
-  'modulos/vehiculos/compartido/baseFlujo.js':                 'Base compartida para maquinas de estado de flujos WhatsApp',
-  'modulos/vehiculos/compartido/kilometraje.js':               'Validacion y logica de kilometraje entre turnos',
-  'modulos/vehiculos/compartido/navegacion.js':                'Textos de navegacion — menu principal, 0=atras, 9=menu',
-  'modulos/vehiculos/compartido/validacionVisual.js':          'Validacion de fotos via Gemini OCR',
+  // Modulos — inspecciones compartido
+  'modulos/inspecciones/compartido/baseFlujo.js':              'Base compartida para maquinas de estado de flujos WhatsApp',
+  'modulos/inspecciones/compartido/iniciadorFlujo.js':         'Iniciador de flujo — OCR placa y odometro',
+  'modulos/inspecciones/compartido/kilometraje.js':            'Validacion y logica de kilometraje entre turnos',
+  'modulos/inspecciones/compartido/navegacion.js':             'Textos de navegacion — menu principal, 0=atras, 9=menu',
+  'modulos/inspecciones/compartido/twiml.js':                  'TwiML utilidades — respuestas WhatsApp',
+  'modulos/inspecciones/compartido/validacionVisual.js':       'Validacion de fotos via Gemini OCR',
 
   // Modulos — inscripcion
-  'modulos/vehiculos/inscripcion/estado.js':                   'Estados del flujo de auto-registro de conductores',
-  'modulos/vehiculos/inscripcion/flujo.js':                    'Flujo de inscripcion automatica de conductor nuevo',
-  'modulos/vehiculos/inscripcion/mensajes.js':                 'Mensajes del flujo de inscripcion',
-  'modulos/vehiculos/inscripcion/validaciones.js':             'Validaciones de inscripcion — cedula, telefono, nombre',
+  'modulos/inscripcion/estado.js':                             'Estados del flujo de auto-registro de conductores',
+  'modulos/inscripcion/flujo.js':                              'Flujo de inscripcion automatica de conductor nuevo',
+  'modulos/inscripcion/mensajes.js':                           'Mensajes del flujo de inscripcion',
+  'modulos/inscripcion/validaciones.js':                       'Validaciones de inscripcion — cedula, telefono, nombre',
 
   // Modulos — preoperacional
-  'modulos/vehiculos/preoperacional/cierre.js':                'Cierre preoperacional — PDF, novedades, autorizaciones',
-  'modulos/vehiculos/preoperacional/estado.js':                'Estados del flujo preoperacional',
-  'modulos/vehiculos/preoperacional/flujo.js':                 'Maquina de estados del preoperacional WhatsApp',
-  'modulos/vehiculos/preoperacional/mensajes.js':              'Mensajes y preguntas del preoperacional',
-  'modulos/vehiculos/preoperacional/validaciones.js':          'Validaciones de respuestas del preoperacional',
+  'modulos/inspecciones/preoperacional/cierre.js':             'Cierre preoperacional — PDF, novedades, autorizaciones',
+  'modulos/inspecciones/preoperacional/estado.js':             'Estados del flujo preoperacional',
+  'modulos/inspecciones/preoperacional/flujo.js':              'Maquina de estados del preoperacional WhatsApp',
+  'modulos/inspecciones/preoperacional/interpretacion.js':     'Interpretacion de novedades via AI/Reglas',
+  'modulos/inspecciones/preoperacional/mensajes.js':           'Mensajes y preguntas del preoperacional',
+  'modulos/inspecciones/preoperacional/validaciones.js':       'Validaciones de respuestas del preoperacional',
 
   // Modulos — posoperacional
-  'modulos/vehiculos/posoperacional/cierre.js':                'Cierre posoperacional — PDF y notificaciones',
-  'modulos/vehiculos/posoperacional/estado.js':                'Estados del flujo posoperacional',
-  'modulos/vehiculos/posoperacional/flujo.js':                 'Maquina de estados del posoperacional WhatsApp',
-  'modulos/vehiculos/posoperacional/mensajes.js':              'Mensajes del posoperacional',
-  'modulos/vehiculos/posoperacional/validaciones.js':          'Validaciones del posoperacional',
+  'modulos/inspecciones/posoperacional/cierre.js':             'Cierre posoperacional — PDF y notificaciones',
+  'modulos/inspecciones/posoperacional/estado.js':             'Estados del flujo posoperacional',
+  'modulos/inspecciones/posoperacional/flujo.js':              'Maquina de estados del posoperacional WhatsApp',
+  'modulos/inspecciones/posoperacional/mensajes.js':           'Mensajes del posoperacional',
+  'modulos/inspecciones/posoperacional/validaciones.js':       'Validaciones del posoperacional',
 
   // Modulos — tanqueo
-  'modulos/vehiculos/tanqueo/flujo.js':                        'Flujo de registro de combustible WhatsApp',
-  'modulos/vehiculos/tanqueo/validaciones.js':                 'Validaciones del tanqueo',
+  'modulos/tanqueo/cierre.js':                                 'Cierre tanqueo — registro en DB y PDF',
+  'modulos/tanqueo/estado.js':                                 'Estados del flujo de tanqueo',
+  'modulos/tanqueo/flujo.js':                                  'Flujo de registro de combustible WhatsApp',
+  'modulos/tanqueo/mensajes.js':                               'Mensajes del flujo de tanqueo',
+  'modulos/tanqueo/validaciones.js':                           'Validaciones del tanqueo',
 
   // Servicios
   'servicios/logo.js':                                         'Logo CERO en base64 para PDFs',

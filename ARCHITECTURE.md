@@ -68,7 +68,7 @@ Field operations management SaaS via WhatsApp + AI.
 Each module follows a class-based pattern extending `FlujoBase`:
 
 ```
-modulos/vehiculos/compartido/
+modulos/inspecciones/compartido/
 ├── baseFlujo.js     # Base class — Twilio validation, concurrency lock,
 │                    #   global nav (0=back, 9=menu), shared plate/odometer states
 ├── twiml.js         # responderTwiml, escaparXml, firmaTwilioValida (single source)
@@ -76,7 +76,7 @@ modulos/vehiculos/compartido/
 ├── kilometraje.js   # Shared km validation logic
 └── navegacion.js    # Menu text, esAtras(), esMenu(), PIE_NAV
 
-modulos/vehiculos/<module>/
+modulos/inspecciones/<module>/
 ├── flujo.js         # Extends FlujoBase — only module-specific states
 ├── estado.js        # State constants + session management
 ├── mensajes.js      # All user-facing message templates
@@ -185,31 +185,31 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── notificador.js  # Cron 6:00 AM — envia alertas de documentos por WhatsApp
 │   │   └── reglas.js  # Reglas de alerta — umbrales 30/15/7/0 dias, clasificacion
 │   ├── inscripcion
-│   │   ├── estado.js
-│   │   ├── flujo.js
-│   │   ├── mensajes.js
-│   │   └── validaciones.js
+│   │   ├── estado.js  # Estados del flujo de auto-registro de conductores
+│   │   ├── flujo.js  # Flujo de inscripcion automatica de conductor nuevo
+│   │   ├── mensajes.js  # Mensajes del flujo de inscripcion
+│   │   └── validaciones.js  # Validaciones de inscripcion — cedula, telefono, nombre
 │   ├── inspecciones
 │   │   ├── compartido
-│   │   │   ├── baseFlujo.js
-│   │   │   ├── iniciadorFlujo.js
-│   │   │   ├── kilometraje.js
-│   │   │   ├── navegacion.js
-│   │   │   ├── twiml.js
-│   │   │   └── validacionVisual.js
+│   │   │   ├── baseFlujo.js  # Base compartida para maquinas de estado de flujos WhatsApp
+│   │   │   ├── iniciadorFlujo.js  # Iniciador de flujo — OCR placa y odometro
+│   │   │   ├── kilometraje.js  # Validacion y logica de kilometraje entre turnos
+│   │   │   ├── navegacion.js  # Textos de navegacion — menu principal, 0=atras, 9=menu
+│   │   │   ├── twiml.js  # TwiML utilidades — respuestas WhatsApp
+│   │   │   └── validacionVisual.js  # Validacion de fotos via Gemini OCR
 │   │   ├── posoperacional
-│   │   │   ├── cierre.js
-│   │   │   ├── estado.js
-│   │   │   ├── flujo.js
-│   │   │   ├── mensajes.js
-│   │   │   └── validaciones.js
+│   │   │   ├── cierre.js  # Cierre posoperacional — PDF y notificaciones
+│   │   │   ├── estado.js  # Estados del flujo posoperacional
+│   │   │   ├── flujo.js  # Maquina de estados del posoperacional WhatsApp
+│   │   │   ├── mensajes.js  # Mensajes del posoperacional
+│   │   │   └── validaciones.js  # Validaciones del posoperacional
 │   │   └── preoperacional
-│   │       ├── cierre.js
-│   │       ├── estado.js
-│   │       ├── flujo.js
-│   │       ├── interpretacion.js
-│   │       ├── mensajes.js
-│   │       └── validaciones.js
+│   │       ├── cierre.js  # Cierre preoperacional — PDF, novedades, autorizaciones
+│   │       ├── estado.js  # Estados del flujo preoperacional
+│   │       ├── flujo.js  # Maquina de estados del preoperacional WhatsApp
+│   │       ├── interpretacion.js  # Interpretacion de novedades via AI/Reglas
+│   │       ├── mensajes.js  # Mensajes y preguntas del preoperacional
+│   │       └── validaciones.js  # Validaciones de respuestas del preoperacional
 │   ├── seguridad-campo
 │   │   ├── ats
 │   │   │   ├── flujo.js  # Flujo ATS (Fase 3)
@@ -221,11 +221,11 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │       ├── flujo.js  # Flujo riesgos locativos (Fase 3)
 │   │       └── validaciones.js  # Validaciones riesgos locativos (Fase 3)
 │   └── tanqueo
-│       ├── cierre.js
-│       ├── estado.js
-│       ├── flujo.js
-│       ├── mensajes.js
-│       └── validaciones.js
+│       ├── cierre.js  # Cierre tanqueo — registro en DB y PDF
+│       ├── estado.js  # Estados del flujo de tanqueo
+│       ├── flujo.js  # Flujo de registro de combustible WhatsApp
+│       ├── mensajes.js  # Mensajes del flujo de tanqueo
+│       └── validaciones.js  # Validaciones del tanqueo
 ├── public
 │   ├── components
 │   │   ├── badge.js  # Componente Badge — estados y alertas

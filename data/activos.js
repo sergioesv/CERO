@@ -8,7 +8,7 @@
 
 var config = require('../config/config');
 var supabase = config.supabase;
-var preop = require('../modulos/vehiculos/preoperacional/validaciones');
+var preop = require('../modulos/inspecciones/preoperacional/validaciones');
 
 // ───────────────────────────────────────────────────────────
 // UTILIDADES DE PLACA (migradas desde data/vehiculos.js)

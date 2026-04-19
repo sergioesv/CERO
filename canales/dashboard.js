@@ -1,5 +1,5 @@
 const alertasData = require('../data/alertas');
-const preop = require('../modulos/vehiculos/preoperacional/validaciones');
+const preop = require('../modulos/inspecciones/preoperacional/validaciones');
 const { supabase } = require('../config/config');
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 
@@ -45,12 +45,15 @@ async function listarPosoperacionales(req, res) {
 
     let query = supabase
       .from('posoperacionales')
-      .select('*, vehiculos:vehiculo_placa(tipo, marca), conductores:conductor_id(nombre)')
+      .select('*, activos:activo_id(placa, tipo_activo_id), conductores:conductor_id(nombre)')
       .order('created_at', { ascending: false })
       .limit(100);
 
     query = aplicarFiltroFecha(query, 'created_at', fecha_inicio, fecha_fin);
-    if (placa) query = query.eq('vehiculo_placa', placa.toUpperCase());
+    if (placa) {
+      // Filtrado por placa requiere join con activos
+      query = query.eq('activos.placa', placa.toUpperCase());
+    }
 
     const { data, error } = await query;
     if (error) throw error;

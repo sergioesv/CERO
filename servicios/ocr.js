@@ -1,6 +1,6 @@
 const axios = require('axios');
 const config = require('../config/config');
-const utils = require('../modulos/vehiculos/preoperacional/validaciones');
+const utils = require('../modulos/inspecciones/preoperacional/validaciones');
 
 const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
 const GEMINI_TIMEOUT_MS = 9000;
