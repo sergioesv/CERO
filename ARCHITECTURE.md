@@ -308,9 +308,7 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
-├── grep-resultado.txt
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
-├── original_prompt.txt
 └── package.json
 ```
 
