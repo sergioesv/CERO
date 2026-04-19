@@ -1,18 +1,49 @@
+/** Zona horaria operativa del negocio (panel y reportes). */
+const TZ_CO = 'America/Bogota';
+
 const Utils = {
   formatearFecha(fecha) {
     if (!fecha) return '—';
     const d = new Date(fecha);
     if (isNaN(d.getTime())) return '—';
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    return `${dia}/${mes}/${d.getFullYear()}`;
+    return d.toLocaleDateString('es-CO', {
+      timeZone: TZ_CO,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  },
+
+  /** Fecha y hora en una línea (p. ej. posoperacionales, detalle). */
+  formatearFechaHora(fecha) {
+    if (!fecha) return '—';
+    const d = new Date(fecha);
+    if (isNaN(d.getTime())) return '—';
+    return (
+      d.toLocaleDateString('es-CO', {
+        timeZone: TZ_CO,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }) +
+      ' ' +
+      d.toLocaleTimeString('es-CO', {
+        timeZone: TZ_CO,
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    );
   },
   
   formatearFechaCorta(fecha) {
     if (!fecha) return '—';
     const d = new Date(fecha);
     if (isNaN(d.getTime())) return '—';
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return d.toLocaleDateString('es-CO', {
+      timeZone: TZ_CO,
+      day: '2-digit',
+      month: '2-digit'
+    });
   },
   
   diasHasta(fecha) {

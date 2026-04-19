@@ -200,7 +200,12 @@ window.ConductoresModule = (() => {
     const hoy   = new Date();
     const fecha = new Date(fechaStr);
     const dias  = Math.ceil((fecha - hoy) / 86400000);
-    const textoFecha = fecha.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const textoFecha = fecha.toLocaleDateString('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
     if (dias < 0)   return { texto: `VENCIDA — ${textoFecha}`,            clase: 'text-danger' };
     if (dias <= 7)  return { texto: `Vence en ${dias}d — ${textoFecha}`,  clase: 'text-danger' };
     if (dias <= 30) return { texto: `Vence en ${dias}d — ${textoFecha}`,  clase: 'text-warning' };

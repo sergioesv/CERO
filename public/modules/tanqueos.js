@@ -141,7 +141,7 @@ const TanqueosRender = {
   },
 
   filaTabla(t) {
-    var fecha = t.created_at ? t.created_at.substring(0, 10) : '-';
+    var fecha = t.created_at ? Utils.formatearFecha(t.created_at) : '-';
     var conductor = t.conductores ? t.conductores.nombre : '-';
     var alerta = TanqueosLogic.tieneDiscrepancias(t) ? ' <span title="Con discrepancias">⚠</span>' : '';
     var check = (t.estado_validacion === 'pendiente_revision' || t.estado_validacion === 'auto_validado')
@@ -238,7 +238,7 @@ const TanqueosRender = {
     html += '<button id="tanq-toggle-adicionales" class="btn btn-secondary btn-sm">Datos adicionales ▼</button>';
     html += '<div id="tanq-datos-adicionales" style="display:none;margin-top:10px;">';
     html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Conductor</span><strong>' + Utils.escaparHTML(t.conductores ? t.conductores.nombre : '-') + '</strong></div>';
-    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Fecha</span><strong>' + Utils.escaparHTML(t.created_at ? t.created_at.substring(0, 10) : '-') + '</strong></div>';
+    html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Fecha</span><strong>' + Utils.escaparHTML(t.created_at ? Utils.formatearFecha(t.created_at) : '-') + '</strong></div>';
     html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Tipo tanqueo</span><strong>' + Utils.escaparHTML(t.tipo_tanqueo || '-') + '</strong></div>';
     html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número factura OCR</span><strong>' + Utils.escaparHTML(t.factura_numero_ocr || '-') + '</strong></div>';
     html += '<div class="flex gap-sm" style="margin-bottom:4px;"><span class="text-secondary" style="min-width:180px;">Número manual</span><strong>' + Utils.escaparHTML(t.factura_numero_manual || t.factura_numero || '-') + '</strong></div>';

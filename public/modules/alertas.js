@@ -807,15 +807,28 @@ const AlertasModule = {
     if (!iso) return '—';
     var d = new Date(iso);
     if (isNaN(d)) return iso;
-    return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   },
 
   formatearFechaHora(iso) {
     if (!iso) return '—';
     var d = new Date(iso);
     if (isNaN(d)) return iso;
-    return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }) + ' '
-      + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }) + ' ' + d.toLocaleTimeString('es-CO', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 };
 

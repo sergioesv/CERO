@@ -20,7 +20,14 @@ window.UsuariosModule = (() => {
   function formatFecha(str) {
     if (!str) return 'Nunca';
     const d = new Date(str);
-    return d.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   function puedeCrear() {

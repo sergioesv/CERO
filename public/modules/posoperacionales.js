@@ -30,8 +30,13 @@ const PosopLogic = {
     if (!valor) return '—';
     const fecha = new Date(valor);
     if (Number.isNaN(fecha.getTime())) return '—';
-    const fechaTexto = fecha.toLocaleDateString('es-CO');
-    const horaTexto = fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    const ops = { timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: 'numeric' };
+    const fechaTexto = fecha.toLocaleDateString('es-CO', ops);
+    const horaTexto = fecha.toLocaleTimeString('es-CO', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
     return `${fechaTexto}<br><span class="text-xs text-secondary">${horaTexto}</span>`;
   },
 
@@ -44,7 +49,12 @@ const PosopLogic = {
 const PosopRender = {
   stats(data, dataFiltrada) {
     const hoy = fechaHoyBogota();
-    const hoyData = data.filter((item) => String(item.created_at || '').startsWith(hoy));
+    const hoyData = data.filter((item) => {
+      if (!item.created_at) return false;
+      const d = new Date(item.created_at);
+      if (Number.isNaN(d.getTime())) return false;
+      return d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === hoy;
+    });
     const conNovedades = hoyData.filter((item) => Array.isArray(item.novedades) && item.novedades.length > 0).length;
 
     return Card.statsGrid([

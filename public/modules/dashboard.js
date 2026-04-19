@@ -83,36 +83,60 @@ window.Dashboard = {
   },
 
   /**
-   * Fecha relativa en español (zona local del navegador).
+   * Fecha relativa en español; día calendario y hora según America/Bogota.
    */
   formatearFechaRelativa(iso) {
     if (!iso) return '';
     var d = new Date(iso);
     if (isNaN(d.getTime())) return '';
 
-    var ahora = new Date();
-    var hoy0 = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    var d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    var diffDias = Math.round((hoy0 - d0) / 86400000);
+    var ymdBogota = function (dt) {
+      return dt.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+    };
+    var partes = function (s) {
+      var x = s.split('-');
+      return { y: +x[0], m: +x[1], d: +x[2] };
+    };
+    var hoyStr = ymdBogota(new Date());
+    var evStr = ymdBogota(d);
+    var H = partes(hoyStr);
+    var E = partes(evStr);
+    var diffDias = Math.round(
+      (Date.UTC(H.y, H.m - 1, H.d) - Date.UTC(E.y, E.m - 1, E.d)) / 86400000
+    );
 
-    var h = d.getHours();
-    var m = d.getMinutes();
-    var ampm = h >= 12 ? 'PM' : 'AM';
-    var h12 = h % 12;
-    if (h12 === 0) h12 = 12;
-    var tStr = h12 + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+    var tStr = d.toLocaleTimeString('es-CO', {
+      timeZone: 'America/Bogota',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
 
     if (diffDias === 0) return 'Hoy ' + tStr;
     if (diffDias === 1) return 'Ayer ' + tStr;
 
+    var hoy0 = new Date(Date.UTC(H.y, H.m - 1, H.d));
+    var d0 = new Date(Date.UTC(E.y, E.m - 1, E.d));
     var inicioSemana = new Date(hoy0);
-    inicioSemana.setDate(hoy0.getDate() - hoy0.getDay() + 1);
+    inicioSemana.setUTCDate(hoy0.getUTCDate() - ((hoy0.getUTCDay() + 6) % 7));
+
     if (d0 >= inicioSemana && d0 < hoy0) {
-      var dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      return dias[d.getDay()] + ' ' + tStr;
+      var diaSem = new Intl.DateTimeFormat('es-CO', {
+        timeZone: 'America/Bogota',
+        weekday: 'short'
+      }).format(d);
+      return diaSem + ' ' + tStr;
     }
 
-    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + tStr;
+    return (
+      d.toLocaleDateString('es-CO', {
+        timeZone: 'America/Bogota',
+        day: '2-digit',
+        month: '2-digit'
+      }) +
+      ' ' +
+      tStr
+    );
   },
 
   /**
