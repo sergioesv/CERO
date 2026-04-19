@@ -329,20 +329,6 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
   // Estados propios del posoperacional
   switch (sesion.estado) {
 
-    // Posop tiene su propio manejo de confirmación km — ya manejado arriba
-    case ESTADOS.ODOMETRO_CONFIRMACION:
-      if (numMedia > 0 && mediaUrl) {
-        return await this._procesarFotoOdometro(res, sesion, mediaUrl);
-      }
-      return twiml.responderTwiml(res, await manejarConfirmacionKilometraje(sesion, mensaje));
-
-    case ESTADOS.ODOMETRO_MANUAL:
-      if (mediaUrl) {
-        sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-        return await this._procesarFotoOdometro(res, sesion, mediaUrl);
-      }
-      return twiml.responderTwiml(res, await manejarKilometrajeManual(sesion, mensaje));
-
     // ── FOTO ESTADO GENERAL ─────────────────────────────────
     case ESTADOS.FOTO_ESTADO_GENERAL:
       if (mediaUrl) {
