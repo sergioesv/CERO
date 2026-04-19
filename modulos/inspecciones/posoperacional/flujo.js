@@ -44,7 +44,9 @@ function crearFlujoPosoperacional() {
     },
 
     onExitoPlaca: async function(sesion) {
+      var vehiculo = sesion.vehiculo; // guardar referencia antes de reiniciar
       estadoPosop.reiniciarDatosOperativos(sesion);
+      sesion.vehiculo = vehiculo; // restaurar despues de reiniciar
       try {
         var plantilla = await plantillas.cargar(sesion.vehiculo.tipo_activo_id, 'posoperacional', sesion.vehiculo.empresa_id);
         sesion.plantilla = plantilla;
