@@ -121,9 +121,22 @@ function mensajeKilometrajeFueraRango(sesion, evaluacion, maxKmSalto) {
 // INSPECCIÓN — GRUPOS Y NOVEDADES
 // ============================================================================
 
+function mensajeSinPlantillaInspeccion() {
+  return (
+    '⚠️ *No hay plantilla de inspección*\n\n' +
+    'Este tipo de activo no tiene una plantilla activa en CERO (ni global ni de tu empresa).\n' +
+    'Un administrador debe crear o activar una plantilla en el panel.\n\n' +
+    'Escribe *9* para volver al menú principal.'
+  );
+}
+
 function primerMensajeInspeccion(sesion, grupos) {
+  var g = grupos != null ? grupos : (sesion && sesion.gruposInspeccion);
+  if (!sesion || sesion.sinPlantilla || !g || !g.length) {
+    return mensajeSinPlantillaInspeccion();
+  }
   return preop.formatGrupoMsg(
-    grupos[0],
+    g[0],
     '📋 *Inspección iniciada*\n' + sesion.placa + ' | ' + sesion.kilometraje + ' km'
   );
 }
@@ -244,6 +257,7 @@ module.exports = {
   mensajeKilometrajeFueraRango,
   mensajeFotoAdicional,
   mensajeFotoNovedad,
+  mensajeSinPlantillaInspeccion,
   primerMensajeInspeccion,
   mensajeMenuObservacionFinal,
   mensajeEscribirObservacionFinal,

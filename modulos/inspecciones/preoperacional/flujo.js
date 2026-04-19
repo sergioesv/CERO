@@ -79,7 +79,9 @@ function crearFlujoPreoperacional() {
         }
       } catch (error) {
         console.error('Error cargando plantilla:', error);
-        // Fallback temporal si no hay plantilla, asume km
+        sesion.sinPlantilla = true;
+        sesion.plantilla = null;
+        sesion.gruposInspeccion = [];
         sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
       }
     },
@@ -94,12 +96,19 @@ function crearFlujoPreoperacional() {
         s.kmDetectado = null;
         s.kmLecturaFueraRango = false;
         s.fotoOdometroTemporal = null;
+        if (s.sinPlantilla || !s.gruposInspeccion || !s.gruposInspeccion.length) {
+          return;
+        }
         s.grupoActual = 0;
         s.estado = 'GRUPO';
       });
     },
 
-    onConfirmarKm: async function(res, sesion) {
+    onConfirmarKm: async function(res, sesion, telefono) {
+      if (sesion.sinPlantilla || !sesion.gruposInspeccion || !sesion.gruposInspeccion.length) {
+        if (telefono) sesiones.eliminarSesion(telefono);
+        return twiml.responderTwiml(res, mensajes.mensajeSinPlantillaInspeccion());
+      }
       kmCompartido.registrarKilometrajeConfirmado(
         sesion, sesion.kmDetectado,
         'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',

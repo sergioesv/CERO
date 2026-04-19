@@ -8,6 +8,7 @@
 var config = require('../../../config/config');
 var ocr = require('../../../servicios/ocr');
 var storage = require('../../../servicios/storage');
+var sesiones = require('../../../servicios/sesiones');
 
 /**
  * Compara km contra sesion.vehiculo.kilometraje (último histórico del vehículo).
@@ -173,6 +174,13 @@ async function manejarConfirmacionOdometro(
         origenDirecto += ' (supera el rango automático)';
         avisoDirecto = '⚠️ Kilometraje fuera del rango automático. Queda registrado.\n\n';
       }
+      if (sesion.sinPlantilla || !sesion.gruposInspeccion || !sesion.gruposInspeccion.length) {
+        if (opciones.telefono) sesiones.eliminarSesion(opciones.telefono);
+        var textoSinPl = mensajes.mensajeSinPlantillaInspeccion
+          ? mensajes.mensajeSinPlantillaInspeccion()
+          : 'No hay plantilla configurada. Escribe *9* para el menú.';
+        return responderFn(res, avisoDirecto + textoSinPl);
+      }
       opciones.registrarKilometrajePreoperacional(sesion, kmDirectoNum, origenDirecto);
       return responderFn(res, avisoDirecto + mensajes.primerMensajeInspeccion(sesion));
     }
@@ -202,7 +210,7 @@ async function manejarConfirmacionOdometro(
   }
 
   if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') {
-    return await opciones.onConfirmarPreoperacional(res, sesion);
+    return await opciones.onConfirmarPreoperacional(res, sesion, opciones.telefono);
   }
 
   if (msgLower === '2' || msgLower === '2️⃣') {
@@ -272,6 +280,13 @@ async function manejarOdometroManual(
       '⚠️ Kilometraje fuera del rango automatico. Queda registrado para revision.\n\n';
   }
 
+  if (sesion.sinPlantilla || !sesion.gruposInspeccion || !sesion.gruposInspeccion.length) {
+    if (opciones.telefono) sesiones.eliminarSesion(opciones.telefono);
+    var textoSin = mensajesModulo.mensajeSinPlantillaInspeccion
+      ? mensajesModulo.mensajeSinPlantillaInspeccion()
+      : 'No hay plantilla configurada. Escribe *9* para el menú.';
+    return responderFn(res, avisoKm + textoSin);
+  }
   opciones.registrarKilometrajePreoperacional(sesion, kmManual, validacionKm);
   return responderFn(res, avisoKm + mensajesModulo.primerMensajeInspeccion(sesion));
 }

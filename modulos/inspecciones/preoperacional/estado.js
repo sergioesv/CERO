@@ -14,6 +14,9 @@ var storage = require('../../../servicios/storage');
 // ───────────────────────────────────────────────────────────
 
 function reiniciarDatosOperativos(sesion) {
+  sesion.sinPlantilla = false;
+  sesion.plantilla = null;
+  sesion.gruposInspeccion = null;
   sesion.respuestas = {};
   sesion.novedades = [];
   sesion.fotosNovedadPendientes = [];

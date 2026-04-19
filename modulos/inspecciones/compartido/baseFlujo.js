@@ -317,6 +317,7 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
       mensajesModulo: {
         mensajeConfirmacionOdometro: mensajes.mensajeConfirmacionOdometro || mensajes.confirmarKmOcr,
         mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango || mensajes.alertaKmFueraRango,
+        mensajeSinPlantillaInspeccion: mensajes.mensajeSinPlantillaInspeccion,
         primerMensajeInspeccion: mensajes.primerMensajeInspeccion || function(s) {
           return self._primerMensajeTrasKm(s);
         }
@@ -347,7 +348,8 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
       registrarKilometrajePreoperacional: self._onRegistrarKm || function(s, km, origen) {
         self._registrarKmDefault(s, km, origen);
       },
-      onConfirmarPreoperacional: self._onConfirmarKm || async function(r, s) {
+      onConfirmarPreoperacional: async function(r, s, tel) {
+        if (self._onConfirmarKm) return self._onConfirmarKm(r, s, tel);
         return self._confirmarKmDefault(r, s);
       }
     }
@@ -364,6 +366,7 @@ FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, men
     {
       mensajeConfirmacionOdometro: mensajes.mensajeConfirmacionOdometro || mensajes.confirmarKmOcr,
       mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango || mensajes.alertaKmFueraRango,
+      mensajeSinPlantillaInspeccion: mensajes.mensajeSinPlantillaInspeccion,
       primerMensajeInspeccion: mensajes.primerMensajeInspeccion || function(s) {
         return self._primerMensajeTrasKm(s);
       }
