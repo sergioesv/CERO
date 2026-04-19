@@ -14,7 +14,8 @@ const PERMISOS = {
   ats:                ['superadmin_plataforma'],
   altura:             ['superadmin_plataforma'],
   riesgo_electrico:   ['superadmin_plataforma'],
-  espacio_confinado:  ['superadmin_plataforma']
+  espacio_confinado:  ['superadmin_plataforma'],
+  plantillas:         ['superadmin_plataforma', 'superadmin_emp', 'administrador']
 };
 
 const App = {
@@ -173,6 +174,7 @@ const App = {
     Router.register('conductores', () => ConductoresModule.render());
     Router.register('sedes', () => SedesModule.render());
     Router.register('usuarios', () => UsuariosModule.render());
+    Router.register('plantillas', () => window.PlantillasModule && window.PlantillasModule.render());
     Router.register('cambiar-password', () => App.mostrarModalCambiarPassword());
 
     Router.register('equipos', () =>

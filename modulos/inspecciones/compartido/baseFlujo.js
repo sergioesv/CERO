@@ -199,7 +199,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
         var mensajeSug = await this._manejarPlaca(sesion, telefono, sesion.placaSugerida);
         var esExito = this._esRespuestaExito(mensajeSug);
         if (esExito) {
-          if (this._onExitoPlaca) this._onExitoPlaca(sesion);
+          if (this._onExitoPlaca) await this._onExitoPlaca(sesion);
           if (fotoSug) {
             storage.guardarFotoUnica(sesion, {
               tipo: this.tipoFotoPlaca,
@@ -266,7 +266,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
       var mensajeInicio = await this._manejarPlaca(sesion, telefono, placaManual);
       var esExitoManual = this._esRespuestaExito(mensajeInicio);
       if (esExitoManual) {
-        if (this._onExitoPlaca) this._onExitoPlaca(sesion);
+        if (this._onExitoPlaca) await this._onExitoPlaca(sesion);
         if (fotoPlacaManual) {
           storage.guardarFotoUnica(sesion, {
             tipo: this.tipoFotoPlaca,

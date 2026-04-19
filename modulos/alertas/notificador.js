@@ -68,7 +68,7 @@ async function enviarAlertaADestinatarios(mensaje, clasificacion, conductorTelef
 // Procesa alertas de documentos de vehículos (SOAT, Tecnomecánica)
 // ───────────────────────────────────────────────────────────
 async function procesarAlertasVehiculos() {
-  var alertas = await alertasData.obtenerVencimientosVehiculos();
+  var alertas = await alertasData.obtenerVencimientosActivos();
   var totalEnviadas = 0;
   var totalBloqueados = 0;
 
@@ -86,7 +86,7 @@ async function procesarAlertasVehiculos() {
     // Bloquear vehículo si el documento venció
     if (reglas.debeBloquear(alerta.tipo_documento, alerta.dias_restantes)) {
       var motivo = alerta.tipo_documento + ' vencido — ' + reglas.formatearFecha(alerta.fecha_vencimiento);
-      var bloqueado = await alertasData.bloquearVehiculo(alerta.placa, motivo);
+      var bloqueado = await alertasData.bloquearActivo(alerta.placa, motivo);
       if (bloqueado) totalBloqueados++;
     }
   }

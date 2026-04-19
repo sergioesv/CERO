@@ -368,7 +368,7 @@ const AlertasModule = {
     // Cargar historial de forma lazy
     if (item.placa) {
       try {
-        var res = await API.get('/vehiculos/' + encodeURIComponent(item.placa) + '/historial');
+        var res = await API.get('/activos/' + encodeURIComponent(item.placa) + '/historial');
         this.renderHistorial(res.historial || []);
       } catch (e) {
         var histContainer = document.getElementById('alertas-historial');
@@ -642,7 +642,7 @@ const AlertasModule = {
   async verMasHistorial() {
     if (!this.itemSeleccionado) return;
     try {
-      var res = await API.get('/vehiculos/' + encodeURIComponent(this.itemSeleccionado.placa) + '/historial');
+      var res = await API.get('/activos/' + encodeURIComponent(this.itemSeleccionado.placa) + '/historial');
       var historial = res.historial || [];
       // Show all 50
       var container = document.getElementById('alertas-historial');
@@ -757,7 +757,7 @@ const AlertasModule = {
     if (!confirmado) return;
 
     try {
-      await API.post('/vehiculos/' + encodeURIComponent(placa) + '/desbloquear');
+      await API.post('/activos/' + encodeURIComponent(placa) + '/desbloquear');
       Toast.success(placa + ' desbloqueado');
       this.itemSeleccionado = null;
       await this.cargarDatos();

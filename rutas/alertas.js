@@ -14,12 +14,15 @@ router.get('/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async
     const hoy = new Date().toISOString().split('T')[0];
     const en30dias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const { data: vehiculos, error: errorV } = await supabase
-      .from('vehiculos')
-      .select('placa, soat_vencimiento, tecnomecanica_vencimiento, bloqueado')
-      .or(`soat_vencimiento.lte.${en30dias},tecnomecanica_vencimiento.lte.${en30dias}`);
+    // Obtener activos con placa (vehículos) — ya no filtramos por fecha de doc
+    // porque soat/tecno están en JSONB, no en columnas indexables
+    const { data: activos, error: errorA } = await supabase
+      .from('activos')
+      .select('id, placa, documentos')
+      .eq('activo', true)
+      .not('placa', 'is', null);
 
-    if (errorV) throw errorV;
+    if (errorA) throw errorA;
 
     const { data: conductores, error: errorC } = await supabase
       .from('conductores')
@@ -33,14 +36,16 @@ router.get('/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async
     let urgentes = 0;
     let informativas = 0;
 
-    (vehiculos || []).forEach(v => {
-      [v.soat_vencimiento, v.tecnomecanica_vencimiento].forEach(fecha => {
-        if (fecha) {
-          const dias = Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
+    (activos || []).forEach(a => {
+      var docs = a.documentos || {};
+      var fechas = [docs.soat_vencimiento, docs.tecnomecanica_vencimiento].filter(function(f) { return f && f !== ''; });
+      fechas.forEach(fecha => {
+        var dias = Math.ceil((new Date(fecha) - new Date()) / (1000 * 60 * 60 * 24));
+        if (dias <= 30) {
           if (dias <= 0) criticas++;
           else if (dias <= 7) criticas++;
           else if (dias <= 15) urgentes++;
-          else if (dias <= 30) informativas++;
+          else informativas++;
         }
       });
     });
@@ -71,7 +76,7 @@ router.get('/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async
 // GET /documentos — estado de documentos por vehículo
 router.get('/documentos', verificarToken, verificarPermiso('alertas', 'ver'), async function (req, res) {
   try {
-    var datos = await autorizacionesData.obtenerDocumentosVehiculos();
+    var datos = await autorizacionesData.obtenerDocumentosActivos();
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/alertas/documentos:', error);

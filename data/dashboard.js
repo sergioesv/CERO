@@ -195,18 +195,32 @@ async function obtenerPesosIndice(sedeId) {
   };
 }
 
-// ─── Vehículos / placas por sede ───
+// ─── Activos / IDs y placas por sede ───
+
+async function obtenerActivoIdsSede(sedeIds) {
+  if (!sedeIds.length) return [];
+  var r = await supabase
+    .from('activos')
+    .select('id')
+    .in('sede_id', sedeIds)
+    .eq('activo', true)
+    .neq('estado', 'retirado');
+
+  if (r.error) return [];
+  return (r.data || []).map(function (a) { return a.id; }).filter(Boolean);
+}
 
 async function obtenerPlacasSede(sedeIds) {
   if (!sedeIds.length) return [];
   var r = await supabase
-    .from('vehiculos')
+    .from('activos')
     .select('placa')
     .in('sede_id', sedeIds)
+    .eq('activo', true)
     .neq('estado', 'retirado');
 
   if (r.error) return [];
-  return (r.data || []).map(function (v) { return v.placa; }).filter(Boolean);
+  return (r.data || []).map(function (a) { return a.placa; }).filter(Boolean);
 }
 
 // ─── Novedades — severidad unificada ───
@@ -271,14 +285,15 @@ function docPorVencer30Dias(fechaVenc) {
 }
 
 async function metricasDocumentacion(sedeIds) {
-  var placas = await obtenerPlacasSede(sedeIds);
-  if (!placas.length) {
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
+  if (!activoIds.length) {
     return { alDiaPct: 0, porVencer: 0, total: 0 };
   }
   var r = await supabase
-    .from('vehiculos')
-    .select('placa, soat_vencimiento, tecnomecanica_vencimiento, bloqueado')
-    .in('placa', placas);
+    .from('activos')
+    .select('id, placa, documentos, bloqueado')
+    .in('id', activoIds)
+    .not('placa', 'is', null);
 
   if (r.error) return { alDiaPct: 0, porVencer: 0, total: 0 };
 
@@ -289,11 +304,14 @@ async function metricasDocumentacion(sedeIds) {
 
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
-    if (docVigente(row.soat_vencimiento) && docVigente(row.tecnomecanica_vencimiento)) {
+    var docs = row.documentos || {};
+    var soat = docs.soat_vencimiento || null;
+    var tecno = (docs.tecnomecanica_vencimiento && docs.tecnomecanica_vencimiento !== '') ? docs.tecnomecanica_vencimiento : null;
+    if (docVigente(soat) && docVigente(tecno)) {
       alDia++;
     }
-    var p1 = docPorVencer30Dias(row.soat_vencimiento);
-    var p2 = docPorVencer30Dias(row.tecnomecanica_vencimiento);
+    var p1 = docPorVencer30Dias(soat);
+    var p2 = docPorVencer30Dias(tecno);
     if (p1 || p2) porVencer++;
   }
 
@@ -341,12 +359,12 @@ async function contarActivosPorEstado(sedeIds, tipoCodigo) {
 // ─── Consultas por período ───
 
 async function fetchPreoperacionalesRango(sedeIds, inicioYmd, finYmd) {
-  var placas = await obtenerPlacasSede(sedeIds);
-  if (!placas.length) return [];
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
+  if (!activoIds.length) return [];
   var r = await supabase
     .from('preoperacionales')
-    .select('id, fecha, hora, vehiculo_placa, novedades')
-    .in('vehiculo_placa', placas)
+    .select('id, fecha, hora, activo_id, novedades, activos:activo_id(placa, nombre, datos)')
+    .in('activo_id', activoIds)
     .gte('fecha', inicioYmd)
     .lte('fecha', finYmd)
     .order('fecha', { ascending: false })
@@ -354,39 +372,49 @@ async function fetchPreoperacionalesRango(sedeIds, inicioYmd, finYmd) {
     .limit(5000);
 
   if (r.error) return [];
-  return r.data || [];
+  // Agregar vehiculo_placa virtual para compat
+  return (r.data || []).map(function(p) {
+    p.vehiculo_placa = (p.activos && p.activos.placa) || null;
+    return p;
+  });
 }
 
 async function fetchAutorizacionesRango(sedeIds, inicioIso, finIso) {
-  var placas = await obtenerPlacasSede(sedeIds);
-  if (!placas.length) return [];
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
+  if (!activoIds.length) return [];
   var r = await supabase
     .from('autorizaciones_novedad')
-    .select('id, vehiculo_placa, decision, novedades_bloqueo, timestamp_alerta, timestamp_decision')
-    .in('vehiculo_placa', placas)
+    .select('id, activo_id, decision, novedades_bloqueo, timestamp_alerta, timestamp_decision, activos:activo_id(placa)')
+    .in('activo_id', activoIds)
     .gte('timestamp_alerta', inicioIso)
     .lte('timestamp_alerta', finIso)
     .limit(3000);
 
   if (r.error) return [];
-  return r.data || [];
+  return (r.data || []).map(function(a) {
+    a.vehiculo_placa = (a.activos && a.activos.placa) || null;
+    return a;
+  });
 }
 
 /**
  * Autorizaciones para series mensuales: ventana más amplia en timestamp_alerta.
  */
 async function fetchAutorizacionesDesde(sedeIds, desdeIso) {
-  var placas = await obtenerPlacasSede(sedeIds);
-  if (!placas.length) return [];
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
+  if (!activoIds.length) return [];
   var r = await supabase
     .from('autorizaciones_novedad')
-    .select('id, vehiculo_placa, decision, timestamp_alerta, timestamp_decision')
-    .in('vehiculo_placa', placas)
+    .select('id, activo_id, decision, timestamp_alerta, timestamp_decision, activos:activo_id(placa)')
+    .in('activo_id', activoIds)
     .gte('timestamp_alerta', desdeIso)
     .limit(8000);
 
   if (r.error) return [];
-  return r.data || [];
+  return (r.data || []).map(function(a) {
+    a.vehiculo_placa = (a.activos && a.activos.placa) || null;
+    return a;
+  });
 }
 
 function ymdToFinDiaIso(ymd) {
@@ -570,10 +598,11 @@ var mapaTipoVehiculo = {};
 
 async function refrescarMapaTipos(placas) {
   if (!placas.length) return;
-  var r = await supabase.from('vehiculos').select('placa, tipo').in('placa', placas);
+  var r = await supabase.from('activos').select('placa, datos').in('placa', placas);
   if (r.error) return;
-  (r.data || []).forEach(function (v) {
-    mapaTipoVehiculo[v.placa] = v.tipo || 'Vehículo';
+  (r.data || []).forEach(function (a) {
+    var datos = a.datos || {};
+    mapaTipoVehiculo[a.placa] = datos.tipo_vehiculo || datos.tipo || 'Vehículo';
   });
 }
 
@@ -594,16 +623,19 @@ async function obtenerActividadReciente(sedeIds, limite) {
   var auth = await fetchAutorizacionesRango(sedeIds, desdeIso, hastaIso);
   auth.forEach(function (a) { if (a.vehiculo_placa) placasSet[a.vehiculo_placa] = 1; });
 
-  var placas = await obtenerPlacasSede(sedeIds);
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
   var rTan = await supabase
     .from('tanqueos')
-    .select('id, fecha, hora, created_at, vehiculo_placa, cantidad')
-    .in('vehiculo_placa', placas.length ? placas : ['___none___'])
+    .select('id, created_at, activo_id, cantidad, activos:activo_id(placa)')
+    .in('activo_id', activoIds.length ? activoIds : ['00000000-0000-0000-0000-000000000000'])
     .gte('created_at', desdeIso)
     .order('created_at', { ascending: false })
     .limit(100);
 
-  var tanqs = rTan.data || [];
+  var tanqs = (rTan.data || []).map(function(t) {
+    t.vehiculo_placa = (t.activos && t.activos.placa) || null;
+    return t;
+  });
   tanqs.forEach(function (t) { if (t.vehiculo_placa) placasSet[t.vehiculo_placa] = 1; });
 
 await refrescarMapaTipos(Object.keys(placasSet));
@@ -693,12 +725,12 @@ async function datosBaseIndice(sedeIds, sedeIdConfig) {
 
   var preops = await fetchPreoperacionalesRango(sedeIds, ini, hoy);
   var placas = await obtenerPlacasSede(sedeIds);
-  var vehOp = await contarActivosPorEstado(sedeIds, 'vehiculo');
+  var vehOp = await contarActivosPorEstado(sedeIds, 'vehiculo_liviano');
   var vehiculosOperativosPanel = vehOp.operativos || 0;
   if (!vehiculosOperativosPanel && placas.length) {
     var rv = await supabase
-      .from('vehiculos')
-      .select('placa', { count: 'exact', head: true })
+      .from('activos')
+      .select('id', { count: 'exact', head: true })
       .in('placa', placas)
       .eq('estado', 'operativo');
     vehiculosOperativosPanel = rv.count || placas.length;
@@ -711,11 +743,12 @@ async function datosBaseIndice(sedeIds, sedeIdConfig) {
 
   var desdeIso = ymdToInicioDiaIso(ini);
   var finIso = new Date().toISOString();
-  var placasArr = placas.length ? placas : ['__sin_placas__'];
+  var activoIdsIdx = await obtenerActivoIdsSede(sedeIds);
+  var activoIdsArr = activoIdsIdx.length ? activoIdsIdx : ['00000000-0000-0000-0000-000000000000'];
   var aRes = await supabase
     .from('autorizaciones_novedad')
     .select('decision, novedades_bloqueo, timestamp_alerta, timestamp_decision')
-    .in('vehiculo_placa', placasArr)
+    .in('activo_id', activoIdsArr)
     .gte('timestamp_alerta', desdeIso)
     .lte('timestamp_alerta', finIso);
 
@@ -920,7 +953,7 @@ async function obtenerItemsMasNovedades(sedeIds, periodo) {
 async function obtenerActivosAtencion(sedeIds) {
   var r = await supabase
     .from('activos')
-    .select('id, codigo, nombre, estado, datos, documentos, tipo_activo_id, tipos_activo(codigo)')
+    .select('id, codigo, nombre, estado, bloqueado, datos, documentos, tipo_activo_id, tipos_activo(codigo)')
     .in('sede_id', sedeIds)
     .eq('activo', true);
 
@@ -948,23 +981,15 @@ async function obtenerActivosAtencion(sedeIds) {
         diasTaller = Math.floor((Date.now() - new Date(hRow.data[0].timestamp)) / (86400000));
       }
 
-      if (a.tipos_activo && a.tipos_activo.codigo === 'vehiculo') {
-        var vv = await supabase
-          .from('vehiculos')
-          .select('soat_vencimiento, tecnomecanica_vencimiento')
-          .eq('placa', a.codigo)
-          .maybeSingle();
-
-        if (!vv.error && vv.data) {
-          if (docPorVencer30Dias(vv.data.soat_vencimiento)) {
-            var ds = Math.ceil((new Date(vv.data.soat_vencimiento) - new Date(hoy)) / 86400000);
-            alertas.push('SOAT ' + ds + 'd');
-          }
-          if (docPorVencer30Dias(vv.data.tecnomecanica_vencimiento)) {
-            var dt = Math.ceil((new Date(vv.data.tecnomecanica_vencimiento) - new Date(hoy)) / 86400000);
-            alertas.push('Tecno ' + dt + 'd');
-          }
-        }
+      // Leer documentos directamente del activo (JSONB)
+      var docsAtt = a.documentos || {};
+      if (docsAtt.soat_vencimiento && docPorVencer30Dias(docsAtt.soat_vencimiento)) {
+        var ds = Math.ceil((new Date(docsAtt.soat_vencimiento) - new Date(hoy)) / 86400000);
+        alertas.push('SOAT ' + ds + 'd');
+      }
+      if (docsAtt.tecnomecanica_vencimiento && docsAtt.tecnomecanica_vencimiento !== '' && docPorVencer30Dias(docsAtt.tecnomecanica_vencimiento)) {
+        var dt = Math.ceil((new Date(docsAtt.tecnomecanica_vencimiento) - new Date(hoy)) / 86400000);
+        alertas.push('Tecno ' + dt + 'd');
       }
 
       list.push({
@@ -973,17 +998,16 @@ async function obtenerActivosAtencion(sedeIds) {
         dias_taller: diasTaller,
         alertas: alertas
       });
-    } else if (a.tipos_activo && a.tipos_activo.codigo === 'vehiculo') {
-      var v2 = await supabase
-        .from('vehiculos')
-        .select('soat_vencimiento, tecnomecanica_vencimiento, bloqueado')
-        .eq('placa', a.codigo)
-        .maybeSingle();
-      if (!v2.error && v2.data && (v2.data.bloqueado || docPorVencer30Dias(v2.data.soat_vencimiento) || docPorVencer30Dias(v2.data.tecnomecanica_vencimiento))) {
+    } else {
+      // Activo operativo — verificar docs y bloqueo
+      var docsOp = a.documentos || {};
+      var soatOp = docsOp.soat_vencimiento || null;
+      var tecnoOp = (docsOp.tecnomecanica_vencimiento && docsOp.tecnomecanica_vencimiento !== '') ? docsOp.tecnomecanica_vencimiento : null;
+      if (a.bloqueado || docPorVencer30Dias(soatOp) || docPorVencer30Dias(tecnoOp)) {
         var al = [];
-        if (docPorVencer30Dias(v2.data.soat_vencimiento)) al.push('SOAT prox');
-        if (docPorVencer30Dias(v2.data.tecnomecanica_vencimiento)) al.push('Tecno prox');
-        if (v2.data.bloqueado) al.push('Bloqueado');
+        if (docPorVencer30Dias(soatOp)) al.push('SOAT prox');
+        if (docPorVencer30Dias(tecnoOp)) al.push('Tecno prox');
+        if (a.bloqueado) al.push('Bloqueado');
         list.push({ codigo: a.codigo, nombre: a.nombre || a.codigo, dias_taller: 0, alertas: al });
       }
     }
@@ -1120,14 +1144,14 @@ async function obtenerDatosGeneral(sedeIds, periodo) {
   var preops = await fetchPreoperacionalesRango(sedeIds, rng.inicio, rng.fin);
   var auths = await fetchAutorizacionesRango(sedeIds, iniIso, finIso);
 
-  var activos = await contarActivosPorEstado(sedeIds, 'vehiculo');
+  var activos = await contarActivosPorEstado(sedeIds, 'vehiculo_liviano');
   var placas = await obtenerPlacasSede(sedeIds);
   var diasHab = diasHabilesEntre(rng.inicio, rng.fin);
   var vehOpCount = activos.operativos || 0;
   if (!vehOpCount && placas.length) {
     var c = await supabase
-      .from('vehiculos')
-      .select('placa', { count: 'exact', head: true })
+      .from('activos')
+      .select('id', { count: 'exact', head: true })
       .in('placa', placas)
       .eq('estado', 'operativo');
     vehOpCount = c.count || 1;
@@ -1247,12 +1271,12 @@ async function obtenerDatosActivos(sedeIds, periodo, tipoFiltro) {
 
   var iniIso = ymdToInicioDiaIso(rng.inicio);
   var finIso = ymdToFinDiaIso(rng.fin);
-  var placas = await obtenerPlacasSede(sedeIds);
-  var placasFiltro = placas.length ? placas : ['__sin_placas__'];
+  var activoIdsDA = await obtenerActivoIdsSede(sedeIds);
+  var activoIdsFiltro = activoIdsDA.length ? activoIdsDA : ['00000000-0000-0000-0000-000000000000'];
   var auths = await supabase
     .from('autorizaciones_novedad')
     .select('id, decision, novedades_bloqueo, timestamp_alerta')
-    .in('vehiculo_placa', placasFiltro)
+    .in('activo_id', activoIdsFiltro)
     .gte('timestamp_alerta', iniIso)
     .lte('timestamp_alerta', finIso);
 

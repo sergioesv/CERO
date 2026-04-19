@@ -85,7 +85,7 @@ async function calcularRendimiento(sesion) {
     }
   } else {
     try {
-      var historial = await tanqueosData.obtenerRendimientoHistorico(sesion.placa);
+      var historial = await tanqueosData.obtenerRendimientoHistorico(sesion.vehiculo ? sesion.vehiculo.id : null);
       if (historial && historial.promedio && historial.promedio > 0) {
         var limiteMin = historial.promedio * 0.70;
         var limiteMax = historial.promedio * 1.30;
@@ -147,7 +147,8 @@ async function guardarTanqueo(sesion, telefono) {
 
   var datosTanqueo = {
     // Campos base
-    vehiculo_placa:    sesion.placa,
+    activo_id:         sesion.vehiculo ? sesion.vehiculo.id : null,
+    plantilla_id:      sesion.plantilla ? sesion.plantilla.id : null,
     conductor_id:      sesion.conductor ? sesion.conductor.id : null,
     telefono_reporta:  validaciones.normalizarTelefono(telefono),
     tipo_tanqueo:      tipoTanqueoInferido,
@@ -160,6 +161,7 @@ async function guardarTanqueo(sesion, telefono) {
     estacion_servicio: sesion.estacionServicio || null,
     ciudad:            null,
     kilometraje:       sesion.kilometraje,
+    horometro:         sesion.horometro || null,
     km_referencia:     sesion.kmReferencia   != null ? sesion.kmReferencia   : null,
     diferencia_km:     sesion.diferenciaKm   != null ? sesion.diferenciaKm   : null,
     inconsistencia_km: !!sesion.inconsistenciaKm,
@@ -225,9 +227,12 @@ async function guardarTanqueo(sesion, telefono) {
     }
   }
 
-  var resVehiculo = await tanqueosData.actualizarKilometrajeVehiculo(sesion.placa, sesion.kilometraje);
-  if (resVehiculo && resVehiculo.error) {
-    console.error('[Cierre] Error actualizando km del vehículo:', resVehiculo.error.message || resVehiculo.error);
+  var activoId = sesion.vehiculo ? sesion.vehiculo.id : null;
+  if (activoId && sesion.kilometraje != null) {
+    var resVehiculo = await tanqueosData.actualizarKilometrajeActivo(activoId, sesion.kilometraje);
+    if (resVehiculo && resVehiculo.error) {
+      console.error('[Cierre] Error actualizando km del activo:', resVehiculo.error.message || resVehiculo.error);
+    }
   }
 
   return {

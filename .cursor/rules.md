@@ -60,12 +60,12 @@ config/           # config.js — única fuente de variables de entorno
 data/             # Acceso a Supabase — una función por operación
 middlewares/      # auth.js — JWT y permisos
 modulos/          # Lógica de negocio por módulo
-  vehiculos/
-    compartido/   # Utilidades compartidas entre flujos WhatsApp
+  inspecciones/
+    compartido/      # Utilidades compartidas entre flujos WhatsApp
     preoperacional/  # flujo.js estado.js mensajes.js validaciones.js cierre.js
-    posoperacional/  # igual
-    tanqueo/         # flujo.js validaciones.js
-    inscripcion/     # flujo.js estado.js mensajes.js validaciones.js
+    posoperacional/  # flujo.js estado.js mensajes.js validaciones.js cierre.js
+  tanqueo/           # flujo.js estado.js mensajes.js validaciones.js cierre.js
+  inscripcion/       # flujo.js estado.js mensajes.js validaciones.js
   alertas/        # notificador.js reglas.js
   seguridad-campo/ # Fase 3 — estructura lista, NO activar sin instrucción
 rutas/            # auth.js dashboard.js

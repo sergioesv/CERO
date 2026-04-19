@@ -29,17 +29,40 @@ const API = {
   put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body }); },
   delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); },
   
-  vehiculos: {
+  activos: {
     listar(filtros = {}) {
       const params = new URLSearchParams(filtros).toString();
-      return API.get(`/vehiculos${params ? '?' + params : ''}`);
+      return API.get(`/activos${params ? '?' + params : ''}`);
     },
-    obtener(placa) { return API.get(`/vehiculos/${placa}`); },
-    crear(data) { return API.post('/vehiculos', data); },
-    actualizar(placa, data) { return API.put(`/vehiculos/${placa}`, data); },
-    bloquear(placa, motivo) { return API.post(`/vehiculos/${placa}/bloquear`, { motivo }); },
-    desbloquear(placa) { return API.post(`/vehiculos/${placa}/desbloquear`); },
-    eliminar(placa) { return API.delete(`/vehiculos/${placa}`); }
+    obtener(id) { return API.get(`/activos/${id}`); },
+    obtenerPorPlaca(placa) { return API.get(`/activos/placa/${placa}`); },
+    crear(data) { return API.post('/activos', data); },
+    actualizar(id, data) { return API.put(`/activos/${id}`, data); },
+    bloquear(id, motivo) { return API.post(`/activos/${id}/bloquear`, { motivo }); },
+    desbloquear(id) { return API.post(`/activos/${id}/desbloquear`); },
+    eliminar(id) { return API.delete(`/activos/${id}`); }
+  },
+
+  plantillas: {
+    listar(filtros = {}) {
+      const params = new URLSearchParams(filtros).toString();
+      return API.get(`/plantillas${params ? '?' + params : ''}`);
+    },
+    obtener(id) { return API.get(`/plantillas/${id}`); },
+    crear(data) { return API.post('/plantillas', data); },
+    actualizar(id, data) { return API.put(`/plantillas/${id}`, data); },
+    clonar(id, data) { return API.post(`/plantillas/${id}/clonar`, data); },
+    eliminar(id) { return API.delete(`/plantillas/${id}`); },
+    // Grupos
+    crearGrupo(plantillaId, data) { return API.post(`/plantillas/${plantillaId}/grupos`, data); },
+    actualizarGrupo(grupoId, data) { return API.put(`/plantillas/grupos/${grupoId}`, data); },
+    eliminarGrupo(grupoId) { return API.delete(`/plantillas/grupos/${grupoId}`); },
+    reordenarGrupos(ids) { return API.put('/plantillas/grupos/reordenar', { ids }); },
+    // Items
+    crearItem(grupoId, data) { return API.post(`/plantillas/grupos/${grupoId}/items`, data); },
+    actualizarItem(itemId, data) { return API.put(`/plantillas/items/${itemId}`, data); },
+    eliminarItem(itemId) { return API.delete(`/plantillas/items/${itemId}`); },
+    reordenarItems(ids) { return API.put('/plantillas/items/reordenar', { ids }); }
   },
   
   conductores: {

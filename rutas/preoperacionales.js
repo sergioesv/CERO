@@ -18,7 +18,7 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
 
     var query = supabase
       .from('preoperacionales')
-      .select('*, vehiculos:vehiculo_placa(placa, marca, modelo), conductores:conductor_id(id, nombre, cedula)')
+      .select('*, activos:activo_id(id, placa, nombre, datos), conductores:conductor_id(id, nombre, cedula)')
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false });
 
@@ -29,8 +29,16 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
       query = query.lte('fecha', hasta);
     }
 
+    // Si hay filtro de placa, resolver a activo_id
     if (placa) {
-      query = query.eq('vehiculo_placa', placa.toUpperCase());
+      var activosData = require('../data/activos');
+      var activoId = await activosData.obtenerActivoIdPorPlaca(placa.toUpperCase());
+      if (activoId) {
+        query = query.eq('activo_id', activoId);
+      } else {
+        // Placa no existe, retornar vacío
+        return res.json({ data: [], stats: { total: 0, hoy: 0, con_novedades_hoy: 0, criticas_hoy: 0 } });
+      }
     }
 
     if (conductor) {
@@ -55,14 +63,17 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
       var novedades = registro.novedades || [];
       var totalNovedades = novedades.length;
       var novedadesCriticas = novedades.filter(function (n) { return n.critico === true; }).length;
+      var activo = registro.activos || {};
+      var datosActivo = activo.datos || {};
 
       return {
         id: registro.id,
         fecha: registro.fecha,
         hora: registro.hora,
-        vehiculo_placa: registro.vehiculo_placa,
-        vehiculo_marca: registro.vehiculos ? registro.vehiculos.marca : null,
-        vehiculo_modelo: registro.vehiculos ? registro.vehiculos.modelo : null,
+        activo_id: registro.activo_id,
+        vehiculo_placa: activo.placa || null,
+        vehiculo_marca: datosActivo.marca || null,
+        vehiculo_modelo: datosActivo.modelo || null,
         conductor_id: registro.conductor_id,
         conductor_nombre: registro.conductores ? registro.conductores.nombre : null,
         conductor_cedula: registro.conductores ? registro.conductores.cedula : null,
@@ -74,10 +85,7 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
         novedades_criticas: novedadesCriticas,
         clasificacion: registro.clasificacion || 'sin_novedades',
         observaciones: registro.observaciones,
-        motor_niveles: registro.motor_niveles,
-        electrico_luces: registro.electrico_luces,
-        frenos_direccion_llantas: registro.frenos_direccion_llantas,
-        cabina_equipo: registro.cabina_equipo,
+        respuestas: registro.respuestas || {},
         firma_operario: registro.firma_operario,
         firma_timestamp: registro.firma_timestamp,
         estado: registro.estado,
@@ -115,7 +123,7 @@ router.get('/:id', verificarToken, verificarPermiso('preoperacionales', 'ver'), 
 
     var resultado = await supabase
       .from('preoperacionales')
-      .select('*, vehiculos:vehiculo_placa(placa, marca, modelo, soat_vencimiento, tecnomecanica_vencimiento), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
+      .select('*, activos:activo_id(id, placa, nombre, datos, documentos), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
       .eq('id', id)
       .single();
 

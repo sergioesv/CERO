@@ -6,7 +6,7 @@
 
 'use strict';
 
-var vehiculosData = require('../../../data/vehiculos');
+var activosData = require('../../../data/activos');
 var inspeccionesData = require('../../../data/inspecciones');
 var kmCompartido = require('./kilometraje');
 var ocr = require('../../../servicios/ocr');
@@ -47,10 +47,10 @@ function crearManejadorPlaca(opciones) {
       return '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*';
     }
 
-    // 3. Buscar vehículo y conductor (función combinada)
-    var carga = await vehiculosData.cargarVehiculoYConductor(placa, telefono);
+    // 3. Buscar activo y conductor (función combinada)
+    var carga = await activosData.cargarActivoYConductor(placa, telefono);
     if (carga.error || !carga.vehiculo) {
-      console.log('[iniciadorFlujo] Vehículo no encontrado: ' + placa);
+      console.log('[iniciadorFlujo] Activo no encontrado: ' + placa);
       return 'Vehículo *' + placa + '* no encontrado.\n\nVerifica la placa y vuelve a intentarlo.';
     }
 
@@ -71,8 +71,8 @@ function crearManejadorPlaca(opciones) {
       return '\u26A0\uFE0F Tu número no está registrado como conductor.\n\nContacta al administrador.';
     }
 
-    // 6. Obtener referencia de kilometraje
-    var refKm = await inspeccionesData.obtenerReferenciaKilometraje(placa, tipoFlujo);
+    // 6. Obtener referencia de kilometraje (usando activo_id)
+    var refKm = await inspeccionesData.obtenerReferenciaKilometraje(vehiculo.id, tipoFlujo);
     console.log('[iniciadorFlujo] Referencia km:', refKm);
 
     // 7. Actualizar sesión
@@ -177,7 +177,7 @@ function crearProcesadorFotoPlaca(opciones) {
       var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
       if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
         if (typeof opciones.onExitoPlaca === 'function') {
-           opciones.onExitoPlaca(sesion);
+           await opciones.onExitoPlaca(sesion);
         }
         storage.guardarFotoUnica(sesion, {
           tipo: opciones.tipoFotoPlaca || 'inicio_placa',
@@ -199,7 +199,7 @@ function crearProcesadorFotoPlaca(opciones) {
     sesion.placaSugerida = null;
 
     if (placaDetectada) {
-      var placaSugerida = await vehiculosData.buscarPlacaSugerida(placaDetectada);
+      var placaSugerida = await activosData.buscarPlacaSugerida(placaDetectada);
       if (placaSugerida && placaSugerida !== placaDetectada) {
         sesion.placaSugerida = placaSugerida;
         sesion.estado = ESTADOS.PLACA_CONFIRMACION_SUGERIDA || 'PLACA_CONFIRMACION_SUGERIDA';

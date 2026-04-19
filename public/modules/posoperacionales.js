@@ -17,7 +17,11 @@ const PosopLogic = {
       filtrada = filtrada.filter(item => (item.estado_general || '') === estadoFiltro);
     }
     if (placaFiltro) {
-      filtrada = filtrada.filter(item => (item.vehiculo_placa || '').toUpperCase().includes(placaFiltro));
+      filtrada = filtrada.filter(item => {
+        const codigo = item.activos?.codigo || item.activo_codigo || '';
+        const placa = item.activos?.placa || item.activo_placa || '';
+        return codigo.toUpperCase().includes(placaFiltro) || placa.toUpperCase().includes(placaFiltro);
+      });
     }
     return filtrada;
   },
@@ -58,14 +62,17 @@ const PosopRender = {
           render: (valor) => PosopLogic.formatFechaHora(valor)
         },
         {
-          key: 'vehiculo_placa', label: 'Placa', width: '90px',
-          render: (valor) => `<span class="font-medium">${Utils.escaparHTML(valor || '—')}</span>`
+          key: 'activo_codigo', label: 'Placa / Código', width: '90px',
+          render: (_, row) => {
+            const ident = row.activos ? (row.activos.placa || row.activos.codigo) : (row.activo_placa || row.activo_codigo || '—');
+            return `<span class="font-medium">${Utils.escaparHTML(ident || '—')}</span>`;
+          }
         },
         {
-          key: 'vehiculo', label: 'Vehículo',
+          key: 'activo', label: 'Activo',
           render: (_, row) => {
-            const vehiculo = [row.vehiculos?.marca, row.vehiculos?.tipo].filter(Boolean).join(' ');
-            return Utils.escaparHTML(vehiculo || '—');
+            const activo = row.activos ? row.activos.nombre : (row.activo_nombre || '—');
+            return Utils.escaparHTML(activo || '—');
           }
         },
         {
@@ -73,12 +80,18 @@ const PosopRender = {
           render: (valor, row) => Utils.escaparHTML((row.conductores && row.conductores.nombre) || valor || '—')
         },
         {
-          key: 'km_referencia', label: 'KM inicial', width: '110px',
-          render: (valor) => Utils.formatearNumero(valor)
+          key: 'medicion_inicial', label: 'Medición Inicial', width: '110px',
+          render: (_, row) => {
+            const val = row.horometro_final != null ? row.horometro_inicial : row.kilometraje_inicial;
+            return Utils.formatearNumero(val || row.km_referencia);
+          }
         },
         {
-          key: 'kilometraje_final', label: 'KM final', width: '110px',
-          render: (valor) => Utils.formatearNumero(valor)
+          key: 'medicion_final', label: 'Medición Final', width: '110px',
+          render: (_, row) => {
+            const val = row.horometro_final != null ? row.horometro_final : row.kilometraje_final;
+            return Utils.formatearNumero(val);
+          }
         },
         {
           key: 'estado_general', label: 'Estado', width: '140px',
@@ -96,11 +109,21 @@ const PosopRender = {
 
   drawerContent(registro) {
     const conductor = (registro.conductores?.nombre) || registro.conductor_nombre || '—';
-    const vehiculo = [registro.vehiculos?.marca, registro.vehiculos?.tipo].filter(Boolean).join(' ') || '—';
-    const kmInicial = Utils.formatearNumero(registro.km_referencia);
-    const kmFinal = Utils.formatearNumero(registro.kilometraje_final);
-    const recorrido = (registro.km_referencia != null && registro.kilometraje_final != null)
-      ? Utils.formatearNumero(registro.kilometraje_final - registro.km_referencia) + ' km'
+    const activo = registro.activos ? registro.activos.nombre : '—';
+    const ident = registro.activos ? (registro.activos.placa || registro.activos.codigo) : '—';
+    const isHoras = registro.horometro_final != null;
+    
+    const medicionInicial = isHoras ? (registro.horometro_inicial || registro.km_referencia) : (registro.kilometraje_inicial || registro.km_referencia);
+    const medicionFinal = isHoras ? registro.horometro_final : registro.kilometraje_final;
+    
+    const labelInicial = isHoras ? 'Horas inicial' : 'KM inicial';
+    const labelFinal = isHoras ? 'Horas final' : 'KM final';
+    const labelRecorrido = isHoras ? 'Horas trabajadas' : 'Recorrido';
+    
+    const inicialFormateado = Utils.formatearNumero(medicionInicial);
+    const finalFormateado = Utils.formatearNumero(medicionFinal);
+    const recorrido = (medicionInicial != null && medicionFinal != null)
+      ? Utils.formatearNumero(medicionFinal - medicionInicial) + (isHoras ? ' h' : ' km')
       : '—';
 
     let novedades = registro.novedades || [];
@@ -143,23 +166,24 @@ const PosopRender = {
           <div class="font-medium">${PosopLogic.formatFechaHora(registro.created_at).replace('<br>', ' ')}</div>
         </div>
         <div class="drawer-info-card">
-          <div class="stat-label">Vehículo</div>
-          <div class="font-medium">${Utils.escaparHTML(vehiculo)}</div>
+          <div class="stat-label">Activo</div>
+          <div class="font-medium">${Utils.escaparHTML(ident)}</div>
+          <div class="text-xs text-secondary">${Utils.escaparHTML(activo)}</div>
         </div>
         <div class="drawer-info-card">
           <div class="stat-label">Estado</div>
           <div>${PosopLogic.estadoBadge(registro.estado_general)}</div>
         </div>
         <div class="drawer-info-card">
-          <div class="stat-label">KM inicial</div>
-          <div class="font-medium">${kmInicial}</div>
+          <div class="stat-label">${labelInicial}</div>
+          <div class="font-medium">${inicialFormateado}</div>
         </div>
         <div class="drawer-info-card">
-          <div class="stat-label">KM final</div>
-          <div class="font-medium">${kmFinal}</div>
+          <div class="stat-label">${labelFinal}</div>
+          <div class="font-medium">${finalFormateado}</div>
         </div>
         <div class="drawer-info-card" style="grid-column:span 2;">
-          <div class="stat-label">Recorrido</div>
+          <div class="stat-label">${labelRecorrido}</div>
           <div class="font-medium">${recorrido}</div>
         </div>
       </div>
@@ -268,7 +292,7 @@ window.PosoperacionalesModule = {
     if (!registro) return;
     
     Drawer.open({
-      title: Utils.escaparHTML(registro.vehiculo_placa || 'Detalle'),
+      title: Utils.escaparHTML(registro.activos ? (registro.activos.placa || registro.activos.codigo) : 'Detalle'),
       content: PosopRender.drawerContent(registro),
       width: '600px'
     });

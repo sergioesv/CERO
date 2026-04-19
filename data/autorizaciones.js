@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // data/autorizaciones.js
 // Capa de datos para autorizaciones del panel web
-// CERO — Módulo Alertas (Fase 2.1)
+// CERO — v26 — vehiculo_placa → activo_id
 // ═══════════════════════════════════════════════════════════
 
 'use strict';
@@ -33,7 +33,7 @@ function clasificarEstado(diasRestantes) {
 }
 
 function construirDocumento(fecha) {
-  if (!fecha) return { vencimiento: null, dias_restantes: null, estado: 'sin_dato' };
+  if (!fecha || fecha === '') return { vencimiento: null, dias_restantes: null, estado: 'sin_dato' };
   var dias = calcularDiasRestantes(fecha);
   return {
     vencimiento: fecha,
@@ -43,29 +43,32 @@ function construirDocumento(fecha) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// DOCUMENTOS DE VEHÍCULOS
+// DOCUMENTOS DE ACTIVOS (antes: documentos de vehículos)
 // GET /api/alertas/documentos
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerDocumentosVehiculos() {
-  var resVehiculos = await config.supabase
-    .from(config.TABLES.vehiculos)
-    .select('placa, tipo, marca, modelo, estado, bloqueado, motivo_bloqueo, soat_vencimiento, tecnomecanica_vencimiento')
-    .neq('estado', 'retirado')
+async function obtenerDocumentosActivos() {
+  var resActivos = await config.supabase
+    .from(config.TABLES.activos)
+    .select('id, placa, nombre, estado, bloqueado, motivo_bloqueo, datos, documentos')
+    .eq('activo', true)
+    .not('placa', 'is', null)
     .order('placa');
 
-  if (resVehiculos.error) throw resVehiculos.error;
+  if (resActivos.error) throw resActivos.error;
 
-  var vehiculos = resVehiculos.data || [];
+  var activos = resActivos.data || [];
 
-  var datos = await Promise.all(vehiculos.map(async function(v) {
+  var datos = await Promise.all(activos.map(async function(a) {
+    var datosJson = a.datos || {};
+    var docsJson = a.documentos || {};
     var licencia = { conductor: null, vencimiento: null, dias_restantes: null, estado: 'sin_dato' };
 
-    // Buscar último conductor del vehículo desde preoperacionales
+    // Buscar último conductor del activo desde preoperacionales
     var resPreop = await config.supabase
       .from(config.TABLES.preoperacionales)
       .select('conductor_id')
-      .eq('vehiculo_placa', v.placa)
+      .eq('activo_id', a.id)
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false })
       .limit(1);
@@ -89,15 +92,16 @@ async function obtenerDocumentosVehiculos() {
     }
 
     return {
-      placa: v.placa,
-      tipo: v.tipo || null,
-      marca: v.marca || null,
-      modelo: v.modelo || null,
-      estado: v.estado || 'operativo',
-      bloqueado: v.bloqueado || false,
-      motivo_bloqueo: v.motivo_bloqueo || null,
-      soat: construirDocumento(v.soat_vencimiento),
-      tecnomecanica: construirDocumento(v.tecnomecanica_vencimiento),
+      id: a.id,
+      placa: a.placa,
+      tipo: datosJson.tipo_vehiculo || datosJson.tipo || null,
+      marca: datosJson.marca || null,
+      modelo: datosJson.modelo || null,
+      estado: a.estado || 'operativo',
+      bloqueado: a.bloqueado || false,
+      motivo_bloqueo: a.motivo_bloqueo || null,
+      soat: construirDocumento(docsJson.soat_vencimiento),
+      tecnomecanica: construirDocumento(docsJson.tecnomecanica_vencimiento),
       licencia: licencia
     };
   }));
@@ -107,22 +111,23 @@ async function obtenerDocumentosVehiculos() {
 
 // ─────────────────────────────────────────────────────────────────
 // AUTORIZACIONES PENDIENTES
-// GET /api/autorizaciones/pendientes
 // ─────────────────────────────────────────────────────────────────
 
 async function obtenerAutorizacionesPendientes() {
   var res = await config.supabase
     .from('autorizaciones_novedad')
-    .select('*, conductores:conductor_id(nombre, telefono)')
+    .select('*, activos:activo_id(id, placa, nombre), conductores:conductor_id(nombre, telefono)')
     .is('decision', null)
     .order('timestamp_alerta', { ascending: true });
 
   if (res.error) throw res.error;
 
   return (res.data || []).map(function(r) {
+    var activo = r.activos || {};
     return {
       id: r.id,
-      vehiculo_placa: r.vehiculo_placa,
+      activo_id: r.activo_id,
+      vehiculo_placa: activo.placa || null,
       conductor_nombre: r.conductores ? r.conductores.nombre : null,
       conductor_telefono: r.conductores ? r.conductores.telefono : null,
       novedades_bloqueo: r.novedades_bloqueo || [],
@@ -134,13 +139,12 @@ async function obtenerAutorizacionesPendientes() {
 
 // ─────────────────────────────────────────────────────────────────
 // AUTORIZACIONES RESUELTAS
-// GET /api/autorizaciones/resueltas
 // ─────────────────────────────────────────────────────────────────
 
 async function obtenerAutorizacionesResueltas() {
   var res = await config.supabase
     .from('autorizaciones_novedad')
-    .select('*, conductores:conductor_id(nombre), supervisores:supervisor_id(nombre)')
+    .select('*, activos:activo_id(id, placa, nombre), conductores:conductor_id(nombre), supervisores:supervisor_id(nombre)')
     .not('decision', 'is', null)
     .order('timestamp_decision', { ascending: false })
     .limit(100);
@@ -148,9 +152,11 @@ async function obtenerAutorizacionesResueltas() {
   if (res.error) throw res.error;
 
   return (res.data || []).map(function(r) {
+    var activo = r.activos || {};
     return {
       id: r.id,
-      vehiculo_placa: r.vehiculo_placa,
+      activo_id: r.activo_id,
+      vehiculo_placa: activo.placa || null,
       conductor_nombre: r.conductores ? r.conductores.nombre : null,
       novedades_bloqueo: r.novedades_bloqueo || [],
       decision: r.decision,
@@ -163,16 +169,14 @@ async function obtenerAutorizacionesResueltas() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// REGISTRAR DECISIÓN — función reutilizable
-// Usada por el panel web (PUT /api/autorizaciones/:id/decidir)
-// y puede ser usada por el flujo WhatsApp
+// REGISTRAR DECISIÓN
 // ─────────────────────────────────────────────────────────────────
 
 async function registrarDecision(autorizacionId, decision, justificacion, supervisorId) {
   // 1. Verificar que exista y no tenga decisión previa
   var resCheck = await config.supabase
     .from('autorizaciones_novedad')
-    .select('id, decision, conductor_id, vehiculo_placa')
+    .select('id, decision, conductor_id, activo_id')
     .eq('id', autorizacionId)
     .single();
 
@@ -201,41 +205,39 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
   if (resUpdate.error) throw resUpdate.error;
 
   var autorizacion = resCheck.data;
+  var activoId = autorizacion.activo_id;
 
-  // 3. Sincronizar estado en vehiculos, activos e historial según decisión
+  // 3. Sincronizar estado en activos e historial según decisión
   var estadoNuevoActivo = null;
   var motivoHistorial = 'Decisión supervisor: ' + decision;
   if (justificacion) motivoHistorial += ' — ' + justificacion;
 
-  if (decision === 'taller' && autorizacion.vehiculo_placa) {
-    // Mover a taller
+  if (decision === 'taller' && activoId) {
     await config.supabase
-      .from(config.TABLES.vehiculos)
-      .update({ estado: 'taller' })
-      .eq('placa', autorizacion.vehiculo_placa);
+      .from(config.TABLES.activos)
+      .update({ estado: 'taller', updated_at: ahora })
+      .eq('id', activoId);
     estadoNuevoActivo = 'taller';
 
-  } else if (decision === 'restringir' && autorizacion.vehiculo_placa) {
-    // Bloquear vehículo
+  } else if (decision === 'restringir' && activoId) {
     await config.supabase
-      .from(config.TABLES.vehiculos)
-      .update({ bloqueado: true, motivo_bloqueo: motivoHistorial })
-      .eq('placa', autorizacion.vehiculo_placa);
+      .from(config.TABLES.activos)
+      .update({ bloqueado: true, motivo_bloqueo: motivoHistorial, updated_at: ahora })
+      .eq('id', activoId);
     estadoNuevoActivo = 'bloqueado';
 
-  } else if (decision === 'autorizar' && autorizacion.vehiculo_placa) {
-    // Desbloquear y marcar operativo
+  } else if (decision === 'autorizar' && activoId) {
     await config.supabase
-      .from(config.TABLES.vehiculos)
-      .update({ bloqueado: false, motivo_bloqueo: null, estado: 'operativo' })
-      .eq('placa', autorizacion.vehiculo_placa);
+      .from(config.TABLES.activos)
+      .update({ bloqueado: false, motivo_bloqueo: null, estado: 'operativo', updated_at: ahora })
+      .eq('id', activoId);
     estadoNuevoActivo = 'operativo';
   }
 
   // Registrar en historial_estado_activo si aplica
-  if (estadoNuevoActivo && autorizacion.vehiculo_placa) {
+  if (estadoNuevoActivo && activoId) {
     activosData.registrarCambioEstado(
-      autorizacion.vehiculo_placa,
+      activoId,
       estadoNuevoActivo,
       motivoHistorial,
       'autorizacion',
@@ -247,7 +249,20 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
     });
   }
 
-  // 4. Buscar teléfono del conductor y notificar por WhatsApp
+  // 4. Obtener placa del activo para notificación
+  var placaActivo = null;
+  if (activoId) {
+    var resActivo = await config.supabase
+      .from(config.TABLES.activos)
+      .select('placa')
+      .eq('id', activoId)
+      .single();
+    if (!resActivo.error && resActivo.data) {
+      placaActivo = resActivo.data.placa;
+    }
+  }
+
+  // 5. Buscar teléfono del conductor y notificar por WhatsApp
   if (autorizacion.conductor_id) {
     try {
       var resConductor = await config.supabase
@@ -258,7 +273,7 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
 
       if (!resConductor.error && resConductor.data && resConductor.data.telefono) {
         var mensajeDecision = construirMensajeDecision(
-          autorizacion.vehiculo_placa,
+          placaActivo || '—',
           resConductor.data.nombre,
           decision,
           justificacion
@@ -267,7 +282,6 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
       }
     } catch (errNotif) {
       console.error('Error notificando al conductor:', errNotif.message);
-      // No bloquear la respuesta si falla la notificación
     }
   }
 
@@ -302,50 +316,70 @@ function construirMensajeDecision(placa, conductorNombre, decision, justificacio
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HISTORIAL DE VEHÍCULO
-// GET /api/vehiculos/:placa/historial
+// HISTORIAL DE ACTIVO
+// GET /api/vehiculos/:placa/historial  (o /api/activos/:placa/historial)
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerHistorialVehiculo(placa) {
+async function obtenerHistorialActivo(placa) {
   var placaUpper = placa.toUpperCase();
 
-  var [resPreop, resPosop, resTanqueos, resAutorizaciones, resVehiculo] = await Promise.all([
+  // Resolver placa a activo_id
+  var activoId = await activosData.obtenerActivoIdPorPlaca(placaUpper);
+
+  // Obtener datos del activo
+  var resActivo = await config.supabase
+    .from(config.TABLES.activos)
+    .select('id, placa, nombre, estado, datos')
+    .eq('placa', placaUpper)
+    .single();
+
+  var activo = null;
+  if (!resActivo.error && resActivo.data) {
+    var datosJson = resActivo.data.datos || {};
+    activo = {
+      placa: resActivo.data.placa,
+      tipo: datosJson.tipo_vehiculo || datosJson.tipo || null,
+      marca: datosJson.marca || null,
+      modelo: datosJson.modelo || null,
+      estado: resActivo.data.estado
+    };
+  } else {
+    activo = { placa: placaUpper };
+  }
+
+  if (!activoId) {
+    return { vehiculo: activo, historial: [] };
+  }
+
+  var [resPreop, resPosop, resTanqueos, resAutorizaciones] = await Promise.all([
     config.supabase
       .from(config.TABLES.preoperacionales)
       .select('id, fecha, hora, novedades')
-      .eq('vehiculo_placa', placaUpper)
+      .eq('activo_id', activoId)
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false })
       .limit(30),
 
     config.supabase
       .from(config.TABLES.posoperacionales)
-      .select('id, fecha, hora, novedades')
-      .eq('vehiculo_placa', placaUpper)
-      .order('fecha', { ascending: false })
-      .order('hora', { ascending: false })
+      .select('id, created_at, novedades')
+      .eq('activo_id', activoId)
+      .order('created_at', { ascending: false })
       .limit(30),
 
     config.supabase
       .from(config.TABLES.tanqueos)
-      .select('id, fecha, hora, cantidad, tipo_combustible, estacion_servicio')
-      .eq('vehiculo_placa', placaUpper)
-      .order('fecha', { ascending: false })
-      .order('hora', { ascending: false })
+      .select('id, created_at, cantidad, tipo_combustible, estacion_servicio')
+      .eq('activo_id', activoId)
+      .order('created_at', { ascending: false })
       .limit(30),
 
     config.supabase
       .from('autorizaciones_novedad')
       .select('id, timestamp_alerta, timestamp_decision, decision, justificacion, novedades_bloqueo, supervisores:supervisor_id(nombre)')
-      .eq('vehiculo_placa', placaUpper)
+      .eq('activo_id', activoId)
       .order('timestamp_alerta', { ascending: false })
-      .limit(30),
-
-    config.supabase
-      .from(config.TABLES.vehiculos)
-      .select('placa, tipo, marca, modelo, estado')
-      .eq('placa', placaUpper)
-      .single()
+      .limit(30)
   ]);
 
   var eventos = [];
@@ -373,7 +407,7 @@ async function obtenerHistorialVehiculo(placa) {
     var novedades = r.novedades || [];
     eventos.push({
       tipo: 'posoperacional',
-      fecha: r.fecha + 'T' + (r.hora || '00:00:00'),
+      fecha: r.created_at,
       resumen: novedades.length > 0 ? 'Con novedades' : 'Sin novedades',
       id: r.id
     });
@@ -386,7 +420,7 @@ async function obtenerHistorialVehiculo(placa) {
     if (r.estacion_servicio) partes.push(r.estacion_servicio);
     eventos.push({
       tipo: 'tanqueo',
-      fecha: r.fecha + 'T' + (r.hora || '00:00:00'),
+      fecha: r.created_at,
       resumen: partes.length > 0 ? partes.join(' — ') : 'Tanqueo registrado',
       id: r.id
     });
@@ -414,17 +448,15 @@ async function obtenerHistorialVehiculo(placa) {
   });
   eventos = eventos.slice(0, 50);
 
-  var vehiculo = (!resVehiculo.error && resVehiculo.data) ? resVehiculo.data : { placa: placaUpper };
-
-  return { vehiculo: vehiculo, historial: eventos };
+  return { vehiculo: activo, historial: eventos };
 }
 
 module.exports = {
   calcularDiasRestantes,
   clasificarEstado,
-  obtenerDocumentosVehiculos,
+  obtenerDocumentosActivos,
   obtenerAutorizacionesPendientes,
   obtenerAutorizacionesResueltas,
   registrarDecision,
-  obtenerHistorialVehiculo
+  obtenerHistorialActivo
 };

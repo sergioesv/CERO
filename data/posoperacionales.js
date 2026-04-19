@@ -1,9 +1,14 @@
+// ═══════════════════════════════════════════════════════════
+// data/posoperacionales.js
+// Capa de datos para posoperacionales
+// CERO — v26 — Queries adaptadas a schema sin vehiculos
+// ═══════════════════════════════════════════════════════════
+
 var config = require('../config/config');
 
 var TABLA_POSOPERACIONALES = config.TABLES.posoperacionales;
 var TABLA_FOTOS = process.env.DB_TABLE_FOTOS_POSOPERACIONAL || 'fotos_posoperacional';
 var TABLA_PREOPERACIONALES = config.TABLES.preoperacionales;
-var TABLA_VEHICULOS = config.TABLES.vehiculos;
 
 function fechaHoyCO() {
   var ahoraUtc = new Date();
@@ -11,12 +16,12 @@ function fechaHoyCO() {
   return ahoraCo.toISOString().slice(0, 10);
 }
 
-async function buscarPreoperacionalDia(placa, fecha) {
+async function buscarPreoperacionalDia(activoId, fecha) {
   try {
     var resultado = await config.supabase
       .from(TABLA_PREOPERACIONALES)
-      .select('id, vehiculo_placa, kilometraje, fecha, hora, created_at')
-      .eq('vehiculo_placa', placa)
+      .select('id, activo_id, kilometraje, fecha, hora, created_at')
+      .eq('activo_id', activoId)
       .eq('fecha', fecha)
       .order('hora', { ascending: false })
       .limit(1);
@@ -33,12 +38,12 @@ async function buscarPreoperacionalDia(placa, fecha) {
   }
 }
 
-async function buscarUltimoPosoperacional(placa) {
+async function buscarUltimoPosoperacional(activoId) {
   try {
     var resultado = await config.supabase
       .from(TABLA_POSOPERACIONALES)
-      .select('id, vehiculo_placa, kilometraje_final, created_at')
-      .eq('vehiculo_placa', placa)
+      .select('id, activo_id, kilometraje_final, created_at')
+      .eq('activo_id', activoId)
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -54,12 +59,12 @@ async function buscarUltimoPosoperacional(placa) {
   }
 }
 
-async function buscarUltimoPreoperacional(placa) {
+async function buscarUltimoPreoperacional(activoId) {
   try {
     var resultado = await config.supabase
       .from(TABLA_PREOPERACIONALES)
-      .select('id, vehiculo_placa, kilometraje, fecha, hora, created_at')
-      .eq('vehiculo_placa', placa)
+      .select('id, activo_id, kilometraje, fecha, hora, created_at')
+      .eq('activo_id', activoId)
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false })
       .limit(1);
@@ -76,31 +81,31 @@ async function buscarUltimoPreoperacional(placa) {
   }
 }
 
-async function buscarKilometrajeVehiculo(placa) {
+async function buscarKilometrajeActivo(activoId) {
   try {
     var resultado = await config.supabase
-      .from(TABLA_VEHICULOS)
-      .select('placa, kilometraje')
-      .eq('placa', placa)
+      .from(config.TABLES.activos)
+      .select('id, placa, kilometraje')
+      .eq('id', activoId)
       .maybeSingle();
 
     if (resultado.error || !resultado.data) {
       if (resultado.error) {
-        console.error('Error buscando kilometraje del vehiculo:', resultado.error.message || resultado.error);
+        console.error('Error buscando kilometraje del activo:', resultado.error.message || resultado.error);
       }
       return null;
     }
 
     return resultado.data;
   } catch (error) {
-    console.error('Error buscando kilometraje del vehiculo:', error.message || error);
+    console.error('Error buscando kilometraje del activo:', error.message || error);
     return null;
   }
 }
 
-async function obtenerReferenciaKilometraje(placa) {
+async function obtenerReferenciaKilometraje(activoId) {
   var hoy = fechaHoyCO();
-  var preopDia = await buscarPreoperacionalDia(placa, hoy);
+  var preopDia = await buscarPreoperacionalDia(activoId, hoy);
   if (preopDia && typeof preopDia.kilometraje === 'number') {
     return {
       kilometraje: preopDia.kilometraje,
@@ -111,7 +116,7 @@ async function obtenerReferenciaKilometraje(placa) {
     };
   }
 
-  var ultimoPosop = await buscarUltimoPosoperacional(placa);
+  var ultimoPosop = await buscarUltimoPosoperacional(activoId);
   if (ultimoPosop && typeof ultimoPosop.kilometraje_final === 'number') {
     return {
       kilometraje: ultimoPosop.kilometraje_final,
@@ -122,7 +127,7 @@ async function obtenerReferenciaKilometraje(placa) {
     };
   }
 
-  var ultimoPreop = await buscarUltimoPreoperacional(placa);
+  var ultimoPreop = await buscarUltimoPreoperacional(activoId);
   if (ultimoPreop && typeof ultimoPreop.kilometraje === 'number') {
     return {
       kilometraje: ultimoPreop.kilometraje,
@@ -133,11 +138,11 @@ async function obtenerReferenciaKilometraje(placa) {
     };
   }
 
-  var vehiculo = await buscarKilometrajeVehiculo(placa);
-  if (vehiculo && typeof vehiculo.kilometraje === 'number') {
+  var activo = await buscarKilometrajeActivo(activoId);
+  if (activo && typeof activo.kilometraje === 'number') {
     return {
-      kilometraje: vehiculo.kilometraje,
-      origen: 'vehiculo',
+      kilometraje: activo.kilometraje,
+      origen: 'activo',
       referenciaId: null,
       fecha: null,
       hora: null

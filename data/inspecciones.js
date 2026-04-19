@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════
+// data/inspecciones.js
+// Capa de datos para preoperacionales y referencia de km
+// CERO — v26 — Queries adaptadas a schema sin vehiculos
+// ═══════════════════════════════════════════════════════════
 
 var config = require('../config/config');
 
@@ -24,25 +29,25 @@ async function guardarFotosEvidencia(preoperacionalId, fotos) {
   return await config.supabase.from(config.TABLES.fotosEvidencia).insert(fotosParaGuardar);
 }
 
-async function actualizarKilometrajeVehiculo(vehiculoId, kilometraje) {
+async function actualizarKilometrajeActivo(activoId, kilometraje) {
   return await config.supabase
-    .from(config.TABLES.vehiculos)
-    .update({ kilometraje: kilometraje })
-    .eq('id', vehiculoId);
+    .from(config.TABLES.activos)
+    .update({ kilometraje: kilometraje, updated_at: new Date().toISOString() })
+    .eq('id', activoId);
 }
 
 /**
  * Obtiene referencia de kilometraje para validación de odómetro.
  * Prioridad según tipo de flujo:
- * - preoperacional: último preoperacional > vehículo
- * - tanqueo: preoperacional del día > último tanqueo > último preoperacional > vehículo
- * - posoperacional: preoperacional del día > último posoperacional > último preoperacional > vehículo
+ * - preoperacional: último preoperacional > activo
+ * - tanqueo: preoperacional del día > último tanqueo > último preoperacional > activo
+ * - posoperacional: preoperacional del día > último posoperacional > último preoperacional > activo
  *
- * @param {string} placa - Placa del vehículo
+ * @param {string} activoId - UUID del activo
  * @param {string} tipoFlujo - 'preoperacional' | 'tanqueo' | 'posoperacional'
  * @returns {Promise<{kilometraje: number|null, origen: string}>}
  */
-async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
+async function obtenerReferenciaKilometraje(activoId, tipoFlujo) {
   var T = config.TABLES;
   var ahoraCO = new Date(Date.now() - (5 * 60 * 60 * 1000));
   var inicioDia = new Date(ahoraCO.getFullYear(), ahoraCO.getMonth(), ahoraCO.getDate());
@@ -52,7 +57,7 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
   var preoperacionalHoy = await config.supabase
     .from(T.preoperacionales)
     .select('kilometraje')
-    .eq('vehiculo_placa', placa)
+    .eq('activo_id', activoId)
     .gte('created_at', inicioISO)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -70,7 +75,7 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
     var ultimoTanqueo = await config.supabase
       .from(T.tanqueos)
       .select('kilometraje')
-      .eq('vehiculo_placa', placa)
+      .eq('activo_id', activoId)
       .not('kilometraje', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -89,7 +94,7 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
     var ultimoPosoperacional = await config.supabase
       .from(T.posoperacionales)
       .select('kilometraje_final')
-      .eq('vehiculo_placa', placa)
+      .eq('activo_id', activoId)
       .not('kilometraje_final', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -107,7 +112,7 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
   var ultimoPreoperacional = await config.supabase
     .from(T.preoperacionales)
     .select('kilometraje')
-    .eq('vehiculo_placa', placa)
+    .eq('activo_id', activoId)
     .not('kilometraje', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -120,17 +125,17 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
     };
   }
 
-  // 5. Fallback: kilometraje del vehículo
-  var vehiculo = await config.supabase
-    .from(T.vehiculos)
+  // 5. Fallback: kilometraje del activo
+  var activo = await config.supabase
+    .from(T.activos)
     .select('kilometraje')
-    .eq('placa', placa)
+    .eq('id', activoId)
     .maybeSingle();
 
-  if (!vehiculo.error && vehiculo.data && vehiculo.data.kilometraje != null) {
+  if (!activo.error && activo.data && activo.data.kilometraje != null) {
     return {
-      kilometraje: vehiculo.data.kilometraje,
-      origen: 'vehiculo'
+      kilometraje: activo.data.kilometraje,
+      origen: 'activo'
     };
   }
 
@@ -144,6 +149,6 @@ async function obtenerReferenciaKilometraje(placa, tipoFlujo) {
 module.exports = {
   crearPreoperacional,
   guardarFotosEvidencia,
-  actualizarKilometrajeVehiculo,
+  actualizarKilometrajeActivo,
   obtenerReferenciaKilometraje
 };

@@ -55,7 +55,7 @@ if (!SUPABASE_URL.includes('supabase.co')) {
 }
 
 const TABLES = {
-  vehiculos: clean(process.env.DB_TABLE_VEHICULOS || 'vehiculos'),
+  activos: clean(process.env.DB_TABLE_ACTIVOS || 'activos'),
   conductores: clean(process.env.DB_TABLE_CONDUCTORES || 'conductores'),
   preoperacionales: clean(process.env.DB_TABLE_PREOPERACIONALES || 'preoperacionales'),
   fotosEvidencia: clean(process.env.DB_TABLE_FOTOS_EVIDENCIA || 'fotos_evidencia'),
@@ -66,7 +66,10 @@ const TABLES = {
   riesgosLocativos: clean(process.env.DB_TABLE_RIESGOS_LOCATIVOS || 'riesgos_locativos'),
   posoperacionales: clean(process.env.DB_TABLE_POSOPERACIONALES || 'posoperacionales'),
   dashboardSnapshots: clean(process.env.DB_TABLE_DASHBOARD_SNAPSHOTS || 'dashboard_snapshots'),
-  sesionesActivas: clean(process.env.DB_TABLE_SESIONES_ACTIVAS || 'sesiones_activas')
+  sesionesActivas: clean(process.env.DB_TABLE_SESIONES_ACTIVAS || 'sesiones_activas'),
+  plantillasInspeccion: 'plantillas_inspeccion',
+  plantillaGrupos: 'plantilla_grupos',
+  plantillaItems: 'plantilla_items'
 };
 
 // ═══════════════════════════════════════════════════════════

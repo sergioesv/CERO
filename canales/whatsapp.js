@@ -7,15 +7,15 @@
 
 'use strict';
 
-const twimlUtil = require('../modulos/vehiculos/compartido/twiml');
+const twimlUtil = require('../modulos/inspecciones/compartido/twiml');
 
 const { obtenerSesion, eliminarSesion, guardarCambios } = require('../servicios/sesiones');
-const flujoPreoperacional = require('../modulos/vehiculos/preoperacional/flujo');
-const flujoPosoperacional = require('../modulos/vehiculos/posoperacional/flujo');
-const flujoTanqueo        = require('../modulos/vehiculos/tanqueo/flujo');
-const flujoInscripcion    = require('../modulos/vehiculos/inscripcion/flujo');
-const nav                 = require('../modulos/vehiculos/compartido/navegacion');
-const vehiculosData       = require('../data/vehiculos');
+const flujoPreoperacional = require('../modulos/inspecciones/preoperacional/flujo');
+const flujoPosoperacional = require('../modulos/inspecciones/posoperacional/flujo');
+const flujoTanqueo        = require('../modulos/tanqueo/flujo');
+const flujoInscripcion    = require('../modulos/inscripcion/flujo');
+const nav                 = require('../modulos/inspecciones/compartido/navegacion');
+const activosData       = require('../data/activos');
 
 // ============================================================================
 // WEBHOOK PRINCIPAL
@@ -86,7 +86,7 @@ async function manejarMenuPrincipal(req, res, sesion, mensaje) {
   const telefono = req.body.From;
 
   // Verificar si el operario está registrado en el sistema
-  const conductor = await vehiculosData.buscarConductorPorTelefono(telefono);
+  const conductor = await activosData.buscarConductorPorTelefono(telefono);
 
   if (!conductor) {
     // Número desconocido → inscripción automática

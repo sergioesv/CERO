@@ -1,8 +1,7 @@
 'use strict';
 
 const GeneradorPDFBase = require('./GeneradorPDFBase');
-const GRUPOS = require('../../modulos/vehiculos/preoperacional/validaciones').GRUPOS;
-const utils = require('../../modulos/vehiculos/preoperacional/validaciones');
+const utils = require('../../modulos/inspecciones/preoperacional/validaciones');
 
 class GeneradorPDFPreoperacional extends GeneradorPDFBase {
   constructor() {
@@ -82,7 +81,8 @@ class GeneradorPDFPreoperacional extends GeneradorPDFBase {
     }
 
     // --- BLOQUES DE INSPECCIÓN ---
-    for (let grupo of GRUPOS) {
+    const bloques = sesion.bloques || [];
+    for (let grupo of bloques) {
       y = this.checkY(y, 40, sesion.placa, fecha);
 
       this.doc.rect(M, y, this.LAYOUT.anchoUtil, 16).fill(C.grisFondo);
@@ -90,16 +90,9 @@ class GeneradorPDFPreoperacional extends GeneradorPDFBase {
         .text(grupo.nombre, M + 10, y + 4);
       y += 22;
 
-      const respuesta = (sesion.respuestas && sesion.respuestas[grupo.id]) ? sesion.respuestas[grupo.id] : null;
-      const itemsReportados = (respuesta && respuesta.items) ? respuesta.items : [];
-      const mapaEstados = {};
-      for (let ri = 0; ri < itemsReportados.length; ri++) {
-        mapaEstados[itemsReportados[ri].nombre] = itemsReportados[ri].estado;
-      }
-
       for (let itemDef of grupo.items) {
         y = this.checkY(y, 22, sesion.placa, fecha);
-        const estadoVal = mapaEstados.hasOwnProperty(itemDef.nombre) ? mapaEstados[itemDef.nombre] : 'OK';
+        const estadoVal = itemDef.estado;
         const clasificacion = utils.clasificarEstado(estadoVal);
         const estadoTexto = typeof estadoVal === 'number'
           ? (estadoVal === 1 ? 'OK' : estadoVal === 2 ? 'Atencion' : estadoVal === 3 ? 'Malo' : 'N/A')

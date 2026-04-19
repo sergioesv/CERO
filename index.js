@@ -83,8 +83,9 @@ registrarCronAlertas();
 
 const { supabase } = require('./config/config');
 
-const rutasVehiculos = require('./rutas/vehiculos');
-app.use('/api/vehiculos', rutasVehiculos);
+const rutasActivos = require('./rutas/activos');
+app.use('/api/activos', rutasActivos);
+app.use('/api/vehiculos', rutasActivos);  // Alias temporal para frontend legacy
 
 const rutasConductores = require('./rutas/conductores');
 app.use('/api/conductores', rutasConductores);
@@ -112,8 +113,8 @@ app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 
       { count: conductoresActivos, error: e3 },
       { count: inspeccionesHoy,    error: e4 }
     ] = await Promise.all([
-      supabase.from('vehiculos').select('*', { count: 'exact', head: true }),
-      supabase.from('vehiculos').select('*', { count: 'exact', head: true }).eq('bloqueado', true),
+      supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null),
+      supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null).eq('bloqueado', true),
       supabase.from('conductores').select('*', { count: 'exact', head: true }).eq('activo', true),
       supabase.from('preoperacionales').select('*', { count: 'exact', head: true }).gte('created_at', hoy)
     ]);

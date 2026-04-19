@@ -18,7 +18,7 @@ var preop      = require('./validaciones');
 var estadoPreop = require('./estado');
 var mensajes   = require('./mensajes');
 var cierre     = require('./cierre');
-var GRUPOS     = estadoPreop.GRUPOS;
+var plantillas = require('../../../servicios/plantillas');
 
 // ============================================================================
 // CONFIGURAR FLUJO BASE
@@ -34,7 +34,10 @@ function crearFlujoPreoperacional() {
       PLACA_MANUAL: 'PLACA_MANUAL',
       ESPERANDO_FOTO_ODOMETRO: 'ESPERANDO_FOTO_ODOMETRO',
       ODOMETRO_CONFIRMACION: 'ODOMETRO_CONFIRMACION',
-      ODOMETRO_MANUAL: 'ODOMETRO_MANUAL'
+      ODOMETRO_MANUAL: 'ODOMETRO_MANUAL',
+      ESPERANDO_FOTO_HOROMETRO: 'ESPERANDO_FOTO_HOROMETRO',
+      HOROMETRO_CONFIRMACION: 'HOROMETRO_CONFIRMACION',
+      HOROMETRO_MANUAL: 'HOROMETRO_MANUAL'
     },
     mensajes: mensajes,
     validaciones: preop,
@@ -57,8 +60,28 @@ function crearFlujoPreoperacional() {
     mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango,
     primerMensajeInspeccion: mensajes.primerMensajeInspeccion,
 
-    onExitoPlaca: function(sesion) {
+    onExitoPlaca: async function(sesion) {
       estadoPreop.reiniciarDatosOperativos(sesion);
+      try {
+        var plantilla = await plantillas.cargar(sesion.vehiculo.tipo_activo_id, 'preoperacional', sesion.vehiculo.empresa_id);
+        sesion.plantilla = plantilla;
+        sesion.gruposInspeccion = plantilla.grupos.filter(function(g) { return !g.solo_panel; });
+        var medicion = plantilla.config.medicion || 'km';
+        if (medicion === 'horas') {
+          sesion.estado = 'ESPERANDO_FOTO_HOROMETRO';
+        } else if (medicion === 'ambos') {
+          sesion.estado = 'ESPERANDO_FOTO_ODOMETRO'; // TODO: implementar 'ambos' paso por paso
+        } else if (medicion === 'ninguna') {
+          sesion.grupoActual = 0;
+          sesion.estado = 'GRUPO';
+        } else {
+          sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+        }
+      } catch (error) {
+        console.error('Error cargando plantilla:', error);
+        // Fallback temporal si no hay plantilla, asume km
+        sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+      }
     },
 
     onRegistrarKm: function(sesion, km, origen) {
@@ -93,7 +116,7 @@ function crearFlujoPreoperacional() {
           s.estado = 'GRUPO';
         }
       );
-      return twiml.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion));
+      return twiml.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion, sesion.gruposInspeccion));
     }
   });
 
@@ -121,7 +144,7 @@ function crearFlujoPreoperacional() {
 // ============================================================================
 
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
-  var resumen = preop.generarResumen(sesion);
+  var resumen = preop.generarResumen(sesion, sesion.gruposInspeccion);
   var mensaje = (prefijo ? prefijo + '\n\n' : '') + resumen + '\n\n' + mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad);
   return twiml.responderTwiml(res, mensaje);
 }
@@ -141,8 +164,8 @@ function manejarAtras(res, sesion) {
   }
   if (sesion.estado === 'GRUPO' && sesion.grupoActual > 0) {
     sesion.grupoActual--;
-    estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
-    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    estadoPreop.limpiarGrupo(sesion, sesion.gruposInspeccion[sesion.grupoActual]);
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '◀️ Volvemos'));
   }
   if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
     estadoPreop.volverAKilometraje(sesion);
@@ -150,13 +173,13 @@ function manejarAtras(res, sesion) {
   }
   if (sesion.estado === 'DESCRIBIR_NOVEDAD') {
     sesion.estado = 'GRUPO';
-    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '◀️ Volvemos'));
   }
   if (sesion.estado === 'SUB_PREGUNTA') {
     sesion.subPreguntasCola = [];
-    estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
+    estadoPreop.limpiarGrupo(sesion, sesion.gruposInspeccion[sesion.grupoActual]);
     sesion.estado = 'GRUPO';
-    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '◀️ Volvemos'));
   }
   if (sesion.estado === 'FOTO_NOVEDAD') {
     storage.limpiarFotosPorTipo(sesion, ['novedad', 'adicional']);
@@ -165,7 +188,7 @@ function manejarAtras(res, sesion) {
   }
   if (sesion.estado === 'FOTO_ADICIONAL') {
     storage.limpiarFotosPorTipo(sesion, ['adicional']);
-    if (preop.obtenerNovedadesFotografiables(sesion.novedades).length > 0) {
+    if (preop.obtenerNovedadesFotografiables(sesion.novedades, sesion.gruposInspeccion).length > 0) {
       storage.limpiarFotosPorTipo(sesion, ['novedad']);
       sesion.fotosNovedadPendientes = [];
       return twiml.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad, '◀️ Volvemos'));
@@ -203,7 +226,7 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
   switch (sesion.estado) {
 
     case 'GRUPO': {
-      var grupoActual = GRUPOS[sesion.grupoActual];
+      var grupoActual = sesion.gruposInspeccion[sesion.grupoActual];
       var respLimpia = mensaje.trim();
       var respLower = respLimpia.toLowerCase();
 
@@ -211,8 +234,8 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
         estadoPreop.limpiarGrupo(sesion, grupoActual);
         sesion.respuestas[grupoActual.id] = ocr.marcarTodoOK();
         sesion.grupoActual++;
-        if (sesion.grupoActual < GRUPOS.length) {
-          return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '✅ OK'));
+        if (sesion.grupoActual < sesion.gruposInspeccion.length) {
+          return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '✅ OK'));
         }
         return avanzarDespuesDeInspeccion(res, sesion);
       }
@@ -228,8 +251,8 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
       if (respLimpia === '3' || respLimpia === '3️⃣' || respLower === 'atras') {
         if (sesion.grupoActual > 0) {
           sesion.grupoActual--;
-          estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
-          return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+          estadoPreop.limpiarGrupo(sesion, sesion.gruposInspeccion[sesion.grupoActual]);
+          return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '◀️ Volvemos'));
         }
         estadoPreop.volverAKilometraje(sesion);
         return twiml.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
@@ -238,7 +261,7 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
     }
 
     case 'DESCRIBIR_NOVEDAD': {
-      var grupoNovedad = GRUPOS[sesion.grupoActual];
+      var grupoNovedad = sesion.gruposInspeccion[sesion.grupoActual];
       var textoNovedad = String(mensaje || '').trim();
 
       if (numMedia > 0) {
@@ -283,7 +306,7 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
       }).map(function(item) {
         return {
           grupo: grupoNovedad.nombre, item: item.nombre, estado: item.estado,
-          nota: item.estado, critico: preop.esCritico(grupoNovedad.id, item.nombre)
+          nota: item.estado, critico: preop.esCritico(grupoNovedad.id, item.nombre, sesion.gruposInspeccion)
         };
       });
 
@@ -291,10 +314,10 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
       var novedadesConSub = [];
       for (var i = 0; i < novedadesGrupo.length; i++) {
         var nov = novedadesGrupo[i];
-        if (preop.tieneSubPregunta(nov.item)) {
+        if (preop.tieneSubPregunta(nov.item, sesion.gruposInspeccion)) {
           novedadesConSub.push(nov);
         } else {
-          nov.severidad = preop.evaluarSeveridadNovedad(nov.item, nov.estado, null);
+          nov.severidad = preop.evaluarSeveridadNovedad(nov.item, nov.estado, null, sesion.gruposInspeccion);
           novedadesSinSub.push(nov);
         }
       }
@@ -306,7 +329,7 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
         sesion.subPreguntasCola = novedadesConSub;
         sesion.estado = 'SUB_PREGUNTA';
         var primeraSub = novedadesConSub[0];
-        var subPregunta = preop.obtenerSubPregunta(primeraSub.item);
+        var subPregunta = preop.obtenerSubPregunta(primeraSub.item, sesion.gruposInspeccion);
         var prefijoSub = novedadesSinSub.length > 0
           ? '⚠️ Anotado: ' + novedadesSinSub.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
           : '📋 Necesito precisar la novedad:';
@@ -318,24 +341,24 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
         : '✅ Registrado';
       sesion.grupoActual++;
       sesion.estado = 'GRUPO';
-      if (sesion.grupoActual < GRUPOS.length) {
-        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacion));
+      if (sesion.grupoActual < sesion.gruposInspeccion.length) {
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], confirmacion));
       }
       return avanzarDespuesDeInspeccion(res, sesion, confirmacion);
     }
 
     case 'SUB_PREGUNTA': {
       if (numMedia > 0) {
-        var subActualFoto = preop.obtenerSubPregunta(sesion.subPreguntasCola[0].item);
+        var subActualFoto = preop.obtenerSubPregunta(sesion.subPreguntasCola[0].item, sesion.gruposInspeccion);
         return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subActualFoto, '⌨️ En este paso necesito un número, no foto.'));
       }
       if (!sesion.subPreguntasCola || sesion.subPreguntasCola.length === 0) {
         sesion.estado = 'GRUPO';
-        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '↩️ Continuamos'));
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], '↩️ Continuamos'));
       }
 
       var novedadSubActual = sesion.subPreguntasCola[0];
-      var subPreguntaActual = preop.obtenerSubPregunta(novedadSubActual.item);
+      var subPreguntaActual = preop.obtenerSubPregunta(novedadSubActual.item, sesion.gruposInspeccion);
       var opcionElegida = preop.procesarRespuestaSubPregunta(subPreguntaActual, mensaje);
 
       if (!opcionElegida) {
@@ -351,12 +374,12 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
 
       if (sesion.subPreguntasCola.length > 0) {
         var siguienteSub = sesion.subPreguntasCola[0];
-        var subSiguiente = preop.obtenerSubPregunta(siguienteSub.item);
+        var subSiguiente = preop.obtenerSubPregunta(siguienteSub.item, sesion.gruposInspeccion);
         return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subSiguiente, '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*'));
       }
 
       sesion.subPreguntasCola = [];
-      var grupoActualNombre = GRUPOS[sesion.grupoActual].nombre;
+      var grupoActualNombre = sesion.gruposInspeccion[sesion.grupoActual].nombre;
       var novedadesDelGrupo = sesion.novedades.filter(function(n) { return n.grupo === grupoActualNombre; });
       var confirmacionSub = novedadesDelGrupo.length > 1
         ? '⚠️ Anotado: ' + novedadesDelGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
@@ -364,8 +387,8 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
 
       sesion.grupoActual++;
       sesion.estado = 'GRUPO';
-      if (sesion.grupoActual < GRUPOS.length) {
-        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacionSub));
+      if (sesion.grupoActual < sesion.gruposInspeccion.length) {
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(sesion.gruposInspeccion[sesion.grupoActual], confirmacionSub));
       }
       return avanzarDespuesDeInspeccion(res, sesion, confirmacionSub);
     }
@@ -435,7 +458,7 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
     case 'CONFIRMACION': {
       if (numMedia > 0) return twiml.responderTwiml(res, 'En este paso solo necesito números (1 o 2).');
       if (msgLower === '1' || msgLower === '1️⃣') {
-        var guardado = await cierre.guardarPreoperacionalCompleto(sesion, telefono, GRUPOS);
+        var guardado = await cierre.guardarPreoperacionalCompleto(sesion, telefono, sesion.gruposInspeccion);
         if (guardado.error) {
           console.error('Error guardando preoperacional:', guardado.error);
           return twiml.responderTwiml(res, '❌ Error guardando. Intente de nuevo o contacte al supervisor.');

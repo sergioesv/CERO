@@ -25,7 +25,11 @@ const PreopLogic = {
   filtrarData(data, estadoFiltro, placaFiltro) {
     let filtrada = data;
     if (placaFiltro) {
-      filtrada = filtrada.filter(item => (item.vehiculo_placa || '').toUpperCase().includes(placaFiltro));
+      filtrada = filtrada.filter(item => {
+        const codigo = item.activos?.codigo || item.activo_codigo || '';
+        const placa = item.activos?.placa || item.activo_placa || '';
+        return codigo.toUpperCase().includes(placaFiltro) || placa.toUpperCase().includes(placaFiltro);
+      });
     }
     return filtrada;
   },
@@ -73,13 +77,16 @@ const PreopRender = {
           }
         },
         {
-          key: 'vehiculo_placa', label: 'Placa', width: '90px',
-          render: function (v) { return '<span class="font-medium">' + Utils.escaparHTML(v || '—') + '</span>'; }
+          key: 'activo_codigo', label: 'Código/Placa', width: '90px',
+          render: function (_, row) { 
+            var ident = row.activos ? (row.activos.placa || row.activos.codigo) : (row.activo_placa || row.activo_codigo || '—');
+            return '<span class="font-medium">' + Utils.escaparHTML(ident || '—') + '</span>'; 
+          }
         },
         {
-          key: 'vehiculo', label: 'Vehículo',
+          key: 'activo', label: 'Activo',
           render: function (_, row) {
-            var nombre = ((row.vehiculo_marca || '') + ' ' + (row.vehiculo_modelo || '')).trim();
+            var nombre = row.activos ? row.activos.nombre : (row.activo_nombre || '—');
             return Utils.escaparHTML(nombre || '—');
           }
         },
@@ -122,15 +129,23 @@ const PreopRender = {
   drawerContent(registro) {
     var conductorNombre = registro.conductores ? registro.conductores.nombre : '—';
     var conductorCedula = registro.conductores ? registro.conductores.cedula : '';
-    var vehiculoInfo = registro.vehiculos ? ((registro.vehiculos.marca || '') + ' ' + (registro.vehiculos.modelo || '')).trim() : '';
+    var activoInfo = registro.activos ? registro.activos.nombre : '';
+    var activoIdent = registro.activos ? (registro.activos.placa || registro.activos.codigo) : '—';
     var fechaFormateada = Utils.formatearFecha(registro.fecha);
     var hora = registro.hora ? registro.hora.substring(0, 5) : '';
 
     var html = '<div class="drawer-info-grid">';
     html += PreopLogic.drawerInfoCard('Conductor', conductorNombre, conductorCedula ? 'CC ' + conductorCedula : '');
     html += PreopLogic.drawerInfoCard('Fecha', fechaFormateada, hora);
-    html += PreopLogic.drawerInfoCard('Kilómetros', Utils.formatearNumero(registro.kilometraje), registro.diferencia_km != null ? '(+' + Utils.formatearNumero(registro.diferencia_km) + ' km)' : '');
-    html += PreopLogic.drawerInfoCard('Vehículo', registro.vehiculo_placa || '—', vehiculoInfo);
+    
+    var unidadMedicion = registro.horometro != null ? 'horas' : 'km';
+    var valorMedicion = registro.horometro != null ? registro.horometro : registro.kilometraje;
+    html += PreopLogic.drawerInfoCard(unidadMedicion === 'horas' ? 'Horómetro' : 'Kilómetros', 
+      Utils.formatearNumero(valorMedicion), 
+      registro.diferencia_km != null ? '(+' + Utils.formatearNumero(registro.diferencia_km) + ' ' + unidadMedicion + ')' : ''
+    );
+    
+    html += PreopLogic.drawerInfoCard('Activo', activoIdent, activoInfo);
     html += '</div>';
 
     var novedades = registro.novedades || [];
@@ -170,11 +185,11 @@ const PreopRender = {
 
       if (autorizacion.decision === null || autorizacion.decision === undefined) {
         var autId = Utils.escaparHTML(String(autorizacion.id));
-        var placa = Utils.escaparHTML(registro.vehiculo_placa || '');
+        var ident = Utils.escaparHTML(activoIdent);
         html += '<div style="display:flex;gap:var(--spacing-sm);">';
-        html += '<button class="btn btn-success btn-sm" onclick="Preoperacionales.abrirModalAutorizar(\'' + autId + '\', \'' + placa + '\')">Autorizar</button>';
-        html += '<button class="btn btn-warning btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'taller\', \'' + placa + '\')">Taller</button>';
-        html += '<button class="btn btn-danger btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'restringir\', \'' + placa + '\')">Restringir</button>';
+        html += '<button class="btn btn-success btn-sm" onclick="Preoperacionales.abrirModalAutorizar(\'' + autId + '\', \'' + ident + '\')">Autorizar</button>';
+        html += '<button class="btn btn-warning btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'taller\', \'' + ident + '\')">Taller</button>';
+        html += '<button class="btn btn-danger btn-sm" onclick="Preoperacionales.decidirPreop(\'' + autId + '\', \'restringir\', \'' + ident + '\')">Restringir</button>';
         html += '</div>';
       } else {
         var decisionTextos = { autorizar: 'Autorizado', taller: 'En taller', restringir: 'Restringido' };
@@ -191,42 +206,40 @@ const PreopRender = {
       html += '</div>';
     }
 
-    var bloques = [
-      { id: 'motor_niveles', nombre: 'Motor y Niveles' },
-      { id: 'electrico_luces', nombre: 'Eléctrico y Luces' },
-      { id: 'frenos_direccion_llantas', nombre: 'Frenos, Dirección y Llantas' },
-      { id: 'cabina_equipo', nombre: 'Cabina y Equipo' }
-    ];
+    var respuestas = registro.respuestas || {};
+    var gruposIds = Object.keys(respuestas);
 
-    html += '<div class="drawer-section"><div class="drawer-section-title">Bloques de inspección</div>';
-    bloques.forEach(function (bloque) {
-      var datos = registro[bloque.id];
-      var tieneNovedad = datos && datos.items && Array.isArray(datos.items) && datos.items.some(function (item) {
-        return item.estado && item.estado !== 'OK' && item.estado !== 'Bueno';
+    if (gruposIds.length > 0) {
+      html += '<div class="drawer-section"><div class="drawer-section-title">Bloques de inspección</div>';
+      
+      gruposIds.forEach(function(grupoId) {
+        var datos = respuestas[grupoId];
+        var nombreGrupo = datos.nombre || datos.grupo || grupoId; // Fallback si no viene el nombre
+        var tieneNovedad = datos.estado && datos.estado !== 'ok';
+        
+        var iconBloque = tieneNovedad ? '⚠️' : '✓';
+        var claseBloque = tieneNovedad ? 'drawer-bloque con-novedad' : 'drawer-bloque';
+
+        html += '<div class="' + claseBloque + '">';
+        html += '<div class="drawer-bloque-header" onclick="Preoperacionales.toggleBloque(this)">';
+        html += '<span>' + iconBloque + ' ' + Utils.escaparHTML(nombreGrupo) + '</span><span class="drawer-bloque-arrow">▸</span>';
+        html += '</div><div class="drawer-bloque-items" style="display:none;">';
+
+        if (datos && datos.items && Array.isArray(datos.items) && datos.items.length > 0) {
+          datos.items.forEach(function (item) {
+            var esOk = !item.estado || item.estado.toUpperCase() === 'OK' || item.estado === 'Bueno';
+            var claseItem = esOk ? 'text-success' : 'text-warning font-medium';
+            html += '<div class="drawer-bloque-item"><span>' + Utils.escaparHTML(item.nombre || '—') + '</span><span class="' + claseItem + '">' + Utils.escaparHTML(item.estado || 'OK') + '</span></div>';
+          });
+        } else if (datos && datos.estado === 'ok') {
+          html += '<div class="drawer-bloque-item"><span class="text-secondary">Todo OK — sin detalles individuales</span></div>';
+        } else {
+          html += '<div class="drawer-bloque-item"><span class="text-secondary">Sin datos</span></div>';
+        }
+        html += '</div></div>';
       });
-
-      var iconBloque = tieneNovedad ? '⚠️' : '✓';
-      var claseBloque = tieneNovedad ? 'drawer-bloque con-novedad' : 'drawer-bloque';
-
-      html += '<div class="' + claseBloque + '">';
-      html += '<div class="drawer-bloque-header" onclick="Preoperacionales.toggleBloque(this)">';
-      html += '<span>' + iconBloque + ' ' + Utils.escaparHTML(bloque.nombre) + '</span><span class="drawer-bloque-arrow">▸</span>';
-      html += '</div><div class="drawer-bloque-items" style="display:none;">';
-
-      if (datos && datos.items && Array.isArray(datos.items)) {
-        datos.items.forEach(function (item) {
-          var esOk = !item.estado || item.estado === 'OK' || item.estado === 'Bueno';
-          var claseItem = esOk ? 'text-success' : 'text-warning font-medium';
-          html += '<div class="drawer-bloque-item"><span>' + Utils.escaparHTML(item.nombre || '—') + '</span><span class="' + claseItem + '">' + Utils.escaparHTML(item.estado || 'OK') + '</span></div>';
-        });
-      } else if (datos && datos.estado === 'ok') {
-        html += '<div class="drawer-bloque-item"><span class="text-secondary">Todo OK — sin detalles individuales</span></div>';
-      } else {
-        html += '<div class="drawer-bloque-item"><span class="text-secondary">Sin datos</span></div>';
-      }
-      html += '</div></div>';
-    });
-    html += '</div>';
+      html += '</div>';
+    }
 
     if (registro.observaciones) {
       html += '<div class="drawer-section"><div class="drawer-section-title">Observaciones</div><div class="drawer-observacion">' + Utils.escaparHTML(registro.observaciones) + '</div></div>';
@@ -328,7 +341,7 @@ const Preoperacionales = {
       var resp = await PreopAPI.obtener(id);
       this.detalleActual = resp;
       Drawer.open({
-        title: Utils.escaparHTML(resp.vehiculo_placa || 'Detalle'),
+        title: Utils.escaparHTML(resp.activos ? (resp.activos.placa || resp.activos.codigo) : 'Detalle'),
         content: PreopRender.drawerContent(resp),
         width: '780px'
       });
@@ -397,8 +410,8 @@ const Preoperacionales = {
 
   async decidirPreop(autorizacionId, decision, placa) {
     var textos = {
-      taller: { title: '¿Enviar a taller?', msg: 'El vehículo pasará a estado "En taller".' },
-      restringir: { title: '¿Restringir operación?', msg: 'El vehículo quedará restringido de operar.' }
+      taller: { title: '¿Enviar a taller?', msg: 'El activo pasará a estado "En taller".' },
+      restringir: { title: '¿Restringir operación?', msg: 'El activo quedará restringido de operar.' }
     };
     var t = textos[decision] || { title: 'Confirmar decisión', msg: '' };
     var confirmado = await Modal.confirm({

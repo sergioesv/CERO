@@ -1,6 +1,6 @@
 var config = require('../../../config/config');
-var preop = require('../preoperacional/validaciones');
-var twiml = require('../compartido/twiml');
+var preop = require('../inspecciones/preoperacional/validaciones');
+var twiml = require('../inspecciones/compartido/twiml');
 
 var TIPOS_COMBUSTIBLE = ['diesel', 'gasolina', 'gas', 'adblue', 'otro'];
 

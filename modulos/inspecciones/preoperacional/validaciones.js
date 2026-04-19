@@ -22,135 +22,7 @@
 //       estado     — estado que se guarda en la novedad
 // ───────────────────────────────────────────────────────────
 
-const GRUPOS = [
-  {
-    id: 'motor_niveles',
-    nombre: 'MOTOR Y NIVELES',
-    items: [
-      {
-        nombre: 'Aceite motor',
-        critico: true,
-        sinValidacion: true,
-        subPregunta: {
-          mensaje: '⚠️ *Aceite motor — ¿qué nivel tiene?*',
-          opciones: [
-            { num: 1, texto: 'Está en la mitad (entre mín y máx)', severidad: 'alerta', estado: 'Nivel medio' },
-            { num: 2, texto: 'Por debajo del mínimo', severidad: 'bloqueo', estado: 'Por debajo del mínimo' },
-            { num: 3, texto: 'No tiene / vacío', severidad: 'bloqueo', estado: 'Vacío' }
-          ]
-        }
-      },
-      {
-        nombre: 'Refrigerante',
-        critico: true,
-        sinValidacion: true,
-        subPregunta: {
-          mensaje: '⚠️ *Refrigerante — ¿qué nivel tiene?*',
-          opciones: [
-            { num: 1, texto: 'Está en la mitad (entre mín y máx)', severidad: 'alerta', estado: 'Nivel medio' },
-            { num: 2, texto: 'Por debajo del mínimo', severidad: 'bloqueo', estado: 'Por debajo del mínimo' },
-            { num: 3, texto: 'No tiene / vacío', severidad: 'bloqueo', estado: 'Vacío' }
-          ]
-        }
-      },
-      {
-        nombre: 'Liquido frenos',
-        critico: true,
-        sinValidacion: true,
-        subPregunta: {
-          mensaje: '⚠️ *Líquido de frenos — ¿qué nivel tiene?*',
-          opciones: [
-            { num: 1, texto: 'Está en la mitad (entre mín y máx)', severidad: 'alerta', estado: 'Nivel medio' },
-            { num: 2, texto: 'Por debajo del mínimo', severidad: 'bloqueo', estado: 'Por debajo del mínimo' },
-            { num: 3, texto: 'No tiene / vacío', severidad: 'bloqueo', estado: 'Vacío' }
-          ]
-        }
-      },
-      {
-        nombre: 'Fugas visibles',
-        critico: true,
-        subPregunta: {
-          mensaje: '⚠️ *Fugas visibles — ¿qué tipo de fuga?*',
-          opciones: [
-            { num: 1, texto: 'Gotas menores (manchas pequeñas)', severidad: 'alerta', estado: 'Gotas menores' },
-            { num: 2, texto: 'Fuga de aceite o hidráulico', severidad: 'alerta', estado: 'Fuga de aceite/hidráulico' },
-            { num: 3, texto: 'Fuga de refrigerante o frenos', severidad: 'bloqueo', estado: 'Fuga de refrigerante/frenos' }
-          ]
-        }
-      }
-    ],
-    abreviado: 'Aceite . Refrigerante . Liq.frenos . Fugas'
-  },
-  {
-    id: 'electrico_luces',
-    nombre: 'ELECTRICO Y LUCES',
-    items: [
-      { nombre: 'Luces delanteras/traseras', critico: true },
-      { nombre: 'Stops y direccionales', critico: true },
-      {
-        nombre: 'Pito y alarma reversa',
-        critico: true,
-        sinFoto: true,
-        subPregunta: {
-          mensaje: '⚠️ *Pito / alarma — ¿cuál no funciona?*',
-          opciones: [
-            { num: 1, texto: 'Pito delantero (bocina)', severidad: 'bloqueo', estado: 'Pito no funciona' },
-            { num: 2, texto: 'Alarma de reversa', severidad: 'alerta', estado: 'Alarma reversa no funciona' },
-            { num: 3, texto: 'Ambos', severidad: 'bloqueo', estado: 'Pito y alarma no funcionan' }
-          ]
-        }
-      },
-      { nombre: 'Tablero instrumentos', critico: false, sinFoto: true },
-      { nombre: 'Baterias', critico: false }
-    ],
-    abreviado: 'Luces . Stops . Pito . Tablero . Baterias'
-  },
-  {
-    id: 'frenos_direccion_llantas',
-    nombre: 'FRENOS, DIRECCION Y LLANTAS',
-    items: [
-      { nombre: 'Freno de parqueo', critico: true },
-      {
-        nombre: 'Estado llantas',
-        critico: true,
-        subPregunta: {
-          mensaje: '⚠️ *Llantas — ¿qué encontró?*',
-          opciones: [
-            { num: 1, texto: 'Desgaste normal (huella baja pero funcional)', severidad: 'alerta', estado: 'Desgaste normal' },
-            { num: 2, texto: 'Daño grave (corte, deformación, sin presión)', severidad: 'bloqueo', estado: 'Daño grave' }
-          ]
-        }
-      },
-      {
-        nombre: 'Pernos de ruedas',
-        critico: true,
-        subPregunta: {
-          mensaje: '⚠️ *Pernos de ruedas — ¿qué encontró?*',
-          opciones: [
-            { num: 1, texto: 'Algunos flojos (se pueden ajustar)', severidad: 'alerta', estado: 'Pernos flojos' },
-            { num: 2, texto: 'Faltan pernos', severidad: 'bloqueo', estado: 'Faltan pernos' }
-          ]
-        }
-      },
-      { nombre: 'Llanta repuesto', critico: false }
-    ],
-    abreviado: 'Freno parqueo . Llantas . Pernos . Repuesto'
-  },
-  {
-    id: 'cabina_equipo',
-    nombre: 'CABINA Y EQUIPO',
-    items: [
-      { nombre: 'Cinturones seguridad', critico: true },
-      { nombre: 'Retrovisores', critico: true },
-      { nombre: 'Pedales', critico: true, sinFoto: true },
-      { nombre: 'Vidrios y limpiabrisas', critico: false },
-      { nombre: 'Aseo y elementos sueltos', critico: false, sinFoto: true },
-      { nombre: 'Aire acondicionado', critico: false, sinFoto: true },
-      { nombre: 'Equipo carretera', critico: true, nuncaBloquea: true }
-    ],
-    abreviado: 'Cinturones . Retrovisores . Pedales . Vidrios . Aseo . Aire . Equipo carretera'
-  }
-];
+// GRUPOS se obtienen dinámicamente de la plantilla del activo
 
 // ───────────────────────────────────────────────────────────
 // PASOS INICIALES — textos de instrucción para fotos
@@ -245,14 +117,14 @@ function clasificarEstado(estado) {
 // RESUMEN DE INSPECCIÓN — texto para WhatsApp antes de firmar
 // ───────────────────────────────────────────────────────────
 
-function generarResumen(sesion) {
+function generarResumen(sesion, grupos) {
   var resumen = '───────────────\n';
   resumen += '*RESUMEN ' + (sesion.placa || '') + '*\n';
   resumen += '───────────────\n';
   var hayNovedades = false;
 
-  for (var g = 0; g < GRUPOS.length; g++) {
-    var grupo = GRUPOS[g];
+  for (var g = 0; g < grupos.length; g++) {
+    var grupo = grupos[g];
     var respuesta = sesion.respuestas[grupo.id];
     if (!respuesta || !Array.isArray(respuesta.items)) continue;
 
@@ -290,12 +162,13 @@ function generarResumen(sesion) {
 // BÚSQUEDA DE ÍTEMS Y DEFINICIONES
 // ───────────────────────────────────────────────────────────
 
-function esCritico(grupoId, itemNombre) {
-  for (var g = 0; g < GRUPOS.length; g++) {
-    if (GRUPOS[g].id === grupoId) {
-      for (var i = 0; i < GRUPOS[g].items.length; i++) {
-        if (GRUPOS[g].items[i].nombre === itemNombre) {
-          return !!GRUPOS[g].items[i].critico;
+function esCritico(grupoId, itemNombre, grupos) {
+  if (!grupos) return false;
+  for (var g = 0; g < grupos.length; g++) {
+    if (grupos[g].id === grupoId) {
+      for (var i = 0; i < grupos[g].items.length; i++) {
+        if (grupos[g].items[i].nombre === itemNombre) {
+          return !!grupos[g].items[i].critico;
         }
       }
     }
@@ -303,11 +176,12 @@ function esCritico(grupoId, itemNombre) {
   return false;
 }
 
-function construirMapaItems() {
+function construirMapaItems(grupos) {
   var mapa = {};
-  for (var g = 0; g < GRUPOS.length; g++) {
-    for (var i = 0; i < GRUPOS[g].items.length; i++) {
-      mapa[GRUPOS[g].items[i].nombre] = GRUPOS[g].items[i];
+  if (!grupos) return mapa;
+  for (var g = 0; g < grupos.length; g++) {
+    for (var i = 0; i < grupos[g].items.length; i++) {
+      mapa[grupos[g].items[i].nombre] = grupos[g].items[i];
     }
   }
   return mapa;
@@ -319,11 +193,12 @@ function construirMapaItems() {
 // Retorna el objeto del ítem o null si no existe.
 // ───────────────────────────────────────────────────────────
 
-function obtenerDefinicionItem(itemNombre) {
-  for (var g = 0; g < GRUPOS.length; g++) {
-    for (var i = 0; i < GRUPOS[g].items.length; i++) {
-      if (GRUPOS[g].items[i].nombre === itemNombre) {
-        return GRUPOS[g].items[i];
+function obtenerDefinicionItem(itemNombre, grupos) {
+  if (!grupos) return null;
+  for (var g = 0; g < grupos.length; g++) {
+    for (var i = 0; i < grupos[g].items.length; i++) {
+      if (grupos[g].items[i].nombre === itemNombre) {
+        return grupos[g].items[i];
       }
     }
   }
@@ -336,8 +211,8 @@ function obtenerDefinicionItem(itemNombre) {
 // Retorna true/false.
 // ───────────────────────────────────────────────────────────
 
-function tieneSubPregunta(itemNombre) {
-  var def = obtenerDefinicionItem(itemNombre);
+function tieneSubPregunta(itemNombre, grupos) {
+  var def = obtenerDefinicionItem(itemNombre, grupos);
   return !!(def && def.subPregunta);
 }
 
@@ -346,8 +221,8 @@ function tieneSubPregunta(itemNombre) {
 // Retorna null si el ítem no tiene sub-pregunta.
 // ───────────────────────────────────────────────────────────
 
-function obtenerSubPregunta(itemNombre) {
-  var def = obtenerDefinicionItem(itemNombre);
+function obtenerSubPregunta(itemNombre, grupos) {
+  var def = obtenerDefinicionItem(itemNombre, grupos);
   return (def && def.subPregunta) || null;
 }
 
@@ -405,8 +280,8 @@ function procesarRespuestaSubPregunta(subPregunta, respuesta) {
 //   - Ítem crítico + sin sub-pregunta + estado advertencia → 'alerta'
 // ───────────────────────────────────────────────────────────
 
-function evaluarSeveridadNovedad(itemNombre, estado, subRespuesta) {
-  var def = obtenerDefinicionItem(itemNombre);
+function evaluarSeveridadNovedad(itemNombre, estado, subRespuesta, grupos) {
+  var def = obtenerDefinicionItem(itemNombre, grupos);
 
   // Ítem no encontrado o no crítico → informativo
   if (!def || !def.critico) {
@@ -453,8 +328,8 @@ function obtenerNovedadesConBloqueo(novedades) {
 // FOTOS Y TELÉFONO — helpers existentes
 // ───────────────────────────────────────────────────────────
 
-function obtenerNovedadesFotografiables(novedades) {
-  var mapaItems = construirMapaItems();
+function obtenerNovedadesFotografiables(novedades, grupos) {
+  var mapaItems = construirMapaItems(grupos);
   return (novedades || []).filter(function(novedad) {
     var definicion = mapaItems[novedad.item];
     return !definicion || !definicion.sinFoto;
@@ -474,7 +349,6 @@ function ocultarTelefono(telefono) {
 
 module.exports = {
   // Datos
-  GRUPOS,
   PASOS_INICIALES,
   // Formato y comunicación
   responderTwiml,

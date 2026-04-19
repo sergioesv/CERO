@@ -1,24 +1,25 @@
 // ═══════════════════════════════════════════════════════════
 // data/alertas.js
 // Consultas a Supabase para vencimientos, bloqueos e historial
-// CERO — Módulo 1.4 Alertas de documentos
+// CERO — v26 — Queries sobre activos (vehiculos eliminado)
 // ═══════════════════════════════════════════════════════════
 
 var config = require('../config/config');
 var activosData = require('./activos');
 
 // ───────────────────────────────────────────────────────────
-// Obtiene vehículos con documentos próximos a vencer o vencidos
-// Retorna: array de { placa, tipo_documento, fecha_vencimiento, dias_restantes }
+// Obtiene activos con documentos próximos a vencer o vencidos
+// Lee soat/tecnomecanica desde activos.documentos JSONB
 // ───────────────────────────────────────────────────────────
-async function obtenerVencimientosVehiculos() {
+async function obtenerVencimientosActivos() {
   var resultado = await config.supabase
-    .from(config.TABLES.vehiculos)
-    .select('placa, tipo, marca, modelo, soat_vencimiento, tecnomecanica_vencimiento')
+    .from(config.TABLES.activos)
+    .select('id, placa, datos, documentos, bloqueado')
+    .eq('activo', true)
     .eq('bloqueado', false);
 
   if (resultado.error || !Array.isArray(resultado.data)) {
-    console.error('❌ Error consultando vencimientos de vehículos:', resultado.error?.message);
+    console.error('❌ Error consultando vencimientos de activos:', resultado.error?.message);
     return [];
   }
 
@@ -27,17 +28,19 @@ async function obtenerVencimientosVehiculos() {
   var alertas = [];
 
   for (var i = 0; i < resultado.data.length; i++) {
-    var v = resultado.data[i];
+    var a = resultado.data[i];
+    var docs = a.documentos || {};
+    var datos = a.datos || {};
 
     // Verificar SOAT
-    if (v.soat_vencimiento) {
-      var diasSoat = calcularDiasRestantes(hoy, v.soat_vencimiento);
+    if (docs.soat_vencimiento) {
+      var diasSoat = calcularDiasRestantes(hoy, docs.soat_vencimiento);
       if (diasSoat <= 30) {
         alertas.push({
-          placa: v.placa,
-          descripcion_vehiculo: (v.marca || '') + ' ' + (v.modelo || ''),
+          placa: a.placa,
+          descripcion_vehiculo: (datos.marca || '') + ' ' + (datos.modelo || ''),
           tipo_documento: 'SOAT',
-          fecha_vencimiento: v.soat_vencimiento,
+          fecha_vencimiento: docs.soat_vencimiento,
           dias_restantes: diasSoat,
           bloquea: true
         });
@@ -45,14 +48,14 @@ async function obtenerVencimientosVehiculos() {
     }
 
     // Verificar Tecnomecánica
-    if (v.tecnomecanica_vencimiento) {
-      var diasTecno = calcularDiasRestantes(hoy, v.tecnomecanica_vencimiento);
+    if (docs.tecnomecanica_vencimiento && docs.tecnomecanica_vencimiento !== '') {
+      var diasTecno = calcularDiasRestantes(hoy, docs.tecnomecanica_vencimiento);
       if (diasTecno <= 30) {
         alertas.push({
-          placa: v.placa,
-          descripcion_vehiculo: (v.marca || '') + ' ' + (v.modelo || ''),
+          placa: a.placa,
+          descripcion_vehiculo: (datos.marca || '') + ' ' + (datos.modelo || ''),
           tipo_documento: 'Tecnomecánica',
-          fecha_vencimiento: v.tecnomecanica_vencimiento,
+          fecha_vencimiento: docs.tecnomecanica_vencimiento,
           dias_restantes: diasTecno,
           bloquea: true
         });
@@ -65,7 +68,6 @@ async function obtenerVencimientosVehiculos() {
 
 // ───────────────────────────────────────────────────────────
 // Obtiene conductores con licencia próxima a vencer o vencida
-// Retorna: array de { conductor_id, nombre, telefono, fecha_vencimiento, dias_restantes }
 // ───────────────────────────────────────────────────────────
 async function obtenerVencimientosLicencias() {
   var resultado = await config.supabase
@@ -107,28 +109,39 @@ async function obtenerVencimientosLicencias() {
 }
 
 // ───────────────────────────────────────────────────────────
-// Bloquea un vehículo por documento vencido
+// Bloquea un activo por documento vencido
+// Acepta activoId (UUID) o placa (string corto)
 // ───────────────────────────────────────────────────────────
-async function bloquearVehiculo(placa, motivo) {
+async function bloquearActivo(activoIdOrPlaca, motivo) {
+  // Resolver a activoId si es placa
+  var activoId = activoIdOrPlaca;
+  if (typeof activoIdOrPlaca === 'string' && activoIdOrPlaca.length < 36) {
+    activoId = await activosData.obtenerActivoIdPorPlaca(activoIdOrPlaca);
+    if (!activoId) {
+      console.error('❌ activo no encontrado para placa: ' + activoIdOrPlaca);
+      return false;
+    }
+  }
+
   var resultado = await config.supabase
-    .from(config.TABLES.vehiculos)
+    .from(config.TABLES.activos)
     .update({
       bloqueado: true,
-      motivo_bloqueo: motivo
+      motivo_bloqueo: motivo,
+      updated_at: new Date().toISOString()
     })
-    .eq('placa', placa);
+    .eq('id', activoId);
 
   if (resultado.error) {
-    console.error('❌ Error bloqueando vehículo ' + placa + ':', resultado.error.message);
+    console.error('❌ Error bloqueando activo ' + activoIdOrPlaca + ':', resultado.error.message);
     return false;
   }
 
-  console.log('🔒 Vehículo ' + placa + ' bloqueado: ' + motivo);
+  console.log('🔒 Activo ' + activoIdOrPlaca + ' bloqueado: ' + motivo);
 
-  // Sincronizar estado en tabla activos y registrar en historial
-  // Operación no bloqueante — no afecta el flujo de alertas si falla
+  // Registrar en historial (no bloqueante)
   activosData.registrarCambioEstado(
-    placa,
+    activoId,
     'bloqueado',
     motivo,
     'alerta_documento',
@@ -144,7 +157,6 @@ async function bloquearVehiculo(placa, motivo) {
 
 // ───────────────────────────────────────────────────────────
 // Obtiene contactos por cargo (Administrador, Supervisor)
-// Retorna: array de { nombre, telefono, cargo }
 // ───────────────────────────────────────────────────────────
 async function obtenerContactosPorCargo(cargo) {
   var resultado = await config.supabase
@@ -163,7 +175,6 @@ async function obtenerContactosPorCargo(cargo) {
 
 // ───────────────────────────────────────────────────────────
 // Calcula días entre hoy y una fecha de vencimiento
-// Positivo = faltan días, Negativo = ya venció, 0 = vence hoy
 // ───────────────────────────────────────────────────────────
 function calcularDiasRestantes(hoy, fechaVencimiento) {
   var fecha = new Date(fechaVencimiento + 'T00:00:00');
@@ -172,9 +183,9 @@ function calcularDiasRestantes(hoy, fechaVencimiento) {
 }
 
 module.exports = {
-  obtenerVencimientosVehiculos,
+  obtenerVencimientosActivos,
   obtenerVencimientosLicencias,
-  bloquearVehiculo,
+  bloquearActivo,
   obtenerContactosPorCargo,
   calcularDiasRestantes
 };
