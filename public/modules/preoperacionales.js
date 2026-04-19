@@ -214,7 +214,8 @@ const PreopRender = {
       
       gruposIds.forEach(function(grupoId) {
         var datos = respuestas[grupoId];
-        var nombreGrupo = datos.nombre || datos.grupo || grupoId; // Fallback si no viene el nombre
+        // Preferir nombre_grupo persistido en backend (Fix bloques UUID vs nombre)
+        var nombreGrupo = datos.nombre_grupo || datos.nombre || datos.grupo || grupoId;
         var tieneNovedad = datos.estado && datos.estado !== 'ok';
         
         var iconBloque = tieneNovedad ? '⚠️' : '✓';

@@ -6,6 +6,38 @@ var activosData = require('../../../data/activos');
 var alertasReglas = require('../../alertas/reglas');
 var alertasNotificador = require('../../alertas/notificador');
 
+/**
+ * Inyecta nombre_grupo en cada entrada de respuestas (clave = UUID del grupo en plantilla).
+ * Así el panel puede mostrar "MOTOR Y NIVELES" en lugar del UUID.
+ */
+function enriquecerRespuestasConNombreGrupo(respuestas, grupos) {
+  var out = {};
+  var mapaNombres = {};
+  if (Array.isArray(grupos)) {
+    grupos.forEach(function (g) {
+      if (g && g.id) {
+        mapaNombres[g.id] = g.nombre || '';
+      }
+    });
+  }
+  Object.keys(respuestas || {}).forEach(function (grupoId) {
+    var entrada = respuestas[grupoId];
+    if (!entrada || typeof entrada !== 'object') {
+      out[grupoId] = entrada;
+      return;
+    }
+    var copia = {};
+    for (var k in entrada) {
+      if (Object.prototype.hasOwnProperty.call(entrada, k)) {
+        copia[k] = entrada[k];
+      }
+    }
+    copia.nombre_grupo = mapaNombres[grupoId] || copia.nombre_grupo || null;
+    out[grupoId] = copia;
+  });
+  return out;
+}
+
 function construirAlertasKm(sesion, kmReferencia, diferenciaKm) {
   var alertas = [];
 
@@ -58,7 +90,7 @@ async function asegurarConductorSesion(sesion, telefono) {
   return null;
 }
 
-function construirDatosPreoperacional(sesion, ahora) {
+function construirDatosPreoperacional(sesion, ahora, grupos) {
   var kmReferencia = sesion.vehiculo && typeof sesion.vehiculo.kilometraje === 'number'
     ? sesion.vehiculo.kilometraje
     : null;
@@ -89,7 +121,9 @@ function construirDatosPreoperacional(sesion, ahora) {
     hora: ahora.toTimeString().split(' ')[0],
     estado: 'completado',
     clasificacion: clasificacion,
-    respuestas: sesion.respuestas || {},
+    respuestas: grupos && Array.isArray(grupos)
+      ? enriquecerRespuestasConNombreGrupo(sesion.respuestas || {}, grupos)
+      : (sesion.respuestas || {}),
     novedades: sesion.novedades.map(function(n) {
       return {
         grupo: n.grupo,
@@ -137,7 +171,7 @@ async function guardarPreoperacionalCompleto(sesion, telefono, grupos) {
     throw new Error('Sesion incompleta: conductor no identificado para el telefono actual.');
   }
 
-  var datosPreoperacional = construirDatosPreoperacional(sesion, ahora);
+  var datosPreoperacional = construirDatosPreoperacional(sesion, ahora, grupos);
 
   var resPreop = await inspeccionesData.crearPreoperacional(datosPreoperacional);
   if (resPreop.error) {
