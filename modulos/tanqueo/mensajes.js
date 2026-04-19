@@ -6,7 +6,8 @@
 
 'use strict';
 
-var PIE = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+var nav = require('../inspecciones/compartido/navegacion');
+var PIE = nav.PIE_NAV;
 
 function faltaFotoRecibo() {
   return '📸 Envía la foto del recibo para continuar.' + PIE;

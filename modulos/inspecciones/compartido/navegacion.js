@@ -26,6 +26,15 @@ var PIE_NAV = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
 /** Solo menú principal */
 var PIE_MENU = '\n\n9️⃣ _Menú principal_';
 
+/** Tecla de atrás — ÚNICA fuente de verdad */
+var TECLA_ATRAS = '0';
+
+/** Tecla de menú — ÚNICA fuente de verdad */
+var TECLA_MENU = '9';
+
+/** Mensaje genérico de error con recuperación */
+var MSG_ERROR_GENERICO = '❌ Ocurrió un error inesperado.\n\nEscribe *9* para volver al menú principal.';
+
 /**
  * Detecta si el mensaje es un comando de navegación global (incluye atrás y menú).
  */
@@ -75,6 +84,9 @@ module.exports = {
   textoMenuPrincipal,
   PIE_NAV,
   PIE_MENU,
+  TECLA_ATRAS,
+  TECLA_MENU,
+  MSG_ERROR_GENERICO,
   esComandoNavegacion,
   esAtras,
   esMenu,

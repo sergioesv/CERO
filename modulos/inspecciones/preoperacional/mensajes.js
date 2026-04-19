@@ -12,11 +12,9 @@
 var preop = require('./validaciones');
 var PASOS_INICIALES = preop.PASOS_INICIALES;
 
-// ── Pie de navegación estándar ────────────────────────────────────────────────
-
-var PIE_MENU    = '\n\n9️⃣ _Menú principal_';
-var PIE_NAV     = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
-var PIE_NAV_MAS = '\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_';
+var nav     = require('../compartido/navegacion');
+var PIE_MENU = nav.PIE_MENU;
+var PIE_NAV  = nav.PIE_NAV;
 
 // ============================================================================
 // INICIO DEL FLUJO
@@ -39,7 +37,7 @@ function mensajeInicioOdometro(vehiculo) {
   if (vehiculo && (vehiculo.kilometraje || vehiculo.kilometraje === 0)) {
     msg += '\n\nÚltimo registrado: *' + vehiculo.kilometraje + ' km*';
   }
-  msg += PIE_NAV_MAS;
+  msg += PIE_NAV;
   return msg;
 }
 
@@ -54,7 +52,7 @@ function mensajeFallbackPlaca(sesion, motivo) {
   msg +=
     '\n\n1️⃣ Enviar otra foto\n' +
     '2️⃣ Escribir la placa manualmente';
-  msg += PIE_NAV_MAS;
+  msg += PIE_NAV;
   msg += '\n\n_Tip: acércate a la placa, evita el zoom digital y limpia la cámara._';
   return msg;
 }
@@ -68,7 +66,7 @@ function mensajeConfirmacionPlacaSugerida(sesion, motivo) {
     '\n\n1️⃣ Confirmar *' + (sesion.placaSugerida || 'placa sugerida') + '*\n' +
     '2️⃣ Enviar otra foto\n' +
     '3️⃣ Escribir la placa manualmente';
-  msg += PIE_NAV_MAS;
+  msg += PIE_NAV;
   return msg;
 }
 
@@ -88,7 +86,7 @@ function mensajeConfirmacionOdometro(sesion, prefijo) {
       '\n\n1️⃣ Confirmar\n' +
       '2️⃣ Corregir el kilometraje\n' +
       '3️⃣ Enviar otra foto';
-    msg += PIE_NAV_MAS;
+    msg += PIE_NAV;
     return msg;
   }
 
@@ -97,7 +95,7 @@ function mensajeConfirmacionOdometro(sesion, prefijo) {
   msg +=
     '\n\n1️⃣ Escribir el kilometraje manualmente\n' +
     '2️⃣ Enviar otra foto';
-  msg += PIE_NAV_MAS;
+  msg += PIE_NAV;
   msg += '\n\n_Tip: acerca el celular al display, toca para enfocar y evita reflejos._';
   return msg;
 }
@@ -112,7 +110,7 @@ function mensajeKilometrajeFueraRango(sesion, evaluacion, maxKmSalto) {
   msg +=
     '\n\n1️⃣ Escribir el kilometraje correcto\n' +
     '2️⃣ Enviar otra foto';
-  msg += PIE_NAV_MAS;
+  msg += PIE_NAV;
   msg += '\n\n_Tip: acerca el celular al display y que solo se vea el tablero._';
   return msg;
 }
