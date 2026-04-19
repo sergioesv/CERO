@@ -130,7 +130,8 @@ function construirDatosPreoperacional(sesion, ahora, grupos) {
         item: n.item,
         estado: n.estado || null,
         nota: n.nota || null,
-        critico: !!n.critico
+        critico: !!n.critico,
+        severidad: n.severidad || null
       };
     }),
     observaciones: sesion.observacion || null,

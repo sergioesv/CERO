@@ -50,6 +50,33 @@ const PreopLogic = {
            '<div class="font-medium">' + Utils.escaparHTML(valor || '—') + '</div>' +
            (sub ? '<div class="text-xs text-secondary">' + Utils.escaparHTML(sub) + '</div>' : '') +
            '</div>';
+  },
+
+  /**
+   * Badge según severidad real de la novedad. Sin severidad: respaldo por critico (datos antiguos).
+   */
+  badgeHtmlNovedad(n) {
+    var sev = (n.severidad && String(n.severidad).toLowerCase()) || '';
+    if (sev === 'alerta') {
+      return '<span class="badge badge-warning">ALERTA</span>';
+    }
+    if (sev === 'bloqueo') {
+      return '<span class="badge badge-danger">BLOQUEO</span>';
+    }
+    if (sev === 'informativo') {
+      return '<span class="badge badge-info">INFORMATIVO</span>';
+    }
+    if (n.critico === true) {
+      return '<span class="badge badge-danger">CRÍTICO</span>';
+    }
+    return '<span class="badge badge-warning">ATENCIÓN</span>';
+  },
+
+  /** Novedades que requieren flujo de supervisor (bloqueo o legado por critico). */
+  esNovedadBloqueoSupervisor(n) {
+    if (n.severidad === 'bloqueo') return true;
+    if (n.severidad == null && n.critico === true) return true;
+    return false;
   }
 };
 
@@ -153,9 +180,9 @@ const PreopRender = {
       html += '<div class="drawer-section">';
       html += '<div class="drawer-section-title"><span class="section-title-bar danger"></span>Novedades (' + novedades.length + ')</div>';
       novedades.forEach(function (n) {
-        var esCritico = n.critico === true;
-        var badgeHtml = esCritico ? '<span class="badge badge-danger">CRÍTICO</span>' : '<span class="badge badge-warning">ATENCIÓN</span>';
-        html += '<div class="drawer-novedad ' + (esCritico ? 'critica' : '') + '">';
+        var badgeHtml = PreopLogic.badgeHtmlNovedad(n);
+        var estiloCritica = PreopLogic.esNovedadBloqueoSupervisor(n);
+        html += '<div class="drawer-novedad ' + (estiloCritica ? 'critica' : '') + '">';
         html += '<div class="flex items-center justify-between"><span class="font-medium">' + Utils.escaparHTML(n.item || n.grupo || '—') + '</span>' + badgeHtml + '</div>';
         if (n.nota) html += '<div class="text-sm text-secondary mt-sm">' + Utils.escaparHTML(n.nota) + '</div>';
         if (n.estado) html += '<div class="text-xs text-secondary mt-sm">Estado: ' + Utils.escaparHTML(n.estado) + '</div>';
@@ -167,7 +194,7 @@ const PreopRender = {
     }
 
     var autorizacion = registro.autorizacion || null;
-    var novedadesBloqueo = novedades.filter(function(n) { return n.critico === true; });
+    var novedadesBloqueo = novedades.filter(function(n) { return PreopLogic.esNovedadBloqueoSupervisor(n); });
 
     if (novedadesBloqueo.length > 0 && autorizacion) {
       html += '<div class="drawer-section">';
