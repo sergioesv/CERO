@@ -11,6 +11,7 @@ var FlujoBase    = require('../compartido/baseFlujo');
 var twiml        = require('../compartido/twiml');
 var sesiones     = require('../../../servicios/sesiones');
 var storage      = require('../../../servicios/storage');
+var config       = require('../../../config/config');
 var nav          = require('../compartido/navegacion');
 var validaciones = require('./validaciones');
 var estadoPosop  = require('./estado');
@@ -93,12 +94,12 @@ function crearFlujoPosoperacional() {
             tipo: 'kilometraje_menor',
             mensaje: 'Kilometraje menor al último registrado'
           }];
-        } else if (sesion.diferenciaKm > 500) {
+        } else if (sesion.diferenciaKm > config.MAX_KM_SALTO) {
           sesion.inconsistenciaKm = true;
           sesion.kmLecturaFueraRango = true;
           sesion.alertasKm = [{
             tipo: 'kilometraje_alto',
-            mensaje: 'Diferencia superior a 500 km'
+            mensaje: 'Diferencia superior a ' + config.MAX_KM_SALTO + ' km'
           }];
         }
       }
@@ -184,8 +185,8 @@ async function manejarKilometrajeManual(sesion, mensaje) {
   if (typeof sesion.kmReferencia === 'number') {
     if (kmNum < sesion.kmReferencia) {
       alertasManual.push({ tipo: 'kilometraje_menor', mensaje: 'Kilometraje menor al último registrado' });
-    } else if (kmNum - sesion.kmReferencia > 500) {
-      alertasManual.push({ tipo: 'kilometraje_alto', mensaje: 'Diferencia superior a 500 km' });
+    } else if (kmNum - sesion.kmReferencia > config.MAX_KM_SALTO) {
+      alertasManual.push({ tipo: 'kilometraje_alto', mensaje: 'Diferencia superior a ' + config.MAX_KM_SALTO + ' km' });
     }
   }
 

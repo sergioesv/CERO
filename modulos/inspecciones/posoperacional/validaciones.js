@@ -2,7 +2,7 @@ var config = require('../../../config/config');
 var ocr = require('../../../servicios/ocr');
 var twiml = require('../compartido/twiml');
 
-var MAX_KM_SALTO_POSOP = parseInt(process.env.MAX_KM_SALTO_POSOP || config.MAX_KM_SALTO || 400, 10) || 400;
+var MAX_KM_SALTO_POSOP = config.MAX_KM_SALTO;
 
 var CATALOGO_NOVEDADES = [
   {

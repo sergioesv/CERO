@@ -139,12 +139,6 @@ function crearFlujoPreoperacional() {
   flujo.manejarAtras = manejarAtras;
   flujo.procesarEstado = procesarEstado;
 
-  // Override esAtrasOdometro for preop (uses 4 instead of 0)
-  flujo._preopEsAtras = function(m) {
-    var ml = String(m || '').trim().toLowerCase();
-    return ml === '4' || ml === '4️⃣';
-  };
-
   return flujo;
 }
 
