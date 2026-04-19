@@ -9,13 +9,6 @@ Field operations management SaaS via WhatsApp + AI.
 
 ---
 
-## How to start a session with Claude Chat
-
-Paste this file at the start of every session. That is all the context needed.
-No history, no repetition.
-
----
-
 ## Stack
 
 | Layer | Technology | Version |
@@ -35,54 +28,21 @@ No history, no repetition.
 
 ---
 
-## Repository
+## Repository & CI/CD
 
-- **Repo:** `sergioesv/CERO` (private)
-- **Main branch:** `desarrollo`
-- **Feature branches:** `claude/<description>` — auto-merged to `desarrollo` via GitHub Actions
-- **Rule:** commit directly to `desarrollo` for fixes; new branch only for complete new modules
-
----
-
-## CI/CD pipeline
-
-Three workflows run in parallel on every push to `desarrollo`:
-
-| Workflow | Triggers when | Validates |
-|---|---|---|
-| `backend.yml` | `routes/` `data/` `modulos/` `servicios/` `index.js` | ESLint, npm audit, hardcoded secrets, .env in repo |
-| `frontend.yml` | `public/` | ESLint, credentials in client JS, folder structure |
-| `security.yml` | Always | Secrets in diff, npm audit high, .gitignore, helmet present |
-| `update-architecture.yml` | Always | Regenerates folder structure + deps in this file |
-
-**Rule:** if any workflow fails, merge is blocked.
+- **Repo:** `sergioesv/CERO` (private) · **Main branch:** `desarrollo`
+- **Commit rule:** directly to `desarrollo` for fixes; new branch for complete new modules
+- **Workflows:** `backend.yml`, `frontend.yml`, `security.yml`, `update-architecture.yml` — all must pass before merge
 
 ---
 
 ## Project phases
 
-### Phase 1 — Vehicle control ✅ COMPLETE
-- Preoperational inspection via WhatsApp + PDF
-- Postoperational inspection via WhatsApp + PDF
-- Fueling records
-- Automatic document alerts (SOAT, tecno, license)
-- Driver auto-registration
-- Authorization system v12 (INFORMATIVO / ALERTA / BLOQUEO)
-
-### Phase 2 — Dashboard & admin panel 🔄 IN PROGRESS
-- 2.1 Web admin panel — Flota, Preoperacionales, Alertas, Conductores, Posoperacionales, Tanqueos, Sedes, Usuarios — todos COMPLETE
-- 2.2 Operational dashboard — complete
-- 2.3 History and reports — pending
-- 2.4 Power BI integration — future
-
-### Phase 3 — Personnel safety ⏳ FUTURE
-- Harness inspection, ladder inspection, ATS (structure exists in `modulos/seguridad-campo/`)
-
----
-
-## Folder structure
-
-> Generada automáticamente en la sección al final de este archivo. No editar manualmente.
+| Phase | Status |
+|---|---|
+| 1 — Vehicle control (WhatsApp inspections, fueling, alerts, registration, authorization v12) | ✅ COMPLETE |
+| 2 — Dashboard & admin panel (Flota, Preop, Alertas, Conductores, Posop, Tanqueos, Sedes, Usuarios) | 🔄 IN PROGRESS |
+| 3 — Personnel safety (harness, ladder, ATS) | ⏳ FUTURE |
 
 ---
 
@@ -95,55 +55,50 @@ Three workflows run in parallel on every push to `desarrollo`:
 | `preoperacionales` | Pre-shift inspections |
 | `posoperacionales` | Post-shift inspections |
 | `tanqueos` | Fueling records |
-| `activos` | Assets (vehicles migrated here for dashboard) |
-| `historial_estado_activo` | Asset state change history |
+| `activos` | Assets (vehicles) for dashboard |
 | `autorizaciones_novedad` | Supervisor authorizations |
-| `empresas / sedes / usuarios_panel` | Multi-company schema · usuarios_panel con auditoría (creado_por, actualizado_en, debe_cambiar_password) |
-| `sesiones_activas` | Active WhatsApp sessions |
+| `empresas / sedes / usuarios_panel` | Multi-company schema with audit fields |
 
----
-
-## Platform hierarchy
-
-```
-Platform (superadmin_plataforma)
-  └── Empresa
-        └── Sede
-              └── Usuario
-```
-
-Conductors can operate across any sede. Roles are configurable per company.
+**Hierarchy:** Platform → Empresa → Sede → Usuario. Conductors operate across any sede.
 
 ---
 
 ## WhatsApp flow architecture
 
-Each module is strictly modular:
+Each module follows a class-based pattern extending `FlujoBase`:
 
 ```
+modulos/vehiculos/compartido/
+├── baseFlujo.js     # Base class — Twilio validation, concurrency lock,
+│                    #   global nav (0=back, 9=menu), shared plate/odometer states
+├── twiml.js         # responderTwiml, escaparXml, firmaTwilioValida (single source)
+├── iniciadorFlujo.js # Factory — plate OCR + odometer OCR handlers
+├── kilometraje.js   # Shared km validation logic
+└── navegacion.js    # Menu text, esAtras(), esMenu(), PIE_NAV
+
 modulos/vehiculos/<module>/
-├── flujo.js         # State machine
-├── estado.js        # State definitions
-├── mensajes.js      # Message templates
-├── validaciones.js  # Input validation
+├── flujo.js         # Extends FlujoBase — only module-specific states
+├── estado.js        # State constants + session management
+├── mensajes.js      # All user-facing message templates
+├── validaciones.js  # Input validation (uses shared twiml.js)
 └── cierre.js        # Session close + PDF + notifications
 ```
 
-**UX rule:** max 2-minute flow. Single-number responses only. `0` = back, `9` = main menu.
+**UX rule:** max 2-minute flow. Single-number responses. `0` = back, `9` = main menu.
 
 ---
 
 ## Frontend pattern
 
-Cada módulo del panel web debe separarse estrictamente en 4 objetos para evitar mezclar lógica, peticiones y UI (anti-XSS):
+Each panel module splits into 4 objects:
 
 ```js
-const ModuleNameAPI = { ... }    // Fetch from API (rutas backend)
-const ModuleNameLogic = { ... }  // Lógica de negocio y transformación de datos puros
-const ModuleNameRender = { ... } // Generación de HTML (uso estricto de Utils.escaparHTML)
-const ModuleName = {
-  render()        // Orquesta componentes genéricos (Drawer.open, Filters.render)
-  cargarDatos()   // Coordina la API, Logic y Render
+const ModuleAPI    = { ... }  // Fetch from API
+const ModuleLogic  = { ... }  // Business logic, data transforms
+const ModuleRender = { ... }  // HTML generation (strict Utils.escaparHTML)
+const Module = {
+  render()       // Orchestrate Drawer, Filters, Table
+  cargarDatos()  // Coordinate API → Logic → Render
 }
 ```
 
@@ -151,125 +106,46 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 
 ---
 
-## Security checklist — before production
+## Security — before production
 
 - [ ] RLS enabled in Supabase
-- [ ] Twilio webhook signature validation (`X-Twilio-Signature`)
-- [ ] Custom domain purchased and configured
+- [ ] Twilio webhook signature validation
+- [ ] Custom domain configured
 - [ ] All routes behind `verificarPermiso` middleware
 - [ ] No credentials in source code
-- [ ] `.env` in `.gitignore` ✅
-- [ ] Signed URL regeneration at query time (Supabase Storage)
-- [ ] Helmet installed and active ✅
-- [ ] CSP configurado con scriptSrc/scriptSrcElem/scriptSrcAttr ✅
-- [x] Trust proxy = 1 (Railway) — rate limiting seguro ✅
-- [x] Timing attack en login corregido (maybeSingle + hash dummy) ✅
+- [ ] Migrate onclick inline to addEventListener (CSP strict)
+- [x] `.env` in `.gitignore` ✅
+- [x] Helmet active ✅
+- [x] Trust proxy = 1 (Railway) ✅
+- [x] Timing attack login fixed ✅
+- [x] bcrypt in all password flows ✅
 
 ---
 
-## Estado de salud del código
-
-### Crítico — antes de producción real
-- [ ] RLS en Supabase
-- [ ] Twilio webhook signature validation
-- [ ] Migrar onclick inline a addEventListener (CSP scriptSrcAttr → 'none')
-- [ ] Dominio propio configurado
-- [x] Nunca almacenar contraseñas en texto plano — bcrypt en todo flujo de creación y cambio ✅
-
-### Importante — antes de segundo cliente
-- [ ] Tests integración flujos WhatsApp críticos
-- [ ] Separar lógica de negocio de data/ (queries puras vs lógica)
-- [ ] Manejo de errores consistente en todas las rutas API
-- [ ] Zona horaria UTC-5 en queries de "hoy"
-- [ ] Foto recibo en drawer tanqueos — URLs firmadas Supabase Storage
-- [ ] Mover /api/dashboard/resumen de index.js a rutas/dashboard.js
-- [x] Flujo de creación de usuarios del panel — admin crea desde UI, no inserción manual en BD ✅
-- [x] Servicio de email (SendGrid o similar) — envío de contraseña temporal al crear usuario — PENDIENTE envío por email (password se muestra en modal por ahora)
-- [x] Campo `debe_cambiar_password` en `usuarios_panel` — forzar cambio en primer login ✅
-- [x] Endpoint `POST /auth/cambiar-password` — verificar contraseña actual antes de cambiar ✅
-- [x] UI cambio de contraseña — accesible desde perfil del usuario en el panel ✅
-- [x] Endpoint `POST /auth/reset-password` — admin puede resetear contraseña de cualquier usuario ✅
-
-### Deuda aceptada conscientemente
-- unsafe-inline en CSP — temporal para demo, revertir antes de producción
-- Sin tests — prioridad demo sobre cobertura
-- Frontend módulos mezclan lógica + render — refactor post-demo
-
-### Resuelto hoy
-- [x] index.js refactorizado — 925 líneas → ~190, 6 archivos de rutas ✅
-- [x] Bug rendimiento primer tanqueo — es_primer_tanqueo flag ✅
-- [x] CSP Helmet — 3 directivas configuradas, panel completamente funcional ✅
-- [x] Sistema de usuarios panel — password temporal autogenerada, scope multi-empresa, auditoría ✅
-- [x] 6 bugs seguridad backend usuarios — permisos incorrectos en POST/PUT/PATCH corregidos ✅
-- [x] Timing attack login — maybeSingle + hash dummy ✅
-- [x] CI frontend verde — ESLint configurado para public/ con max-warnings=50 ✅
-- [x] Badge rol usuario dinámico — lee JWT y muestra rol real ✅
-- [x] Drawer labels espaciado — CSS grid 2 columnas para detalles ✅
-- [x] Trust proxy = 1 — rate limiting funcional sin bypass ✅
-
----
-
-## Decision log
+## Decision log (key decisions only)
 
 | Date | Decision | Reason |
 |---|---|---|
-| 18/04/2026 | Trust proxy = 1 en vez de true | Con true, Express confía en cualquier header X-Forwarded-For permitiendo bypass del rate limiter. Con 1, solo confía en Railway (primer proxy). Corrige warning ERR_ERL_PERMISSIVE_TRUST_PROXY. |
-| 18/04/2026 | CI frontend: ESLint sobre public/ con max-warnings=50 | Workflow fallaba con "all files ignored" porque eslint.config.cjs ignoraba public/**. Solución: quitar ignore, cambiar sourceType a 'script', agregar globals.browser. Max warnings en 50 por código legacy. |
-| 18/04/2026 | Badge header usuario dinámico — lee JWT en App.init() | Antes hardcodeado "Administrador" en index.html. Ahora App.actualizarHeaderUsuario() lee roles del JWT y muestra rol real capitalizado con mapeo técnico→legible. |
-| 18/04/2026 | Drawer usuarios: CSS grid para .detail-* | Labels y valores aparecían pegados sin espacios. Agregado CSS .detail-grid (flex column), .detail-item (grid 2 columnas 140px + 1fr), .detail-label (secundario), .detail-value (primario). |
-| 18/04/2026 | Arquitectura usuarios separada en rutas propias — usuarios.js, roles.js, usuariosRoles.js | Endpoints estaban mezclados en canales/dashboard.js con bugs de seguridad. Extraídos a rutas/ con verificarPermiso correcto, scope multi-empresa y auditoría. |
-| 18/04/2026 | Timing attack login corregido — maybeSingle + hash dummy | Login con .single() + bcrypt permitía enumerar emails (email no existe = error rápido, email existe + password mala = 100ms bcrypt). Solución: siempre ejecutar bcrypt.compare con hash dummy si usuario no existe. |
-| 18/04/2026 | Scope multi-empresa en usuarios — superadmin_plataforma vs superadmin_emp | superadmin_plataforma crea/edita usuarios en cualquier empresa. superadmin_emp solo en su empresa_id. Helper empresaPermitida(usuario, empresaTarget) valida en cada endpoint. Nadie asigna rol superadmin_plataforma desde UI. |
-| 18/04/2026 | Password temporal autogenerada al crear usuario — 12 chars criptográficamente seguros | Backend genera con crypto.randomBytes, charset sin ambiguos (sin 0/O/l/1/I). Modal muestra password 1 sola vez con botón copiar. Admin entrega al usuario manualmente (email SendGrid pendiente fase futura). |
-| 18/04/2026 | Flujo de primer login forzado — modal bloqueante cambiar contraseña | Columna debe_cambiar_password en usuarios_panel (default false). Al crear usuario o resetear password, se setea true. Login incluye flag en JWT. App.init() detecta flag y muestra modal bloqueante. POST /auth/cambiar-password valida actual, limpia flag, fuerza logout para refrescar JWT. |
-| 18/04/2026 | Auditoría usuarios panel — creado_por, actualizado_en | Columnas agregadas en SQL v26. creado_por = UUID del admin que creó. actualizado_en = timestamp de última modificación. Soft-delete únicamente (activo=false), nunca hard-delete. |
-| 18/04/2026 | 6 bugs de seguridad usuarios corregidos | B1: POST validaba 'ver' en vez de 'crear'. B2: PUT validaba 'ver' en vez de 'editar'. B3: PATCH estado sin verificarPermiso. B4: PATCH password sin verificarPermiso (CRÍTICO). B5: POST/DELETE roles sin verificarPermiso. B6: Sin validación scope multi-empresa. Todos corregidos con verificarPermiso + scope helpers. |
-| 17/04/2026 | Rebranding a dialk — eliminar referencias a EDEMSA e Inteligencia de Ciudad | EDEMSA no es cliente firmado; Inteligencia de Ciudad no pertenece a Sergio. Riesgo legal. dialk S.A.S. es la empresa en constitución. |
-| 17/04/2026 | Landing relanzada con caso demostrativo ficticio (AAA 123, Toyota Hilux, Carlos Ramírez) | Eliminar caso real WDS340 por riesgo de derechos de autor y uso no autorizado de marca |
-| 15/04/2026 | Refactor módulo panel `public/modules/tanqueos.js` en 4 objetos (TanqueosAPI, TanqueosLogic, TanqueosRender, Tanqueos) | Separar responsabilidades (datos, lógica, render y orquestación), mejorar mantenibilidad y eliminar mezcla de UI/lógica |
-| 15/04/2026 | UX tanqueos ajustada: filtros reducidos (Todos/Pendientes/Revisados), drawer sin rechazar y lightbox inline con ESC | Simplificar operación diaria del panel, reducir errores de revisión y mejorar experiencia móvil |
-| 15/04/2026 | Backend tanqueos: stats por período filtrado + soporte `estado_validacion=revisados` combinado | Alinear tarjetas y tabla con los filtros activos, evitando métricas fijas de "hoy" |
-| 15/04/2026 | SQL v24 día 5 agregado para campos v3 de tanqueos + índices + columnas opcionales en vehículos | Formalizar cambios de esquema para OCR/revisión administrativa y mejorar consultas del panel |
-| 14/04/2026 | Fix validarTipoCombustible — mapeo por keywords GASOLINA/DIESEL/GAS | OCR Terpel retorna "GASOLINA CORRIENTE 10% OXIG" — regex exacto no funcionaba |
-| 14/04/2026 | Fix km manual directo en fuera de rango — conductor puede escribir número sin presionar 1 | UX campo en CONFIRMACION_KM |
-| 14/04/2026 | Tanqueo v3 completo — OCR factura, score/tier, fallback, cierre con inferencia tipo_tanqueo | Semana 1 del plan v24 completa |
-| 14/04/2026 | Eliminar endpoint /api/tanqueos duplicado en canales/dashboard.js | Interceptaba requests antes que rutas/tanqueos.js — stats nunca llegaban al frontend |
-| 14/04/2026 | Proxy seguro imágenes Twilio — GET /api/tanqueos/media/:fotoId | Frontend nunca controla URL — backend resuelve desde BD |
-| 14/04/2026 | Zona horaria Bogotá (UTC-5) en backend y frontend | Stats "hoy" calculaban en UTC — diferencia de 5h causaba 0s en cards |
-| 14/04/2026 | Security workflow corregido — regex .env y agregar *.pem *.key | Workflow bloqueaba deploys de Railway con Wait for CI activo |
-| 14/04/2026 | es_primer_tanqueo corregido en BD — 2 registros existentes | kmReferencia null generaba rendimiento 11402 km/u en datos históricos |
-| 14/04/2026 | CSP Helmet — scriptSrc + scriptSrcElem + scriptSrcAttr unsafe-inline | onclick inline bloqueado en panel admin |
-| 14/04/2026 | Refactor index.js — 6 archivos de rutas extraídos | index.js de 925 a ~190 líneas |
-| 14/04/2026 | Fix rendimiento primer tanqueo — es_primer_tanqueo flag | kmReferencia null generaba 11402 km/u |
-| 12/04/2026 | Tanqueo v2 — flujo reconstruido sobre patrón preoperacional | OCR síncrono, reutiliza kmCompartido, foto placa → odómetro → recibo |
-| 12/04/2026 | Validación cruzada 4 campos — placa, km, cantidad, factura | Antifraude, auto_validado vs pendiente_revision |
-| 12/04/2026 | Plan tanqueo v21 — OCR, validación cruzada 4 campos, antifraude rendimiento | 4 semanas, semana 1 en curso |
-| 10/04/2026 | Pipeline CI/CD — 3 workflows | Validación automática antes de merge |
-| 10/04/2026 | Helmet instalado | Headers de seguridad HTTP obligatorios |
+| 18/04/2026 | Refactor flujos WhatsApp a clases (FlujoBase + herencia) | Eliminar código duplicado masivo (~50% reducción), separar estados compartidos de placa/odómetro en clase base |
+| 18/04/2026 | Centralizar TwiML en `compartido/twiml.js` | responderTwiml y escaparXml estaban copiados en 4 archivos |
+| 18/04/2026 | Factory pattern `iniciadorFlujo.js` para placa/km | Una sola implementación de OCR placa y odómetro para los 3 flujos |
+| 17/04/2026 | Rebranding a dialk — eliminar EDEMSA | Riesgo legal — EDEMSA no es cliente firmado |
+| 15/04/2026 | Frontend en 4 objetos (API/Logic/Render/Module) | Anti-XSS, separación de responsabilidades |
+| 14/04/2026 | Tanqueo v3 — OCR factura con score/tier/fallback | Validación cruzada 4 campos, antifraude |
+| 14/04/2026 | Refactor index.js — 925 → ~190 líneas | 6 archivos de rutas extraídos |
 | 10/04/2026 | ARCHITECTURE.md como fuente de verdad | Reemplaza archivos de sesión de diseño |
-| 10/04/2026 | Cursor como ejecutor, Claude Chat como orquestador | Separación de roles clara |
-| 10/04/2026 | Migrar a WhatsApp Business API | Sandbox no apto para producción real |
-| 27/03/2026 | Dashboard 4 pestañas — General, Activos, Seguridad, Reportes | Vista gerencial + operativa separadas |
-| 27/03/2026 | Índice de Seguridad Operativa (score 0-100) | KPI hero del dashboard |
-| 27/03/2026 | Tendencias y análisis profundo van a Power BI | Evita scope creep en JS |
-| 27/03/2026 | Camino B — tablas separadas por tipo de inspección | Fase 1 intacta, sin riesgo |
-| 27/03/2026 | KPIs financieros como "susurro" en dashboard | Ejecutivos leen dinero primero |
-| 27/03/2026 | Seguridad personal visible en demo, oculta en prod | Estrategia comercial |
-| 18/04/2026 | Refactor iniciadorFlujo — centralizar validación placa/km | Eliminar duplicación entre preoperacional/tanqueo/posoperacional (3 copias → 1 factory). Factory pattern con opciones por flujo. Reduce mantenimiento y asegura consistencia. |
-| 18/04/2026 | obtenerReferenciaKilometraje en data/inspecciones | Lógica de referencia de km unificada con prioridad por tipo de flujo: preoperacional día > tanqueo/posoperacional según contexto > último preoperacional > vehículo > sin referencia. |
-| 18/04/2026 | Posoperacional v2 — flujo alineado con preoperacional/tanqueo | Pide placa y km al inicio del flujo usando iniciadorFlujo factory. PDF omite placa del vehículo pero mantiene km final, fotos, documentos, novedades y firma digital. |
-| 18/04/2026 | Refactor integral Frontend (Fases 1-4) | Implementación de `Drawer.js` y `Filters.js` genéricos. Estandarización de módulos en 4 capas (API/Logic/Render/Orquestador). Cierre de vulnerabilidades XSS en inyecciones DOM con `Utils.escaparHTML()`. Centralización de decodificación JWT. |
-| 18/04/2026 | Unificación OCR Placa en WhatsApp | Se extrajo la lógica de `procesarFotoFrontal` (preoperacional) y `procesarFotoPlaca` (tanqueo) a `iniciadorFlujo.crearProcesadorFotoPlaca`. Posoperacional ahora soporta fotos de placa con OCR, igualando 100% la experiencia entre los 3 flujos. |
 
-## Cursor — cómo usar las reglas especializadas
+---
 
-`rules.md` siempre activo. Para tareas específicas agregar al inicio de la instrucción:
+## Cursor rules
+
+`rules.md` siempre activo. Para tareas específicas:
 
 | Tipo de tarea | Archivo adicional |
 |---|---|
-| Rutas API, data/, middlewares/, servicios/, index.js | `Contexto adicional: leer .cursor/rules-backend.md` |
-| Panel web, public/, módulos, CSS, HTML | `Contexto adicional: leer .cursor/rules-frontend.md` |
-| Flujos WhatsApp, modulos/vehiculos/, sesiones | `Contexto adicional: leer .cursor/rules-whatsapp.md` |
+| Backend (rutas, data, servicios) | `.cursor/rules-backend.md` |
+| Frontend (public, CSS, HTML) | `.cursor/rules-frontend.md` |
+| WhatsApp (modulos/vehiculos, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
 <!-- Última actualización: 2026-04-18 -->
@@ -295,13 +171,6 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
 │   ├── tanqueos.js  # Tanqueos — registro de combustible
 │   └── vehiculos.js  # Vehiculos — flota, buscar por telefono, bloqueos
-├── instrucciones
-│   ├── fix-badge-rol-header.txt
-│   ├── fix-ci-frontend-eslint.txt
-│   ├── fix-drawer-labels-spacing.txt
-│   ├── fix-trust-proxy-security.txt
-│   ├── update-architecture-usuarios.txt
-│   └── usuarios-panel-v1.txt
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
 ├── modulos
@@ -309,126 +178,44 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── notificador.js  # Cron 6:00 AM — envia alertas de documentos por WhatsApp
 │   │   └── reglas.js  # Reglas de alerta — umbrales 30/15/7/0 dias, clasificacion
 │   ├── seguridad-campo
-│   │   ├── ats
-│   │   │   ├── flujo.js  # Flujo ATS (Fase 3)
-│   │   │   └── validaciones.js  # Validaciones ATS (Fase 3)
-│   │   ├── revision-equipos
-│   │   │   ├── flujo.js  # Flujo revision de equipos (Fase 3)
-│   │   │   └── validaciones.js  # Validaciones revision de equipos (Fase 3)
-│   │   └── riesgos-locativos
-│   │       ├── flujo.js  # Flujo riesgos locativos (Fase 3)
-│   │       └── validaciones.js  # Validaciones riesgos locativos (Fase 3)
+│   │   ├── ats/
+│   │   ├── revision-equipos/
+│   │   └── riesgos-locativos/
 │   └── vehiculos
 │       ├── compartido
-│       │   ├── baseFlujo.js  # Base compartida para maquinas de estado de flujos WhatsApp
-│       │   ├── iniciadorFlujo.js
-│       │   ├── kilometraje.js  # Validacion y logica de kilometraje entre turnos
-│       │   ├── navegacion.js  # Textos de navegacion — menu principal, 0=atras, 9=menu
+│       │   ├── baseFlujo.js  # Clase base FlujoBase — estados compartidos placa/odómetro
+│       │   ├── iniciadorFlujo.js  # Factory — OCR placa + odómetro reutilizable
+│       │   ├── kilometraje.js  # Validacion de kilometraje entre turnos
+│       │   ├── navegacion.js  # Menu principal, 0=atras, 9=menu
+│       │   ├── twiml.js  # TwiML compartido — responderTwiml, escaparXml, firmaTwilioValida
 │       │   └── validacionVisual.js  # Validacion de fotos via Gemini OCR
 │       ├── inscripcion
-│       │   ├── estado.js  # Estados del flujo de auto-registro de conductores
-│       │   ├── flujo.js  # Flujo de inscripcion automatica de conductor nuevo
-│       │   ├── mensajes.js  # Mensajes del flujo de inscripcion
-│       │   └── validaciones.js  # Validaciones de inscripcion — cedula, telefono, nombre
+│       │   ├── estado.js / flujo.js / mensajes.js / validaciones.js
 │       ├── posoperacional
-│       │   ├── cierre.js  # Cierre posoperacional — PDF y notificaciones
-│       │   ├── estado.js  # Estados del flujo posoperacional
-│       │   ├── flujo.js  # Maquina de estados del posoperacional WhatsApp
-│       │   ├── mensajes.js  # Mensajes del posoperacional
-│       │   └── validaciones.js  # Validaciones del posoperacional
+│       │   ├── cierre.js / estado.js / flujo.js / mensajes.js / validaciones.js
 │       ├── preoperacional
-│       │   ├── cierre.js  # Cierre preoperacional — PDF, novedades, autorizaciones
-│       │   ├── estado.js  # Estados del flujo preoperacional
-│       │   ├── flujo.js  # Maquina de estados del preoperacional WhatsApp
-│       │   ├── mensajes.js  # Mensajes y preguntas del preoperacional
-│       │   └── validaciones.js  # Validaciones de respuestas del preoperacional
+│       │   ├── cierre.js / estado.js / flujo.js / interpretacion.js / mensajes.js / validaciones.js
 │       └── tanqueo
-│           ├── cierre.js
-│           ├── estado.js
-│           ├── flujo.js  # Flujo de registro de combustible WhatsApp
-│           ├── mensajes.js
-│           └── validaciones.js  # Validaciones del tanqueo
+│           ├── cierre.js / estado.js / flujo.js / mensajes.js / validaciones.js
 ├── public
-│   ├── components
-│   │   ├── badge.js  # Componente Badge — estados y alertas
-│   │   ├── card.js  # Componente Card — stat cards del panel
-│   │   ├── drawer.js
-│   │   ├── filters.js
-│   │   ├── modal.js  # Componente Modal — detalle y formularios
-│   │   ├── sidebar.js  # Sidebar dinamico con filtro por rol
-│   │   ├── table.js  # Tabla reutilizable con ordenamiento y paginacion
-│   │   └── toast.js  # Notificaciones toast
-│   ├── css
-│   │   ├── components.css
-│   │   ├── landing.css
-│   │   ├── layout.css
-│   │   ├── theme-dark.css
-│   │   ├── theme-light.css
-│   │   └── variables.css
-│   ├── files
-│   │   └── preop_AAA123_demo.pdf
-│   ├── img
-│   │   └── landing
-│   │       ├── odometro-aaa123.jpg
-│   │       └── placa-aaa123.jpg
-│   ├── js
-│   │   ├── landing
-│   │   │   ├── chat-demo.js
-│   │   │   └── landing.js
-│   │   ├── api.js  # Cliente API — fetch con JWT y manejo de errores
-│   │   ├── app.js  # Inicializacion del panel — tema, sidebar, ruta inicial
-│   │   ├── login-init.js
-│   │   ├── login.js
-│   │   ├── router.js  # Router SPA — navegacion sin recarga
-│   │   ├── theme.js  # Toggle tema claro/oscuro
-│   │   ├── transitions.js  # Transiciones suaves entre páginas — fade-out/fade-in, intercepta links internos
-│   │   └── utils.js  # Helpers compartidos del frontend
-│   ├── modules
-│   │   ├── vehiculos
-│   │   │   ├── alertas.js  # Modulo Alertas — documentos y autorizaciones pendientes
-│   │   │   ├── conductores.js  # Modulo Conductores del panel
-│   │   │   ├── flota.js  # Modulo Flota — gestion de vehiculos con drawer de detalle
-│   │   │   └── preoperacionales.js  # Modulo Preoperacionales — lista, filtros, drawer con autorizacion
-│   │   ├── dashboard.js  # Modulo Dashboard — 4 pestanas, Indice de Seguridad Operativa
-│   │   ├── posoperacionales.js  # Modulo Posoperacionales del panel
-│   │   ├── sedes.js  # Modulo Sedes — gestion multi-sede
-│   │   ├── tanqueos.js  # Modulo Tanqueos del panel
-│   │   └── usuarios.js  # Modulo Usuarios y roles del panel
-│   ├── index.html  # Panel de administracion
-│   ├── landing.html  # Landing page publica
-│   └── login.html  # Pagina de autenticacion
+│   ├── components/  # badge, card, drawer, filters, modal, sidebar, table, toast
+│   ├── css/  # variables, layout, components, themes
+│   ├── js/  # api, app, router, theme, utils, login, transitions
+│   ├── modules/  # dashboard, flota, preoperacionales, posoperacionales, tanqueos, alertas, conductores, sedes, usuarios
+│   ├── index.html / landing.html / login.html
 ├── rutas
-│   ├── alertas.js
-│   ├── auth.js  # Rutas de autenticacion — /auth/login, /auth/me, /auth/logout
-│   ├── autorizaciones.js
-│   ├── conductores.js
-│   ├── dashboard.js  # Rutas del dashboard operativo
-│   ├── preoperacionales.js
-│   ├── roles.js
-│   ├── tanqueos.js
-│   ├── usuarios.js
-│   ├── usuariosRoles.js
-│   └── vehiculos.js
+│   ├── alertas.js / auth.js / autorizaciones.js / conductores.js
+│   ├── dashboard.js / preoperacionales.js / roles.js / tanqueos.js
+│   ├── usuarios.js / usuariosRoles.js / vehiculos.js
 ├── scripts
+│   ├── test-flujos.js  # Tests de carga y estructura de flujos WhatsApp
 │   ├── test-pdf.js
-│   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
+│   └── update-architecture.js
 ├── servicios
-│   ├── pdf
-│   │   ├── base.js  # Motor PDF compartido — nunca duplicar logica aqui
-│   │   ├── GeneradorPDFBase.js
-│   │   ├── GeneradorPDFPosoperacional.js
-│   │   ├── GeneradorPDFPreoperacional.js
-│   │   ├── posoperacional.js  # Generador PDF posoperacional
-│   │   └── preoperacional.js  # Generador PDF preoperacional
-│   ├── logo.js  # Logo CERO en base64 para PDFs
-│   ├── ocr.js  # OCR via Gemini — lectura de placas y odometros
-│   ├── passwords.js
-│   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
-│   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
-├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
-├── eslint.config.cjs  # ESLint — compatible con CommonJS
-├── grep-resultado.txt
-├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
+│   ├── pdf/  # GeneradorPDFBase, Preoperacional, Posoperacional, base, logo
+│   ├── ocr.js / passwords.js / sesiones.js / storage.js
+├── ARCHITECTURE.md
+├── index.js  # Entrada Express — helmet, rutas, cron
 └── package.json
 ```
 

@@ -162,26 +162,12 @@ const PASOS_INICIALES = {
 };
 
 // ───────────────────────────────────────────────────────────
-// UTILIDADES DE FORMATO — XML, TwiML, texto
+// UTILIDADES DE FORMATO — TwiML desde módulo compartido
 // ───────────────────────────────────────────────────────────
 
-function escaparXml(valor) {
-  return String(valor == null ? '' : valor)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function responderTwiml(res, mensaje) {
-  var twiml = '<?xml version="1.0" encoding="UTF-8"?>';
-  twiml += '<Response>';
-  twiml += '<Message>' + escaparXml(mensaje) + '</Message>';
-  twiml += '</Response>';
-  res.type('text/xml');
-  res.send(twiml);
-}
+var twimlModule = require('../compartido/twiml');
+var escaparXml = twimlModule.escaparXml;
+var responderTwiml = twimlModule.responderTwiml;
 
 function formatGrupoMsg(grupo, prefijo) {
   var msg = prefijo ? (prefijo + '\n\n') : '';

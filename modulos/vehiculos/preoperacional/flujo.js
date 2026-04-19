@@ -1,949 +1,477 @@
-var twilio = require('twilio');
-var config = require('../../../config/config');
-var preop = require('./validaciones');
+/**
+ * flujo.js — FlujoPreoperacional: máquina de estados del preoperacional.
+ * Extiende FlujoBase — solo implementa estados propios de la inspección.
+ * CERO — Gestión de Operaciones de Campo
+ */
+
+'use strict';
+
+var FlujoBase  = require('../compartido/baseFlujo');
+var twiml      = require('../compartido/twiml');
+var storage    = require('../../../servicios/storage');
+var sesiones   = require('../../../servicios/sesiones');
+var ocr        = require('../../../servicios/ocr');
+var config     = require('../../../config/config');
+var nav        = require('../compartido/navegacion');
+var kmCompartido = require('../compartido/kilometraje');
+var preop      = require('./validaciones');
 var estadoPreop = require('./estado');
-var mensajes = require('./mensajes');
-var cierre = require('./cierre');
-var GRUPOS = estadoPreop.GRUPOS;
-var sesiones = require('../../../servicios/sesiones');
-var ocr = require('../../../servicios/ocr');
-var storage = require('../../../servicios/storage');
-var vehiculosData = require('../../../data/vehiculos');
-var kilometrajeCompartido = require('../compartido/kilometraje');
-var nav = require('../compartido/navegacion');
-var iniciadorFlujo = require('../compartido/iniciadorFlujo');
+var mensajes   = require('./mensajes');
+var cierre     = require('./cierre');
+var GRUPOS     = estadoPreop.GRUPOS;
 
-// Manejadores configurados con factory
-var manejarPlacaCompartido = iniciadorFlujo.crearManejadorPlaca({
-  ESTADOS: { ESPERANDO_FOTO_ODOMETRO: 'ESPERANDO_FOTO_ODOMETRO' },
-  mensajes: mensajes,
-  validaciones: preop,
-  tipoFlujo: 'preoperacional',
-  mensajeConfirmacion: function(vehiculo) {
-    return '\u2705 *' + vehiculo.placa + '*\n' +
-      [vehiculo.tipo, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') +
-      '\n\n' + mensajes.mensajeInicioOdometro(vehiculo);
-  },
-  validadorFormato: function(placa) {
-    var FORMATO_PLACA_CO = /^[A-Z]{3}[0-9]{3}$/;
-    return FORMATO_PLACA_CO.test(placa);
-  }
-});
+// ============================================================================
+// CONFIGURAR FLUJO BASE
+// ============================================================================
 
-var procesarFotoPlacaCompartido = iniciadorFlujo.crearProcesadorFotoPlaca({
-  ESTADOS: {
-    PLACA_CONFIRMACION_SUGERIDA: 'PLACA_CONFIRMACION_SUGERIDA',
-    PLACA_FALLBACK: 'PLACA_FALLBACK'
-  },
-  mensajes: {
-    mensajeConfirmacionPlacaSugerida: mensajes.mensajeConfirmacionPlacaSugerida,
-    mensajeFallbackPlaca: mensajes.mensajeFallbackPlaca
-  },
-  validaciones: preop,
-  manejarPlacaCompartido: manejarPlacaCompartido,
-  tipoFotoPlaca: 'inicio_placa',
-  onExitoPlaca: function(sesion) {
-    estadoPreop.reiniciarDatosOperativos(sesion);
-  }
-});
+function crearFlujoPreoperacional() {
+  var flujo = new FlujoBase({
+    tipo: 'preoperacional',
+    ESTADOS: {
+      ESPERANDO_FOTO_PLACA: 'ESPERANDO_FOTO_FRONTAL',
+      PLACA_CONFIRMACION_SUGERIDA: 'PLACA_CONFIRMACION_SUGERIDA',
+      PLACA_FALLBACK: 'PLACA_FALLBACK',
+      PLACA_MANUAL: 'PLACA_MANUAL',
+      ESPERANDO_FOTO_ODOMETRO: 'ESPERANDO_FOTO_ODOMETRO',
+      ODOMETRO_CONFIRMACION: 'ODOMETRO_CONFIRMACION',
+      ODOMETRO_MANUAL: 'ODOMETRO_MANUAL'
+    },
+    mensajes: mensajes,
+    validaciones: preop,
+    tipoFotoPlaca: 'inicio_placa',
+    estadoEsperandoFotoPlaca: 'ESPERANDO_FOTO_FRONTAL',
 
-var procesarFotoOdometroCompartido = iniciadorFlujo.crearProcesadorFotoOdometro({
-  ESTADOS: { ODOMETRO_CONFIRMACION: 'ODOMETRO_CONFIRMACION' },
-  mensajes: {
+    mensajeInicio: function() { return mensajes.mensajeInicio(); },
+
+    mensajeConfirmacionPlaca: function(vehiculo) {
+      return '\u2705 *' + vehiculo.placa + '*\n' +
+        [vehiculo.tipo, vehiculo.marca, vehiculo.modelo].filter(Boolean).join(' ') +
+        '\n\n' + mensajes.mensajeInicioOdometro(vehiculo);
+    },
+
+    mensajeInicioOdometro: function(sesion) {
+      return mensajes.mensajeInicioOdometro(sesion.vehiculo);
+    },
+
     mensajeConfirmacionOdometro: mensajes.mensajeConfirmacionOdometro,
     mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango,
-    primerMensajeInspeccion: mensajes.primerMensajeInspeccion
-  },
-  validaciones: preop,
-  tipoFlujo: 'preoperacional',
-  config: config
-});
+    primerMensajeInspeccion: mensajes.primerMensajeInspeccion,
 
+    onExitoPlaca: function(sesion) {
+      estadoPreop.reiniciarDatosOperativos(sesion);
+    },
 
-
-function volverAMenuPrincipal(res, telefono) {
-  sesiones.eliminarSesion(telefono);
-  return preop.responderTwiml(res, nav.textoMenuPrincipal());
-}
-
-function normalizarTextoBase(texto) {
-  return String(texto == null ? '' : texto)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function aliasExtrasPorItem(nombre) {
-  var clave = normalizarTextoBase(nombre);
-  if (clave === 'aceite motor') return ['aceite', 'motor', 'aceite motor', 'derrame aceite', 'aceite derramado'];
-  if (clave === 'refrigerante') return ['refrigerante', 'agua', 'agua visible', 'fuga de agua', 'agua derramada'];
-  if (clave === 'liquido frenos') return ['liquido frenos', 'liquido de frenos', 'freno', 'frenos', 'liquido'];
-  if (clave === 'fugas visibles') return ['fuga', 'fugas', 'goteo', 'goteando', 'botando', 'derrame', 'derramado', 'visible', 'visibles'];
-  if (clave === 'luces delanteras traseras') return ['luz', 'luces', 'faro', 'farola', 'delantera', 'trasera'];
-  if (clave === 'stops y direccionales') return ['stop', 'stops', 'direccional', 'direccionales', 'cocuyo', 'cocuyos'];
-  if (clave === 'pito y alarma reversa') return ['pito', 'alarma', 'reversa', 'bocina', 'corneta'];
-  if (clave === 'tablero instrumentos') return ['tablero', 'instrumento', 'instrumentos', 'testigo', 'indicador'];
-  if (clave === 'baterias') return ['bateria', 'baterias'];
-  if (clave === 'freno de parqueo') return ['freno', 'parqueo', 'mano'];
-  if (clave === 'estado llantas') return ['llanta', 'llantas', 'neumatico', 'neumaticos', 'rueda', 'ruedas'];
-  if (clave === 'pernos de ruedas') return ['perno', 'pernos', 'rueda', 'ruedas', 'tuerca', 'tuercas'];
-  if (clave === 'llanta repuesto') return ['repuesto', 'llanta repuesto', 'rueda repuesto'];
-  if (clave === 'cinturones seguridad') return ['cinturon', 'cinturones', 'seguridad'];
-  if (clave === 'retrovisores') return ['retrovisor', 'retrovisores', 'espejo', 'espejos'];
-  if (clave === 'pedales') return ['pedal', 'pedales'];
-  if (clave === 'vidrios y limpiabrisas') return ['vidrio', 'vidrios', 'limpiabrisas', 'plumilla', 'plumillas', 'parabrisas'];
-  if (clave === 'aseo y elementos sueltos') return ['aseo', 'limpieza', 'suelto', 'sueltos', 'elementos'];
-  if (clave === 'aire acondicionado') return ['aire', 'acondicionado', 'ac'];
-  if (clave === 'equipo carretera') return ['equipo', 'carretera', 'botiquin', 'extintor', 'cono', 'conos'];
-  return [];
-}
-
-function puntuarItemLocal(segmento, itemNombre) {
-  var normalizado = normalizarTextoBase(segmento);
-  var nombreNormalizado = normalizarTextoBase(itemNombre);
-  var alias = [nombreNormalizado].concat(aliasExtrasPorItem(itemNombre));
-  var score = 0;
-
-  for (var i = 0; i < alias.length; i++) {
-    var termino = normalizarTextoBase(alias[i]);
-    if (!termino) continue;
-    if (normalizado.indexOf(termino) >= 0) {
-      score += termino.indexOf(' ') >= 0 ? 3 : 2;
-    }
-  }
-
-  return score;
-}
-
-function detectarEstadoLocal(texto) {
-  var t = normalizarTextoBase(texto);
-  if (!t) return 'Mal estado';
-  if (/fuga|fugas|goteo|goteando|botando|derrame|derramado/.test(t)) return 'Con fugas';
-  if (/no funciona|no prende|apagad|fundid|sin luz|sin luces/.test(t)) return 'No funciona';
-  if (/bajo|vacio|vacia|faltante|falta|sin /.test(t)) return 'Bajo';
-  if (/desgastad|lisa|lisas/.test(t)) return 'Desgastada';
-  if (/sin aire|sin presion|desinflad|pinchad/.test(t)) return 'Sin presion';
-  if (/flojo|floja/.test(t)) return 'Flojo';
-  if (/danad|roto|rota|quebrad|partid|averiad|malo|mala|falla/.test(t)) return 'Mal estado';
-  return 'Mal estado';
-}
-
-function interpretarNovedadLocal(texto, grupo) {
-  var observacion = String(texto || '').trim();
-  var segmentos = observacion
-    .replace(/[\n\r]+/g, ', ')
-    .split(/,|;|\.|\s+y\s+|\s+e\s+|\//i)
-    .map(function(parte) { return parte.trim(); })
-    .filter(Boolean);
-
-  if (!segmentos.length && observacion) segmentos = [observacion];
-
-  var vistos = {};
-  var salida = [];
-
-  for (var i = 0; i < segmentos.length; i++) {
-    var segmento = segmentos[i];
-    var mejorItem = null;
-    var mejorScore = 0;
-
-    for (var j = 0; j < grupo.items.length; j++) {
-      var itemNombre = grupo.items[j].nombre;
-      var score = puntuarItemLocal(segmento, itemNombre);
-      if (score > mejorScore) {
-        mejorScore = score;
-        mejorItem = itemNombre;
-      }
-    }
-
-    if (!mejorItem || mejorScore <= 0 || vistos[mejorItem]) continue;
-    vistos[mejorItem] = true;
-    salida.push({
-      nombre: mejorItem,
-      estado: detectarEstadoLocal(segmento)
-    });
-  }
-
-  if (!salida.length && observacion) {
-    var mejorItemGeneral = null;
-    var mejorScoreGeneral = 0;
-    for (var k = 0; k < grupo.items.length; k++) {
-      var nombreItem = grupo.items[k].nombre;
-      var scoreGeneral = puntuarItemLocal(observacion, nombreItem);
-      if (scoreGeneral > mejorScoreGeneral) {
-        mejorScoreGeneral = scoreGeneral;
-        mejorItemGeneral = nombreItem;
-      }
-    }
-
-    if (mejorItemGeneral && mejorScoreGeneral > 0) {
-      salida.push({
-        nombre: mejorItemGeneral,
-        estado: detectarEstadoLocal(observacion)
+    onRegistrarKm: function(sesion, km, origen) {
+      kmCompartido.registrarKilometrajeConfirmado(sesion, km, origen, function(s, k, o) {
+        s.kilometraje = k;
+        storage.guardarFotoUnica(s, {
+          tipo: 'inicio_odometro', url: s.fotoOdometroTemporal,
+          descripcion: 'Foto del odometro', validacion: o, validada: true
+        });
+        s.kmDetectado = null;
+        s.kmLecturaFueraRango = false;
+        s.fotoOdometroTemporal = null;
+        s.grupoActual = 0;
+        s.estado = 'GRUPO';
       });
+    },
+
+    onConfirmarKm: async function(res, sesion) {
+      kmCompartido.registrarKilometrajeConfirmado(
+        sesion, sesion.kmDetectado,
+        'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',
+        function(s, k, o) {
+          s.kilometraje = k;
+          storage.guardarFotoUnica(s, {
+            tipo: 'inicio_odometro', url: s.fotoOdometroTemporal,
+            descripcion: 'Foto del odometro', validacion: o, validada: true
+          });
+          s.kmDetectado = null;
+          s.kmLecturaFueraRango = false;
+          s.fotoOdometroTemporal = null;
+          s.grupoActual = 0;
+          s.estado = 'GRUPO';
+        }
+      );
+      return twiml.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion));
     }
-  }
+  });
 
-  return {
-    items: salida,
-    observacion: observacion,
-    fuente: 'reglas_locales'
+  flujo.inicializarSesion = function(sesion) {
+    sesion.tipo = 'preoperacional';
+    sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
+    sesion.fotos = [];
+    estadoPreop.reiniciarDatosOperativos(sesion);
   };
+
+  flujo.manejarAtras = manejarAtras;
+  flujo.procesarEstado = procesarEstado;
+
+  // Override esAtrasOdometro for preop (uses 4 instead of 0)
+  flujo._preopEsAtras = function(m) {
+    var ml = String(m || '').trim().toLowerCase();
+    return ml === '4' || ml === '4️⃣';
+  };
+
+  return flujo;
 }
 
-function obtenerUrlWebhook(req) {
-  if (config.TWILIO_WEBHOOK_URL) {
-    return config.TWILIO_WEBHOOK_URL;
-  }
-
-  var proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  var host = req.headers['x-forwarded-host'] || req.get('host') || '';
-  return proto + '://' + host + req.originalUrl;
-}
-
-function firmaTwilioValida(req) {
-  // FIX: solo permitir desactivar la validacion de firma Twilio en entornos de desarrollo.
-  var esDesarrollo = process.env.NODE_ENV !== 'production';
-  // FIX: mantener bypass unicamente en desarrollo cuando la bandera explicita esta activa.
-  if (esDesarrollo && String(process.env.DISABLE_TWILIO_SIGNATURE_VALIDATION || '').toLowerCase() === 'true') {
-    return true;
-  }
-  // FIX: bloquear el bypass de validacion si la bandera se activa en produccion.
-  if (!esDesarrollo && String(process.env.DISABLE_TWILIO_SIGNATURE_VALIDATION || '').toLowerCase() === 'true') {
-    console.warn('⚠️ Validación de firma desactivada en producción — bloqueado');
-    return false;
-  }
-
-  if (!config.TWILIO_AUTH_TOKEN) {
-    console.warn('TWILIO_AUTH_TOKEN no configurado; se omite validacion de firma.');
-    return true;
-  }
-
-  var signature = req.headers['x-twilio-signature'];
-  if (!signature) return false;
-
-  try {
-    return twilio.validateRequest(config.TWILIO_AUTH_TOKEN, signature, obtenerUrlWebhook(req), req.body || {});
-  } catch (error) {
-    console.error('Error validando firma Twilio:', error.message);
-    return false;
-  }
-}
+// ============================================================================
+// AVANZAR DESPUÉS DE INSPECCIÓN
+// ============================================================================
 
 function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion);
   var mensaje = (prefijo ? prefijo + '\n\n' : '') + resumen + '\n\n' + mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad);
-  return preop.responderTwiml(res, mensaje);
+  return twiml.responderTwiml(res, mensaje);
 }
 
-
-
-/**
- * OCR de odómetro + validación de rango (lógica en compartido/kilometraje.js).
- */
-async function procesarFotoOdometroPreoperacional(res, sesion, fotoUrl) {
-  return await procesarFotoOdometroCompartido(res, sesion, fotoUrl);
-}
+// ============================================================================
+// MANEJAR ATRÁS
+// ============================================================================
 
 function manejarAtras(res, sesion) {
   if (sesion.estado === 'ESPERANDO_FOTO_ODOMETRO' || sesion.estado === 'PLACA_FALLBACK' || sesion.estado === 'PLACA_CONFIRMACION_SUGERIDA' || sesion.estado === 'PLACA_MANUAL') {
     estadoPreop.volverAInicioPorFoto(sesion);
-    return preop.responderTwiml(res, '◀️ Volvemos al inicio.\n\n' + mensajes.mensajeInicioPlaca());
+    return twiml.responderTwiml(res, '◀️ Volvemos al inicio.\n\n' + mensajes.mensajeInicio());
   }
-
   if (sesion.estado === 'ODOMETRO_CONFIRMACION' || sesion.estado === 'ODOMETRO_MANUAL') {
     estadoPreop.volverAKilometraje(sesion);
-    return preop.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
+    return twiml.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
   }
-
   if (sesion.estado === 'GRUPO' && sesion.grupoActual > 0) {
     sesion.grupoActual--;
     estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
-    return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
   }
-
   if (sesion.estado === 'GRUPO' && sesion.grupoActual === 0) {
     estadoPreop.volverAKilometraje(sesion);
-    return preop.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
+    return twiml.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
   }
-
   if (sesion.estado === 'DESCRIBIR_NOVEDAD') {
     sesion.estado = 'GRUPO';
-    return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
   }
-
-  // v12 — Atrás desde sub-pregunta: limpiar grupo y volver a opciones
   if (sesion.estado === 'SUB_PREGUNTA') {
     sesion.subPreguntasCola = [];
     estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
     sesion.estado = 'GRUPO';
-    return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+    return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
   }
-
   if (sesion.estado === 'FOTO_NOVEDAD') {
     storage.limpiarFotosPorTipo(sesion, ['novedad', 'adicional']);
     sesion.fotosNovedadPendientes = [];
-    return preop.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad, '◀️ Volvemos'));
+    return twiml.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad, '◀️ Volvemos'));
   }
-
   if (sesion.estado === 'FOTO_ADICIONAL') {
     storage.limpiarFotosPorTipo(sesion, ['adicional']);
     if (preop.obtenerNovedadesFotografiables(sesion.novedades).length > 0) {
       storage.limpiarFotosPorTipo(sesion, ['novedad']);
       sesion.fotosNovedadPendientes = [];
-      return preop.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad, '◀️ Volvemos'));
+      return twiml.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad, '◀️ Volvemos'));
     }
-    return preop.responderTwiml(res, mensajes.mensajeFotoAdicional('◀️'));
+    return twiml.responderTwiml(res, mensajes.mensajeFotoAdicional('◀️'));
   }
-
   if (sesion.estado === 'OBSERVACION_TEXTO') {
     sesion.estado = 'OBSERVACION';
-    return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+    return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
   }
-
   if (sesion.estado === 'OBSERVACION') {
     sesion.observacion = null;
     sesion.estado = 'FOTO_ADICIONAL';
-    return preop.responderTwiml(res, mensajes.mensajeFotoAdicional('◀️'));
+    return twiml.responderTwiml(res, mensajes.mensajeFotoAdicional('◀️'));
   }
-
   if (sesion.estado === 'CONFIRMACION') {
     sesion.estado = 'OBSERVACION';
-    return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+    return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
   }
-
-  return preop.responderTwiml(res, 'No hay paso anterior.\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_');
+  return twiml.responderTwiml(res, 'No hay paso anterior.\n\n0️⃣ _Atrás_  •  9️⃣ _Menú principal_');
 }
 
+// ============================================================================
+// PROCESADOR DE ESTADOS
+// ============================================================================
 
-// ============================================================================
-// MANEJADOR PRINCIPAL DEL PREOPERACIONAL - Exportable para el enrutador
-// ============================================================================
-async function manejarPreoperacional(req, res) {
-    if (!firmaTwilioValida(req)) {
-      return res.status(403).send('Forbidden');
+async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrls) {
+  var msgLower = mensaje.toLowerCase();
+  var numMedia = mediaUrls.length;
+
+  // Estados compartidos de placa/odómetro
+  var resultadoCompartido = await this.procesarEstadoCompartido(res, sesion, telefono, mensaje, mediaUrls);
+  if (resultadoCompartido !== null) return resultadoCompartido;
+
+  switch (sesion.estado) {
+
+    case 'GRUPO': {
+      var grupoActual = GRUPOS[sesion.grupoActual];
+      var respLimpia = mensaje.trim();
+      var respLower = respLimpia.toLowerCase();
+
+      if (respLimpia === '1' || respLimpia === '1️⃣' || respLower === 'ok' || respLower === 'todo bien') {
+        estadoPreop.limpiarGrupo(sesion, grupoActual);
+        sesion.respuestas[grupoActual.id] = ocr.marcarTodoOK();
+        sesion.grupoActual++;
+        if (sesion.grupoActual < GRUPOS.length) {
+          return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '✅ OK'));
+        }
+        return avanzarDespuesDeInspeccion(res, sesion);
+      }
+      if (respLimpia === '2' || respLimpia === '2️⃣') {
+        sesion.estado = 'DESCRIBIR_NOVEDAD';
+        var listaItems = grupoActual.items.map(function(item) { return '• ' + item.nombre; }).join('\n');
+        var ejemplos = grupoActual.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
+        return twiml.responderTwiml(res,
+          '✍️ *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n------\n' + listaItems +
+          '\n------\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
+        );
+      }
+      if (respLimpia === '3' || respLimpia === '3️⃣' || respLower === 'atras') {
+        if (sesion.grupoActual > 0) {
+          sesion.grupoActual--;
+          estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
+          return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
+        }
+        estadoPreop.volverAKilometraje(sesion);
+        return twiml.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
+      }
+      return twiml.responderTwiml(res, preop.formatGrupoMsg(grupoActual, '❌ Responde 1, 2 o 3'));
     }
 
-    var mensaje = (req.body.Body || '').trim();
-    var telefono = req.body.From || '';
-    var mediaUrls = storage.obtenerMediaUrls(req);
-    var numMedia = mediaUrls.length;
-    var sesion;
+    case 'DESCRIBIR_NOVEDAD': {
+      var grupoNovedad = GRUPOS[sesion.grupoActual];
+      var textoNovedad = String(mensaje || '').trim();
 
-    // FIX: bloquear el procesamiento concurrente antes de ejecutar cualquier logica del handler principal.
-    if (!sesiones.bloquear(telefono)) {
-      return preop.responderTwiml(res, 'Un momento, procesando tu mensaje anterior...');
-    }
-
-    try {
-      sesion = await sesiones.obtenerSesion(telefono);
-      console.log('[' + preop.ocultarTelefono(telefono) + '] Estado=' + sesion.estado + ' Texto=' + mensaje.length + ' chars Media=' + numMedia);
-      var msgUpper = mensaje.toUpperCase();
-      var msgLower = mensaje.toLowerCase();
-
-      if (mensaje === '9' || msgUpper === 'CANCELAR') {
-        sesiones.eliminarSesion(telefono);
-        sesiones.guardarCambios();
-        return preop.responderTwiml(res, nav.textoMenuPrincipal());
+      if (numMedia > 0) {
+        return twiml.responderTwiml(res, '✍️ En este paso necesito texto, no foto.\nDescribe el item y la falla.\n_Ej: "freno de parqueo malo"_');
       }
-
-      if (msgUpper === 'REINICIAR') {
-        sesiones.eliminarSesion(telefono);
-        sesiones.guardarCambios();
-        return preop.responderTwiml(res, nav.textoMenuPrincipal());
-      }
-
-      if (mensaje === '0' || msgUpper === 'ATRAS') {
+      if (textoNovedad === '3' || textoNovedad === '3️⃣' || textoNovedad.toUpperCase() === 'ATRAS') {
         return manejarAtras(res, sesion);
       }
-
-      if (msgUpper === 'MENU' || msgUpper === 'INICIO') {
-        sesiones.eliminarSesion(telefono);
-        sesiones.guardarCambios();
-        return preop.responderTwiml(res, nav.textoMenuPrincipal());
+      if (!textoNovedad || textoNovedad.length < 3 || ['1', '1️⃣', '2', '2️⃣'].indexOf(textoNovedad) >= 0) {
+        var ejemplosAyuda = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
+        return twiml.responderTwiml(res, '✍️ Describe el item y la falla con texto.\n_Ej: "' + ejemplosAyuda + ' malo"_\nTambién puedes escribir *ATRAS* para volver.');
       }
 
-      switch (sesion.estado) {
-        case 'INICIO':
-        case 'ESPERANDO_PLACA':
-        case 'ESPERANDO_FOTO_FRONTAL': {
-          sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
-          // FIX: detectar multiples fotos y procesar solo la primera en la captura frontal.
-          var totalFotos = parseInt(req.body.NumMedia || '0', 10);
-          // FIX: dejar trazabilidad cuando el usuario envia mas de una foto en este paso.
-          if (totalFotos > 1) {
-            console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
-          }
-          if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
-          if (numMedia === 0) return preop.responderTwiml(res, mensajes.mensajeInicio());
-          return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
-        }
+      var interpretacion;
+      try {
+        interpretacion = await ocr.interpretarNovedad(textoNovedad, grupoNovedad.items.map(function(item) { return item.nombre; }));
+      } catch (error) {
+        console.error('Error interpretando novedad [' + grupoNovedad.id + ']:', error.message || error);
+        interpretacion = null;
+      }
 
-        case 'PLACA_CONFIRMACION_SUGERIDA': {
-          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
+      if (!interpretacion || !Array.isArray(interpretacion.items)) {
+        var ejemplosError = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
+        return twiml.responderTwiml(res, '❌ No pude interpretar la novedad.\nDescribe de nuevo el item y la falla.\n_Ej: "' + ejemplosError + ' malo"_');
+      }
 
-          if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) {
-            return volverAMenuPrincipal(res, telefono);
-          }
+      var itemsInterpretados = estadoPreop.normalizarItemsInterpretados(interpretacion.items, grupoNovedad);
+      if (!itemsInterpretados.length) {
+        return twiml.responderTwiml(res,
+          '❌ No pude asociar la novedad a un item de este bloque.\nMenciona uno de estos items: ' + grupoNovedad.items.map(function(item) { return item.nombre; }).join(', ')
+        );
+      }
 
-          if ((msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') && sesion.placaSugerida) {
-            var fotoPlacaRef = sesion.fotoPlacaTemporal;
-            var mensajeSugerido = await manejarPlacaCompartido(sesion, telefono, sesion.placaSugerida);
-            var esExito = typeof mensajeSugerido === 'string' && mensajeSugerido.length > 0 && mensajeSugerido.charCodeAt(0) === 0x2705;
-            if (esExito) {
-              estadoPreop.reiniciarDatosOperativos(sesion);
-              if (fotoPlacaRef) {
-                storage.guardarFotoUnica(sesion, {
-                  tipo: 'inicio_placa',
-                  url: fotoPlacaRef,
-                  validacion: 'Placa confirmada desde sugerencia: ' + sesion.placaSugerida + (sesion.placaDetectada ? (' (lectura inicial: ' + sesion.placaDetectada + ')') : ''),
-                  validada: true
-                });
-              }
-              return preop.responderTwiml(res, mensajeSugerido);
-            }
-            var esBloqueado = typeof mensajeSugerido === 'string' && (mensajeSugerido.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(mensajeSugerido));
-            if (esBloqueado) {
-              return preop.responderTwiml(res, mensajeSugerido);
-            }
-            return preop.responderTwiml(res, mensajeSugerido);
-          }
+      estadoPreop.limpiarGrupo(sesion, grupoNovedad);
+      sesion.respuestas[grupoNovedad.id] = {
+        estado: 'NOVEDAD', items: itemsInterpretados,
+        observacion: interpretacion.observacion || textoNovedad
+      };
 
-          if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
-            sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
-            return preop.responderTwiml(res, mensajes.mensajeInicio());
-          }
+      var novedadesGrupo = itemsInterpretados.filter(function(item) {
+        return preop.clasificarEstado(item.estado) !== 'ok';
+      }).map(function(item) {
+        return {
+          grupo: grupoNovedad.nombre, item: item.nombre, estado: item.estado,
+          nota: item.estado, critico: preop.esCritico(grupoNovedad.id, item.nombre)
+        };
+      });
 
-          if (msgLower === '3' || msgLower === '3️⃣') {
-            sesion.estado = 'PLACA_MANUAL';
-            return preop.responderTwiml(res, '⌨️ Escribe la placa manualmente.\nEjemplo: *IDL354*');
-          }
-
-          return preop.responderTwiml(res, mensajes.mensajeConfirmacionPlacaSugerida(sesion));
-        }
-
-        case 'PLACA_FALLBACK': {
-          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
-          if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
-          if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'foto') {
-            sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
-            return preop.responderTwiml(res, mensajes.mensajeInicio());
-          }
-          if (msgLower === '2' || msgLower === '2️⃣') {
-            sesion.estado = 'PLACA_MANUAL';
-            return preop.responderTwiml(res, '⌨️ Escribe la placa manualmente.\nEjemplo: *IDL354*');
-          }
-          return preop.responderTwiml(res, mensajes.mensajeFallbackPlaca(sesion));
-        }
-
-        case 'PLACA_MANUAL': {
-          if (numMedia > 0) return await procesarFotoPlacaCompartido(res, sesion, telefono, mediaUrls[0]);
-          if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
-
-          var placaManual = preop.normalizarPlaca(mensaje);
-          if (!placaManual) return preop.responderTwiml(res, '\u2328\uFE0F Escribe la placa sin espacios.\nEjemplo: *IDL354*');
-
-          var FORMATO_PLACA_CO = /^[A-Z]{3}[0-9]{3}$/;
-          if (!FORMATO_PLACA_CO.test(placaManual)) {
-            return preop.responderTwiml(res, '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*');
-          }
-
-          var fotoPlacaManual = sesion.fotoPlacaTemporal;
-          var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaManual);
-          var esExito = typeof mensajeInicio === 'string' && mensajeInicio.length > 0 && mensajeInicio.charCodeAt(0) === 0x2705;
-          if (esExito) {
-            estadoPreop.reiniciarDatosOperativos(sesion);
-            if (fotoPlacaManual) {
-              storage.guardarFotoUnica(sesion, {
-                tipo: 'inicio_placa',
-                url: fotoPlacaManual,
-                validacion: 'Placa registrada manualmente: ' + placaManual,
-                validada: true
-              });
-            }
-          }
-          return preop.responderTwiml(res, mensajeInicio);
-        }
-
-        case 'ESPERANDO_FOTO_ODOMETRO': {
-          // FIX: detectar multiples fotos y procesar solo la primera en la captura del odometro.
-          var totalFotos = parseInt(req.body.NumMedia || '0', 10);
-          // FIX: dejar trazabilidad cuando el usuario envia mas de una foto en este paso.
-          if (totalFotos > 1) {
-            console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
-          }
-          if (nav.esOpcion(msgLower, ['4', '4️⃣'])) return manejarAtras(res, sesion);
-          if (nav.esOpcion(msgLower, ['9', '9️⃣', '0', '0️⃣'])) return volverAMenuPrincipal(res, telefono);
-          if (numMedia === 0) return preop.responderTwiml(res, mensajes.mensajeInicioOdometro(sesion.vehiculo));
-          return await procesarFotoOdometroPreoperacional(res, sesion, mediaUrls[0]);
-        }
-
-        case 'ODOMETRO_CONFIRMACION': {
-          return await kilometrajeCompartido.manejarConfirmacionOdometro(
-            res,
-            sesion,
-            mensaje,
-            numMedia,
-            mediaUrls,
-            {
-              mensajesModulo: mensajes,
-              responderFn: preop.responderTwiml,
-              estadoManual: 'ODOMETRO_MANUAL',
-              estadoEsperandoFoto: 'ESPERANDO_FOTO_ODOMETRO',
-              maxKmSalto: config.MAX_KM_SALTO,
-              mensajeInicioOdometro: function(s) {
-                return mensajes.mensajeInicioOdometro(s.vehiculo);
-              },
-              procesarFotoOdometro: procesarFotoOdometroPreoperacional,
-              telefono: telefono,
-              volverMenuPrincipal: volverAMenuPrincipal,
-              esAtrasOdometro: function(m) {
-                var ml = String(m || '').trim().toLowerCase();
-                return ml === '4' || ml === '4️⃣';
-              },
-              manejarAtrasDesdeOdometro: manejarAtras,
-              esOpcion: nav.esOpcion,
-              onConfirmarPreoperacional: async function(res, sesion) {
-                kilometrajeCompartido.registrarKilometrajeConfirmado(
-                  sesion,
-                  sesion.kmDetectado,
-                  'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',
-                  function(s, km, orig) {
-                    s.kilometraje = km;
-                    storage.guardarFotoUnica(s, {
-                      tipo: 'inicio_odometro',
-                      url: s.fotoOdometroTemporal,
-                      descripcion: 'Foto del odometro',
-                      validacion: orig,
-                      validada: true
-                    });
-                    s.kmDetectado = null;
-                    s.kmLecturaFueraRango = false;
-                    s.fotoOdometroTemporal = null;
-                    s.grupoActual = 0;
-                    s.estado = 'GRUPO';
-                  }
-                );
-                return preop.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion));
-              }
-            }
-          );
-        }
-
-        case 'ODOMETRO_MANUAL': {
-          return await kilometrajeCompartido.manejarOdometroManual(
-            res,
-            sesion,
-            mensaje,
-            mensajes,
-            preop.responderTwiml,
-            {
-              numMedia: numMedia,
-              mediaUrls: mediaUrls,
-              procesarFotoOdometro: procesarFotoOdometroPreoperacional,
-              esAtrasOdometro: function(m) {
-                var ml = String(m || '').trim().toLowerCase();
-                return ml === '4' || ml === '4️⃣';
-              },
-              manejarAtrasDesdeOdometro: manejarAtras,
-              volverMenuPrincipal: volverAMenuPrincipal,
-              telefono: telefono,
-              esOpcion: nav.esOpcion,
-              registrarKilometrajePreoperacional: function(sesion, kmManual, validacionKm) {
-                kilometrajeCompartido.registrarKilometrajeConfirmado(sesion, kmManual, validacionKm, function(s, km, orig) {
-                  s.kilometraje = km;
-                  storage.guardarFotoUnica(s, {
-                    tipo: 'inicio_odometro',
-                    url: s.fotoOdometroTemporal,
-                    descripcion: 'Foto del odometro',
-                    validacion: orig,
-                    validada: true
-                  });
-                  s.kmDetectado = null;
-                  s.kmLecturaFueraRango = false;
-                  s.fotoOdometroTemporal = null;
-                  s.grupoActual = 0;
-                  s.estado = 'GRUPO';
-                });
-              }
-            }
-          );
-        }
-
-        case 'GRUPO': {
-          var grupoActual = GRUPOS[sesion.grupoActual];
-          var respLimpia = mensaje.trim();
-          var respLower = respLimpia.toLowerCase();
-
-          if (respLimpia === '1' || respLimpia === '1️⃣' || respLower === 'ok' || respLower === 'todo bien') {
-            estadoPreop.limpiarGrupo(sesion, grupoActual);
-            sesion.respuestas[grupoActual.id] = ocr.marcarTodoOK();
-            sesion.grupoActual++;
-            if (sesion.grupoActual < GRUPOS.length) {
-              return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '✅ OK'));
-            }
-            return avanzarDespuesDeInspeccion(res, sesion);
-          }
-
-          if (respLimpia === '2' || respLimpia === '2️⃣') {
-            sesion.estado = 'DESCRIBIR_NOVEDAD';
-            var listaItems = grupoActual.items.map(function(item) { return '• ' + item.nombre; }).join('\n');
-            var ejemplos = grupoActual.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
-            return preop.responderTwiml(res,
-              '✍️ *Describe la novedad en:*\n*' + grupoActual.nombre + '*\n------\n' + listaItems +
-              '\n------\n_Escribe lo que encontraste_\n_Ej: "' + ejemplos + ' malo"_'
-            );
-          }
-
-          if (respLimpia === '3' || respLimpia === '3️⃣' || respLower === 'atras') {
-            if (sesion.grupoActual > 0) {
-              sesion.grupoActual--;
-              estadoPreop.limpiarGrupo(sesion, GRUPOS[sesion.grupoActual]);
-              return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '◀️ Volvemos'));
-            }
-            estadoPreop.volverAKilometraje(sesion);
-            return preop.responderTwiml(res, '◀️ Volvemos al kilometraje.\n\n' + mensajes.mensajeInicioOdometro(sesion.vehiculo));
-          }
-
-          return preop.responderTwiml(res, preop.formatGrupoMsg(grupoActual, '❌ Responde 1, 2 o 3'));
-        }
-
-        case 'DESCRIBIR_NOVEDAD': {
-          var grupoNovedad = GRUPOS[sesion.grupoActual];
-          var textoNovedad = String(mensaje || '').trim();
-
-          if (numMedia > 0) {
-            return preop.responderTwiml(res, '✍️ En este paso necesito texto, no foto.\nDescribe el item y la falla.\n_Ej: "freno de parqueo malo"_');
-          }
-
-          if (textoNovedad === '3' || textoNovedad === '3️⃣' || textoNovedad.toUpperCase() === 'ATRAS') {
-            return manejarAtras(res, sesion);
-          }
-
-          if (!textoNovedad || textoNovedad.length < 3 || ['1', '1️⃣', '2', '2️⃣'].indexOf(textoNovedad) >= 0) {
-            var ejemplosAyuda = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
-            return preop.responderTwiml(res, '✍️ Describe el item y la falla con texto.\n_Ej: "' + ejemplosAyuda + ' malo"_\nTambién puedes escribir *ATRAS* para volver.');
-          }
-
-          var interpretacion;
-          try {
-            interpretacion = await ocr.interpretarNovedad(textoNovedad, grupoNovedad.items.map(function(item) { return item.nombre; }));
-          } catch (error) {
-            console.error('Error interpretando novedad [' + grupoNovedad.id + '] texto="' + textoNovedad + '":', error.message || error);
-            interpretacion = null;
-          }
-
-          if (!interpretacion || !Array.isArray(interpretacion.items)) {
-            var ejemplosError = grupoNovedad.items.slice(0, 2).map(function(item) { return item.nombre.toLowerCase(); }).join('", "');
-            return preop.responderTwiml(res, '❌ No pude interpretar la novedad.\nDescribe de nuevo el item y la falla.\n_Ej: "' + ejemplosError + ' malo"_');
-          }
-
-          var itemsInterpretados = estadoPreop.normalizarItemsInterpretados(interpretacion.items, grupoNovedad);
-          if (!itemsInterpretados.length) {
-            return preop.responderTwiml(
-              res,
-              '❌ No pude asociar la novedad a un item de este bloque.\nMenciona uno de estos items: ' + grupoNovedad.items.map(function(item) { return item.nombre; }).join(', ')
-            );
-          }
-
-          estadoPreop.limpiarGrupo(sesion, grupoNovedad);
-          sesion.respuestas[grupoNovedad.id] = {
-            estado: 'NOVEDAD',
-            items: itemsInterpretados,
-            observacion: interpretacion.observacion || textoNovedad
-          };
-
-          var novedadesGrupo = itemsInterpretados.filter(function(item) {
-            return preop.clasificarEstado(item.estado) !== 'ok';
-          }).map(function(item) {
-            return {
-              grupo: grupoNovedad.nombre,
-              item: item.nombre,
-              estado: item.estado,
-              nota: item.estado,
-              critico: preop.esCritico(grupoNovedad.id, item.nombre)
-            };
-          });
-
-          // v12 — Separar novedades con y sin sub-pregunta de severidad
-          var novedadesSinSub = [];
-          var novedadesConSub = [];
-
-          for (var i = 0; i < novedadesGrupo.length; i++) {
-            var nov = novedadesGrupo[i];
-            if (preop.tieneSubPregunta(nov.item)) {
-              novedadesConSub.push(nov);
-            } else {
-              // Ítems sin sub-pregunta: evaluar severidad inmediatamente
-              nov.severidad = preop.evaluarSeveridadNovedad(nov.item, nov.estado, null);
-              novedadesSinSub.push(nov);
-            }
-          }
-
-          // Agregar novedades sin sub-pregunta directamente
-          for (var j = 0; j < novedadesSinSub.length; j++) {
-            sesion.novedades.push(novedadesSinSub[j]);
-          }
-
-          // Si hay novedades que necesitan sub-pregunta, entrar al estado SUB_PREGUNTA
-          if (novedadesConSub.length > 0) {
-            sesion.subPreguntasCola = novedadesConSub;
-            sesion.estado = 'SUB_PREGUNTA';
-            var primeraSub = novedadesConSub[0];
-            var subPregunta = preop.obtenerSubPregunta(primeraSub.item);
-            var prefijoSub = novedadesSinSub.length > 0
-              ? '⚠️ Anotado: ' + novedadesSinSub.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
-              : '📋 Necesito precisar la novedad:';
-            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subPregunta, prefijoSub));
-          }
-
-          // Sin sub-preguntas pendientes — avanzar normalmente
-          var confirmacion = novedadesGrupo.length > 0
-            ? '⚠️ Anotado: ' + novedadesGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
-            : '✅ Registrado';
-
-          sesion.grupoActual++;
-          sesion.estado = 'GRUPO';
-          if (sesion.grupoActual < GRUPOS.length) {
-            return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacion));
-          }
-          return avanzarDespuesDeInspeccion(res, sesion, confirmacion);
-        }
-
-        // ────────────────────────────────────────────────────
-        // SUB_PREGUNTA — v12 — precisar severidad de novedad
-        // Se activa cuando un ítem crítico tiene opciones de
-        // nivel (aceite, refrigerante, etc.) o tipo (fugas, pito)
-        // ────────────────────────────────────────────────────
-        case 'SUB_PREGUNTA': {
-          // No se aceptan fotos en este paso
-          if (numMedia > 0) {
-            var subActualFoto = preop.obtenerSubPregunta(sesion.subPreguntasCola[0].item);
-            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subActualFoto, '⌨️ En este paso necesito un número, no foto.'));
-          }
-
-          // Validar que hay cola activa
-          if (!sesion.subPreguntasCola || sesion.subPreguntasCola.length === 0) {
-            sesion.estado = 'GRUPO';
-            return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '↩️ Continuamos'));
-          }
-
-          var novedadSubActual = sesion.subPreguntasCola[0];
-          var subPreguntaActual = preop.obtenerSubPregunta(novedadSubActual.item);
-
-          // Procesar la respuesta numérica del operario
-          var opcionElegida = preop.procesarRespuestaSubPregunta(subPreguntaActual, mensaje);
-
-          if (!opcionElegida) {
-            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subPreguntaActual, '❌ Responde con el número de la opción'));
-          }
-
-          // Actualizar la novedad con la severidad y estado preciso
-          novedadSubActual.severidad = opcionElegida.severidad;
-          novedadSubActual.estado = opcionElegida.estado;
-          novedadSubActual.nota = opcionElegida.estado;
-          novedadSubActual.subRespuesta = {
-            num: opcionElegida.num,
-            texto: opcionElegida.texto,
-            severidad: opcionElegida.severidad
-          };
-
-          // Agregar la novedad procesada a la sesión
-          sesion.novedades.push(novedadSubActual);
-
-          // Quitar de la cola
-          sesion.subPreguntasCola.shift();
-
-          // Si hay más sub-preguntas en la cola, preguntar la siguiente
-          if (sesion.subPreguntasCola.length > 0) {
-            var siguienteSub = sesion.subPreguntasCola[0];
-            var subSiguiente = preop.obtenerSubPregunta(siguienteSub.item);
-            var prefijoSiguiente = '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*';
-            return preop.responderTwiml(res, preop.formatSubPreguntaMsg(subSiguiente, prefijoSiguiente));
-          }
-
-          // Cola vacía — todas las sub-preguntas respondidas
-          sesion.subPreguntasCola = [];
-
-          // Generar confirmación con todas las novedades del grupo actual
-          var grupoActualNombre = GRUPOS[sesion.grupoActual].nombre;
-          var novedadesDelGrupo = sesion.novedades.filter(function(n) {
-            return n.grupo === grupoActualNombre;
-          });
-          var confirmacionSub = '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*';
-          if (novedadesDelGrupo.length > 1) {
-            confirmacionSub = '⚠️ Anotado: ' + novedadesDelGrupo.map(function(n) {
-              return n.item + ' (' + n.estado + ')';
-            }).join(', ');
-          }
-
-          // Avanzar al siguiente grupo
-          sesion.grupoActual++;
-          sesion.estado = 'GRUPO';
-          if (sesion.grupoActual < GRUPOS.length) {
-            return preop.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacionSub));
-          }
-          return avanzarDespuesDeInspeccion(res, sesion, confirmacionSub);
-        }
-
-        case 'FOTO_NOVEDAD': {
-          // FIX: detectar multiples fotos y procesar solo la primera para evidencia de novedad.
-          var totalFotos = parseInt(req.body.NumMedia || '0', 10);
-          // FIX: registrar en logs cuando llegan varias fotos en este estado.
-          if (totalFotos > 1) {
-            console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
-          }
-          estadoPreop.prepararFotosNovedad(sesion);
-          if (!sesion.fotosNovedadPendientes.length) {
-            sesion.estado = 'FOTO_ADICIONAL';
-            return preop.responderTwiml(res, mensajes.mensajeFotoAdicional());
-          }
-          if (numMedia === 0) {
-            return preop.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad));
-          }
-
-          var novedadActual = sesion.fotosNovedadPendientes[0];
-          sesion.fotos.push({
-            tipo: 'novedad',
-            url: mediaUrls[0],
-            descripcion: novedadActual.grupo + ' - ' + novedadActual.item,
-            validacion: 'Evidencia de novedad recibida',
-            validada: true
-          });
-          sesion.fotosNovedadPendientes.shift();
-
-          if (sesion.fotosNovedadPendientes.length > 0) {
-            var siguienteNov = sesion.fotosNovedadPendientes[0];
-            return preop.responderTwiml(res, '✅ Foto recibida\n\n📸 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + siguienteNov.item + '*\n_' + (siguienteNov.nota || siguienteNov.estado || siguienteNov.grupo) + '_');
-          }
-
-          sesion.estado = 'FOTO_ADICIONAL';
-          return preop.responderTwiml(res, '✅ Todas las fotos recibidas\n\n' + mensajes.mensajeFotoAdicional());
-        }
-
-        case 'FOTO_ADICIONAL': {
-          // FIX: detectar multiples fotos y procesar solo la primera como evidencia adicional.
-          var totalFotos = parseInt(req.body.NumMedia || '0', 10);
-          // FIX: registrar en logs cuando llegan varias fotos en este estado.
-          if (totalFotos > 1) {
-            console.log('Usuario envió ' + totalFotos + ' fotos, procesando solo la primera');
-          }
-          if (numMedia > 0) {
-            sesion.fotos.push({
-              tipo: 'adicional',
-              url: mediaUrls[0],
-              descripcion: 'Foto adicional',
-              validacion: 'Evidencia adicional recibida',
-              validada: true
-            });
-            // Confirmar recepción y mostrar opciones con formato unificado y PIE_NAV
-            return preop.responderTwiml(res, mensajes.mensajeFotoAdicional('✅ Foto guardada'));
-          }
-
-          if (msgLower === '1' || msgLower === '1️⃣') {
-            sesion.estado = 'OBSERVACION';
-            return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
-          }
-
-          // Fallback: mostrar opciones nuevamente con formato correcto
-          return preop.responderTwiml(res, mensajes.mensajeFotoAdicional());
-        }
-
-        case 'OBSERVACION': {
-          if (numMedia > 0) {
-            return preop.responderTwiml(res, '💬 En este paso solo necesito números (1 o 2).');
-          }
-          if (!mensaje) {
-            return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
-          }
-          if (msgLower === '1' || msgLower === '1️⃣') {
-            sesion.observacion = null;
-            sesion.estado = 'CONFIRMACION';
-            return preop.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
-          }
-          if (msgLower === '2' || msgLower === '2️⃣') {
-            sesion.estado = 'OBSERVACION_TEXTO';
-            return preop.responderTwiml(res, mensajes.mensajeEscribirObservacionFinal());
-          }
-          return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
-        }
-
-        case 'OBSERVACION_TEXTO': {
-          if (numMedia > 0) {
-            return preop.responderTwiml(res, '💬 En este paso solo necesito texto.\nEscribe la observación final.');
-          }
-          if (!mensaje) {
-            return preop.responderTwiml(res, mensajes.mensajeEscribirObservacionFinal());
-          }
-          sesion.observacion = mensaje;
-          sesion.estado = 'CONFIRMACION';
-          return preop.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
-        }
-
-        case 'CONFIRMACION': {
-          if (numMedia > 0) {
-            return preop.responderTwiml(res, 'En este paso solo necesito números (1 o 2).');
-          }
-          if (msgLower === '1' || msgLower === '1️⃣') {
-            var guardado = await cierre.guardarPreoperacionalCompleto(sesion, telefono, GRUPOS);
-            if (guardado.error) {
-              console.error('Error guardando preoperacional:', guardado.error);
-              return preop.responderTwiml(res, '❌ Error guardando. Intente de nuevo o contacte al supervisor.');
-            }
-
-            sesiones.eliminarSesion(telefono);
-            return preop.responderTwiml(
-              res,
-              mensajes.mensajeFinalFirma(
-                guardado.datosSesion,
-                guardado.ahora.toLocaleDateString('es-CO'),
-                guardado.novedadesCriticas,
-                guardado.pdfUrl
-              )
-            );
-          }
-
-          if (msgLower === '2' || msgLower === '2️⃣') {
-            sesion.estado = 'OBSERVACION';
-            return preop.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
-          }
-
-          return preop.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
-        }
-
-        default: {
-          sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
-          return preop.responderTwiml(res, mensajes.mensajeInicio());
+      var novedadesSinSub = [];
+      var novedadesConSub = [];
+      for (var i = 0; i < novedadesGrupo.length; i++) {
+        var nov = novedadesGrupo[i];
+        if (preop.tieneSubPregunta(nov.item)) {
+          novedadesConSub.push(nov);
+        } else {
+          nov.severidad = preop.evaluarSeveridadNovedad(nov.item, nov.estado, null);
+          novedadesSinSub.push(nov);
         }
       }
-    } catch (err) {
-      // FIX: unificar el manejo de errores del handler principal con el mensaje solicitado.
-      console.error('Error handler:', err.message);
-      // FIX: responder con instruccion explicita para reiniciar el flujo ante un error inesperado.
-      return preop.responderTwiml(res, 'Ocurrió un error. Escribe *9* para volver al menú.');
-    } finally {
-      sesiones.desbloquear(telefono);
-      sesiones.guardarCambios();
+      for (var j = 0; j < novedadesSinSub.length; j++) {
+        sesion.novedades.push(novedadesSinSub[j]);
+      }
+
+      if (novedadesConSub.length > 0) {
+        sesion.subPreguntasCola = novedadesConSub;
+        sesion.estado = 'SUB_PREGUNTA';
+        var primeraSub = novedadesConSub[0];
+        var subPregunta = preop.obtenerSubPregunta(primeraSub.item);
+        var prefijoSub = novedadesSinSub.length > 0
+          ? '⚠️ Anotado: ' + novedadesSinSub.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
+          : '📋 Necesito precisar la novedad:';
+        return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subPregunta, prefijoSub));
+      }
+
+      var confirmacion = novedadesGrupo.length > 0
+        ? '⚠️ Anotado: ' + novedadesGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
+        : '✅ Registrado';
+      sesion.grupoActual++;
+      sesion.estado = 'GRUPO';
+      if (sesion.grupoActual < GRUPOS.length) {
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacion));
+      }
+      return avanzarDespuesDeInspeccion(res, sesion, confirmacion);
     }
+
+    case 'SUB_PREGUNTA': {
+      if (numMedia > 0) {
+        var subActualFoto = preop.obtenerSubPregunta(sesion.subPreguntasCola[0].item);
+        return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subActualFoto, '⌨️ En este paso necesito un número, no foto.'));
+      }
+      if (!sesion.subPreguntasCola || sesion.subPreguntasCola.length === 0) {
+        sesion.estado = 'GRUPO';
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], '↩️ Continuamos'));
+      }
+
+      var novedadSubActual = sesion.subPreguntasCola[0];
+      var subPreguntaActual = preop.obtenerSubPregunta(novedadSubActual.item);
+      var opcionElegida = preop.procesarRespuestaSubPregunta(subPreguntaActual, mensaje);
+
+      if (!opcionElegida) {
+        return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subPreguntaActual, '❌ Responde con el número de la opción'));
+      }
+
+      novedadSubActual.severidad = opcionElegida.severidad;
+      novedadSubActual.estado = opcionElegida.estado;
+      novedadSubActual.nota = opcionElegida.estado;
+      novedadSubActual.subRespuesta = { num: opcionElegida.num, texto: opcionElegida.texto, severidad: opcionElegida.severidad };
+      sesion.novedades.push(novedadSubActual);
+      sesion.subPreguntasCola.shift();
+
+      if (sesion.subPreguntasCola.length > 0) {
+        var siguienteSub = sesion.subPreguntasCola[0];
+        var subSiguiente = preop.obtenerSubPregunta(siguienteSub.item);
+        return twiml.responderTwiml(res, preop.formatSubPreguntaMsg(subSiguiente, '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*'));
+      }
+
+      sesion.subPreguntasCola = [];
+      var grupoActualNombre = GRUPOS[sesion.grupoActual].nombre;
+      var novedadesDelGrupo = sesion.novedades.filter(function(n) { return n.grupo === grupoActualNombre; });
+      var confirmacionSub = novedadesDelGrupo.length > 1
+        ? '⚠️ Anotado: ' + novedadesDelGrupo.map(function(n) { return n.item + ' (' + n.estado + ')'; }).join(', ')
+        : '✅ ' + novedadSubActual.item + ': *' + opcionElegida.estado + '*';
+
+      sesion.grupoActual++;
+      sesion.estado = 'GRUPO';
+      if (sesion.grupoActual < GRUPOS.length) {
+        return twiml.responderTwiml(res, preop.formatGrupoMsg(GRUPOS[sesion.grupoActual], confirmacionSub));
+      }
+      return avanzarDespuesDeInspeccion(res, sesion, confirmacionSub);
+    }
+
+    case 'FOTO_NOVEDAD': {
+      estadoPreop.prepararFotosNovedad(sesion);
+      if (!sesion.fotosNovedadPendientes.length) {
+        sesion.estado = 'FOTO_ADICIONAL';
+        return twiml.responderTwiml(res, mensajes.mensajeFotoAdicional());
+      }
+      if (numMedia === 0) {
+        return twiml.responderTwiml(res, mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad));
+      }
+      var novedadActual = sesion.fotosNovedadPendientes[0];
+      sesion.fotos.push({
+        tipo: 'novedad', url: mediaUrls[0],
+        descripcion: novedadActual.grupo + ' - ' + novedadActual.item,
+        validacion: 'Evidencia de novedad recibida', validada: true
+      });
+      sesion.fotosNovedadPendientes.shift();
+      if (sesion.fotosNovedadPendientes.length > 0) {
+        var siguienteNov = sesion.fotosNovedadPendientes[0];
+        return twiml.responderTwiml(res, '✅ Foto recibida\n\n📸 *Foto de novedad* (' + sesion.fotosNovedadPendientes.length + ' pendiente(s))\n*' + siguienteNov.item + '*\n_' + (siguienteNov.nota || siguienteNov.estado || siguienteNov.grupo) + '_');
+      }
+      sesion.estado = 'FOTO_ADICIONAL';
+      return twiml.responderTwiml(res, '✅ Todas las fotos recibidas\n\n' + mensajes.mensajeFotoAdicional());
+    }
+
+    case 'FOTO_ADICIONAL': {
+      if (numMedia > 0) {
+        sesion.fotos.push({
+          tipo: 'adicional', url: mediaUrls[0],
+          descripcion: 'Foto adicional', validacion: 'Evidencia adicional recibida', validada: true
+        });
+        return twiml.responderTwiml(res, mensajes.mensajeFotoAdicional('✅ Foto guardada'));
+      }
+      if (msgLower === '1' || msgLower === '1️⃣') {
+        sesion.estado = 'OBSERVACION';
+        return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+      }
+      return twiml.responderTwiml(res, mensajes.mensajeFotoAdicional());
+    }
+
+    case 'OBSERVACION': {
+      if (numMedia > 0) return twiml.responderTwiml(res, '💬 En este paso solo necesito números (1 o 2).');
+      if (!mensaje) return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+      if (msgLower === '1' || msgLower === '1️⃣') {
+        sesion.observacion = null;
+        sesion.estado = 'CONFIRMACION';
+        return twiml.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
+      }
+      if (msgLower === '2' || msgLower === '2️⃣') {
+        sesion.estado = 'OBSERVACION_TEXTO';
+        return twiml.responderTwiml(res, mensajes.mensajeEscribirObservacionFinal());
+      }
+      return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+    }
+
+    case 'OBSERVACION_TEXTO': {
+      if (numMedia > 0) return twiml.responderTwiml(res, '💬 En este paso solo necesito texto.\nEscribe la observación final.');
+      if (!mensaje) return twiml.responderTwiml(res, mensajes.mensajeEscribirObservacionFinal());
+      sesion.observacion = mensaje;
+      sesion.estado = 'CONFIRMACION';
+      return twiml.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
+    }
+
+    case 'CONFIRMACION': {
+      if (numMedia > 0) return twiml.responderTwiml(res, 'En este paso solo necesito números (1 o 2).');
+      if (msgLower === '1' || msgLower === '1️⃣') {
+        var guardado = await cierre.guardarPreoperacionalCompleto(sesion, telefono, GRUPOS);
+        if (guardado.error) {
+          console.error('Error guardando preoperacional:', guardado.error);
+          return twiml.responderTwiml(res, '❌ Error guardando. Intente de nuevo o contacte al supervisor.');
+        }
+        sesiones.eliminarSesion(telefono);
+        return twiml.responderTwiml(res,
+          mensajes.mensajeFinalFirma(guardado.datosSesion, guardado.ahora.toLocaleDateString('es-CO'), guardado.novedadesCriticas, guardado.pdfUrl)
+        );
+      }
+      if (msgLower === '2' || msgLower === '2️⃣') {
+        sesion.estado = 'OBSERVACION';
+        return twiml.responderTwiml(res, mensajes.mensajeMenuObservacionFinal());
+      }
+      return twiml.responderTwiml(res, mensajes.mensajeConfirmacionFinal(sesion));
+    }
+
+    default: {
+      sesion.estado = 'ESPERANDO_FOTO_FRONTAL';
+      return twiml.responderTwiml(res, mensajes.mensajeInicio());
+    }
+  }
 }
 
 // ============================================================================
-// REGISTRO DEL ENDPOINT (para compatibilidad)
+// SINGLETON Y EXPORTS
 // ============================================================================
+
+var instancia = crearFlujoPreoperacional();
+
 function registrarPreoperacional(app) {
-  app.get('/', function(req, res) {
-    res.send('CERO v3 corriendo - validacion inicial por foto');
-  });
-  
-  app.post('/webhook', manejarPreoperacional);
+  app.get('/', function(req, res) { res.send('CERO v3 corriendo'); });
+  app.post('/webhook', function(req, res) { return instancia.manejar(req, res); });
 }
 
-// ============================================================================
-// EXPORTAR AMBAS FUNCIONES
-// ============================================================================
-module.exports = { 
-  registrarPreoperacional,
-  manejarPreoperacional  // ← NUEVA: para el enrutador con menú
+module.exports = {
+  registrarPreoperacional: registrarPreoperacional,
+  manejarPreoperacional: function(req, res) { return instancia.manejar(req, res); },
+  manejar: function(req, res) { return instancia.manejar(req, res); }
 };

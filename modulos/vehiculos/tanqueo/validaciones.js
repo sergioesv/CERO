@@ -1,24 +1,10 @@
 var config = require('../../../config/config');
 var preop = require('../preoperacional/validaciones');
+var twiml = require('../compartido/twiml');
 
 var TIPOS_COMBUSTIBLE = ['diesel', 'gasolina', 'gas', 'adblue', 'otro'];
 
-function responderTwiml(res, mensaje) {
-  res.set('Content-Type', 'text/xml');
-  res.send(
-    '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<Response><Message>' + escaparXml(mensaje) + '</Message></Response>'
-  );
-}
-
-function escaparXml(texto) {
-  return String(texto || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
+var responderTwiml = twiml.responderTwiml;
 
 function normalizarPlaca(texto) {
   return preop.normalizarPlaca(texto);

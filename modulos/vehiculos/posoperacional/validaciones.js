@@ -1,5 +1,6 @@
 var config = require('../../../config/config');
 var ocr = require('../../../servicios/ocr');
+var twiml = require('../compartido/twiml');
 
 var MAX_KM_SALTO_POSOP = parseInt(process.env.MAX_KM_SALTO_POSOP || config.MAX_KM_SALTO || 400, 10) || 400;
 
@@ -128,23 +129,7 @@ var MAPA_IA = {
 
 var ITEMS_FALLBACK_IA = Object.keys(MAPA_IA);
 
-function escaparXml(valor) {
-  return String(valor == null ? '' : valor)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function responderTwiml(res, mensaje) {
-  var twiml = '<?xml version="1.0" encoding="UTF-8"?>';
-  twiml += '<Response>';
-  twiml += '<Message>' + escaparXml(mensaje) + '</Message>';
-  twiml += '</Response>';
-  res.type('text/xml');
-  res.send(twiml);
-}
+var responderTwiml = twiml.responderTwiml;
 
 function sinAcentos(texto) {
   return String(texto == null ? '' : texto)
