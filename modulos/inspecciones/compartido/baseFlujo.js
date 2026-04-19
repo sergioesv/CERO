@@ -76,7 +76,8 @@ function FlujoBase(opciones) {
     validaciones: validaciones,
     manejarPlacaCompartido: this._manejarPlaca,
     tipoFotoPlaca: this.tipoFotoPlaca,
-    onExitoPlaca: opciones.onExitoPlaca || null
+    onExitoPlaca: opciones.onExitoPlaca || null,
+    contextoFlujo: self
   });
 
   // Odómetro — posoperacional usa procesarLecturaPos custom
@@ -199,7 +200,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
         var mensajeSug = await this._manejarPlaca(sesion, telefono, sesion.placaSugerida);
         var esExito = this._esRespuestaExito(mensajeSug);
         if (esExito) {
-          if (this._onExitoPlaca) await this._onExitoPlaca(sesion);
+          if (this._onExitoPlaca) await this._onExitoPlaca.call(this, sesion);
           if (fotoSug) {
             storage.guardarFotoUnica(sesion, {
               tipo: this.tipoFotoPlaca,
@@ -266,7 +267,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
       var mensajeInicio = await this._manejarPlaca(sesion, telefono, placaManual);
       var esExitoManual = this._esRespuestaExito(mensajeInicio);
       if (esExitoManual) {
-        if (this._onExitoPlaca) await this._onExitoPlaca(sesion);
+        if (this._onExitoPlaca) await this._onExitoPlaca.call(this, sesion);
         if (fotoPlacaManual) {
           storage.guardarFotoUnica(sesion, {
             tipo: this.tipoFotoPlaca,
@@ -436,6 +437,55 @@ FlujoBase.prototype._confirmarKmDefault = async function(res, sesion) {
   this._registrarKmDefault(sesion, sesion.kmDetectado, 'Km confirmado: ' + sesion.kmDetectado + ' km');
   var msg = this._primerMensajeTrasKm(sesion);
   return twiml.responderTwiml(res, msg);
+};
+
+/**
+ * Implementación default de onExitoPlaca.
+ * Carga plantilla y asigna estado según tipo de medición.
+ * Los flujos hijos sobreescriben onExitoPlaca para lógica adicional
+ * PERO deben llamar a este método internamente.
+ *
+ * @param {Object} sesion
+ * @param {string} tipoInspeccion — 'preoperacional' | 'posoperacional' | 'tanqueo'
+ * @param {Object} opcionesExtra — { reiniciarFn, estadoSinMedicion, filtrarGrupos }
+ */
+FlujoBase.prototype._onExitoPlacaDefault = async function(sesion, tipoInspeccion, opcionesExtra) {
+  var plantillasServ = require('../../../servicios/plantillas');
+  var opts = opcionesExtra || {};
+  var ESTADOS = this.ESTADOS;
+
+  try {
+    var plantilla = await plantillasServ.cargar(
+      sesion.vehiculo.tipo_activo_id,
+      tipoInspeccion,
+      sesion.vehiculo.empresa_id
+    );
+    sesion.plantilla = plantilla;
+
+    if (typeof opts.filtrarGrupos === 'function') {
+      sesion.gruposInspeccion = opts.filtrarGrupos(plantilla.grupos);
+    }
+
+    var medicion = plantilla.config.medicion || 'km';
+
+    if (medicion === 'horas') {
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_HOROMETRO;
+    } else if (medicion === 'ambos') {
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+    } else if (medicion === 'ninguna') {
+      sesion.estado = opts.estadoSinMedicion || ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+    } else {
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+    }
+  } catch (error) {
+    console.error('Error cargando plantilla en ' + tipoInspeccion + ':', error);
+    sesion.sinPlantilla = true;
+    sesion.plantilla = null;
+    if (typeof opts.filtrarGrupos === 'function') {
+      sesion.gruposInspeccion = [];
+    }
+    sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+  }
 };
 
 // ============================================================================

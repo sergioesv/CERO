@@ -17,7 +17,6 @@ var validaciones = require('./validaciones');
 var estadoPosop  = require('./estado');
 var mensajes     = require('./mensajes');
 var cierre       = require('./cierre');
-var plantillas   = require('../../../servicios/plantillas');
 // Reservado para alinear con data/inspecciones (referencia km); iniciadorFlujo ya la usa internamente.
 var inspeccionesData = require('../../../data/inspecciones'); // eslint-disable-line no-unused-vars
 
@@ -50,23 +49,10 @@ function crearFlujoPosoperacional() {
       estadoPosop.reiniciarDatosOperativos(sesion);
       sesion.vehiculo = vehiculo;
       sesion.conductor = conductor;
-      try {
-        var plantilla = await plantillas.cargar(sesion.vehiculo.tipo_activo_id, 'posoperacional', sesion.vehiculo.empresa_id);
-        sesion.plantilla = plantilla;
-        var medicion = plantilla.config.medicion || 'km';
-        if (medicion === 'horas') {
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_HOROMETRO;
-        } else if (medicion === 'ambos') {
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO; // TODO: implementar 'ambos' paso por paso
-        } else if (medicion === 'ninguna') {
-          sesion.estado = ESTADOS.FOTO_ESTADO_GENERAL;
-        } else {
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-        }
-      } catch (error) {
-        console.error('Error cargando plantilla en posop:', error);
-        sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-      }
+
+      await this._onExitoPlacaDefault(sesion, 'posoperacional', {
+        estadoSinMedicion: ESTADOS.FOTO_ESTADO_GENERAL
+      });
     },
 
     // Posoperacional usa procesamiento custom de lectura de odómetro

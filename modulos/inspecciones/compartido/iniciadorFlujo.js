@@ -177,7 +177,7 @@ function crearProcesadorFotoPlaca(opciones) {
       var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
       if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
         if (typeof opciones.onExitoPlaca === 'function') {
-           await opciones.onExitoPlaca(sesion);
+          await opciones.onExitoPlaca.call(opciones.contextoFlujo, sesion);
         }
         storage.guardarFotoUnica(sesion, {
           tipo: opciones.tipoFotoPlaca || 'inicio_placa',

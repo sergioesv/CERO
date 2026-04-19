@@ -18,7 +18,6 @@ var estadoMod    = require('./estado');
 var ESTADOS      = estadoMod.ESTADOS;
 var mensajes     = require('./mensajes');
 var cierre       = require('./cierre');
-var plantillas   = require('../../servicios/plantillas');
 
 // ============================================================================
 // CONFIGURAR FLUJO BASE
@@ -47,19 +46,7 @@ function crearFlujoTanqueo() {
     },
 
     onExitoPlaca: async function(sesion) {
-      try {
-        var plantilla = await plantillas.cargar(sesion.vehiculo.tipo_activo_id, 'tanqueo', sesion.vehiculo.empresa_id);
-        sesion.plantilla = plantilla;
-        var medicion = plantilla.config.medicion || 'km';
-        if (medicion === 'horas') {
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_HOROMETRO;
-        } else {
-          sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-        }
-      } catch (error) {
-        console.error('Error cargando plantilla en tanqueo:', error);
-        sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-      }
+      await this._onExitoPlacaDefault(sesion, 'tanqueo', {});
     },
 
     mensajeConfirmacionOdometro: function(sesion, prefijo) {

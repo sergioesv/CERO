@@ -18,7 +18,6 @@ var preop      = require('./validaciones');
 var estadoPreop = require('./estado');
 var mensajes   = require('./mensajes');
 var cierre     = require('./cierre');
-var plantillas = require('../../../servicios/plantillas');
 
 // ============================================================================
 // CONFIGURAR FLUJO BASE
@@ -62,27 +61,14 @@ function crearFlujoPreoperacional() {
 
     onExitoPlaca: async function(sesion) {
       estadoPreop.reiniciarDatosOperativos(sesion);
-      try {
-        var plantilla = await plantillas.cargar(sesion.vehiculo.tipo_activo_id, 'preoperacional', sesion.vehiculo.empresa_id);
-        sesion.plantilla = plantilla;
-        sesion.gruposInspeccion = plantilla.grupos.filter(function(g) { return !g.solo_panel; });
-        var medicion = plantilla.config.medicion || 'km';
-        if (medicion === 'horas') {
-          sesion.estado = 'ESPERANDO_FOTO_HOROMETRO';
-        } else if (medicion === 'ambos') {
-          sesion.estado = 'ESPERANDO_FOTO_ODOMETRO'; // TODO: implementar 'ambos' paso por paso
-        } else if (medicion === 'ninguna') {
-          sesion.grupoActual = 0;
-          sesion.estado = 'GRUPO';
-        } else {
-          sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
-        }
-      } catch (error) {
-        console.error('Error cargando plantilla:', error);
-        sesion.sinPlantilla = true;
-        sesion.plantilla = null;
-        sesion.gruposInspeccion = [];
-        sesion.estado = 'ESPERANDO_FOTO_ODOMETRO';
+      await this._onExitoPlacaDefault(sesion, 'preoperacional', {
+        filtrarGrupos: function(grupos) {
+          return grupos.filter(function(g) { return !g.solo_panel; });
+        },
+        estadoSinMedicion: 'GRUPO'
+      });
+      if (sesion.estado === 'GRUPO') {
+        sesion.grupoActual = 0;
       }
     },
 
