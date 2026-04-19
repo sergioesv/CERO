@@ -26,14 +26,14 @@ function mensajeInicio() {
 
 function mensajeInicioPlaca() {
   return (
-    '📸 *Paso 1 de 2*\n' +
+    '📸 *Identificación del vehículo*\n' +
     PASOS_INICIALES.fotoPlaca +
     PIE_MENU
   );
 }
 
 function mensajeInicioOdometro(vehiculo) {
-  var msg = '📸 *Paso 2 de 2*\n' + PASOS_INICIALES.fotoOdometro;
+  var msg = '📸 *Lectura del odómetro*\n' + PASOS_INICIALES.fotoOdometro;
   if (vehiculo && (vehiculo.kilometraje || vehiculo.kilometraje === 0)) {
     msg += '\n\nÚltimo registrado: *' + vehiculo.kilometraje + ' km*';
   }

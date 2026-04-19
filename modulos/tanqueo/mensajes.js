@@ -16,7 +16,7 @@ function faltaFotoRecibo() {
 function inicio() {
   return (
     '⛽ *Registro de tanqueo*\n\n' +
-    '📸 *Paso 1 — Foto de la placa*\n' +
+    '📸 *Identificación del vehículo*\n' +
     'Envía una foto frontal donde la placa sea claramente visible.\n' +
     '_Buena luz, sin reflejos._' +
     PIE
@@ -52,7 +52,7 @@ function solicitarPlacaManual() {
 }
 
 function solicitarFotoOdometro(kmReferenciaMeta) {
-  var msg = '📸 *Paso 2 — Foto del odómetro*\n' +
+  var msg = '📸 *Lectura del odómetro*\n' +
     'Envía la foto del tablero donde se vea el kilometraje.';
   if (kmReferenciaMeta && typeof kmReferenciaMeta.kilometraje === 'number') {
     msg += '\n\n_Último registrado: *' + kmReferenciaMeta.kilometraje.toLocaleString('es-CO') + ' km*_';
