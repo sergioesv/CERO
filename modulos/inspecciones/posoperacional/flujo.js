@@ -317,13 +317,30 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
     return twiml.responderTwiml(res, mensajePlaca);
   }
 
+  // Manejar ODOMETRO_CONFIRMACION y ODOMETRO_MANUAL ANTES del compartido
+  // porque posop necesita ir a FOTO_ESTADO_GENERAL, no al siguiente estado del preop
+  if (sesion.estado === ESTADOS.ODOMETRO_CONFIRMACION) {
+    if (numMedia > 0 && mediaUrl) {
+      return await this._procesarFotoOdometro(res, sesion, mediaUrl);
+    }
+    return twiml.responderTwiml(res, await manejarConfirmacionKilometraje(sesion, mensaje));
+  }
+
+  if (sesion.estado === ESTADOS.ODOMETRO_MANUAL) {
+    if (mediaUrl) {
+      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
+      return await this._procesarFotoOdometro(res, sesion, mediaUrl);
+    }
+    return twiml.responderTwiml(res, await manejarKilometrajeManual(sesion, mensaje));
+  }
+
   var resultadoCompartido = await this.procesarEstadoCompartido(res, sesion, telefono, mensaje, mediaUrls);
   if (resultadoCompartido !== null) return resultadoCompartido;
 
   // Estados propios del posoperacional
   switch (sesion.estado) {
 
-    // Posop tiene su propio manejo de confirmación km
+    // Posop tiene su propio manejo de confirmación km — ya manejado arriba
     case ESTADOS.ODOMETRO_CONFIRMACION:
       if (numMedia > 0 && mediaUrl) {
         return await this._procesarFotoOdometro(res, sesion, mediaUrl);
