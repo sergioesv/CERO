@@ -125,10 +125,10 @@ const DESCRIPCIONES = {
   'public/modules/sedes.js':                                   'Modulo Sedes — gestion multi-sede',
   'public/modules/tanqueos.js':                                'Modulo Tanqueos del panel',
   'public/modules/usuarios.js':                                'Modulo Usuarios y roles del panel',
-  'public/modules/vehiculos/alertas.js':                       'Modulo Alertas — documentos y autorizaciones pendientes',
-  'public/modules/vehiculos/conductores.js':                   'Modulo Conductores del panel',
-  'public/modules/vehiculos/flota.js':                         'Modulo Flota — gestion de vehiculos con drawer de detalle',
-  'public/modules/vehiculos/preoperacionales.js':                'Modulo Preoperacionales — lista, filtros, drawer con autorizacion',
+  'public/modules/alertas.js':                                 'Modulo Alertas — documentos y autorizaciones pendientes',
+  'public/modules/conductores.js':                             'Modulo Conductores del panel',
+  'public/modules/flota.js':                                   'Modulo Flota — gestion de activos con drawer de detalle',
+  'public/modules/preoperacionales.js':                        'Modulo Preoperacionales — lista, filtros, drawer con autorizacion',
 
   // Frontend — paginas
   'public/index.html':                                         'Panel de administracion',

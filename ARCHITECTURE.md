@@ -262,14 +262,13 @@ Routes: `/` landing · `/login` auth · `/panel` admin panel
 │   │   ├── transitions.js  # Transiciones suaves entre páginas — fade-out/fade-in, intercepta links internos
 │   │   └── utils.js  # Helpers compartidos del frontend
 │   ├── modules
-│   │   ├── vehiculos
-│   │   │   ├── alertas.js  # Modulo Alertas — documentos y autorizaciones pendientes
-│   │   │   ├── conductores.js  # Modulo Conductores del panel
-│   │   │   ├── flota.js  # Modulo Flota — gestion de vehiculos con drawer de detalle
-│   │   │   └── preoperacionales.js  # Modulo Preoperacionales — lista, filtros, drawer con autorizacion
+│   │   ├── alertas.js  # Modulo Alertas — documentos y autorizaciones pendientes
+│   │   ├── conductores.js  # Modulo Conductores del panel
 │   │   ├── dashboard.js  # Modulo Dashboard — 4 pestanas, Indice de Seguridad Operativa
+│   │   ├── flota.js  # Modulo Flota — gestion de activos con drawer de detalle
 │   │   ├── plantillas.js
 │   │   ├── posoperacionales.js  # Modulo Posoperacionales del panel
+│   │   ├── preoperacionales.js  # Modulo Preoperacionales — lista, filtros, drawer con autorizacion
 │   │   ├── sedes.js  # Modulo Sedes — gestion multi-sede
 │   │   ├── tanqueos.js  # Modulo Tanqueos del panel
 │   │   └── usuarios.js  # Modulo Usuarios y roles del panel
