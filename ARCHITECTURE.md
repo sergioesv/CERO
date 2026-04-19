@@ -46,6 +46,280 @@ Field operations management SaaS via WhatsApp + AI.
 
 ---
 
+## Database — key tables (v26)
+
+> **v26 migration (19/04/2026):** tabla `vehiculos` eliminada. Todo opera sobre `activos`.
+> Inspecciones usan `activo_id` (UUID) en lugar de `vehiculo_placa` (string).
+> Respuestas de inspección son JSONB dinámico, no columnas hardcodeadas.
+
+| Table | Purpose |
+|---|---|
+| `activos` | Assets — plate, type, docs (JSONB), status, km |
+| `tipos_activo` | Asset types — vehiculo_liviano, grua, moto, maquina_estatica |
+| `plantillas_inspeccion` | Dynamic inspection templates per asset type |
+| `plantilla_grupos` | Groups within a template |
+| `plantilla_items` | Items within a group — with sub-questions |
+| `conductores` | Drivers — license, category, active |
+| `preoperacionales` | Pre-shift inspections — activo_id, respuestas JSONB, plantilla_id |
+| `posoperacionales` | Post-shift inspections — activo_id, plantilla_id |
+| `tanqueos` | Fueling records — activo_id, OCR score/tier, validation |
+| `autorizaciones_novedad` | Supervisor authorizations — activo_id |
+| `historial_estado_activo` | Asset state timeline — cambiado_por UUID or null |
+| `empresas / sedes / usuarios_panel` | Multi-company schema with audit fields |
+
+**Hierarchy:** Platform → Empresa → Sede → Usuario. Conductors operate across any sede.
+
+**Key rules:**
+- `activos.documentos` is JSONB — always merge, never overwrite: `{ soat_vencimiento, tecnomecanica_vencimiento }`
+- `activos.datos` is JSONB — vehicle metadata: `{ marca, modelo, tipo_vehiculo, anio }`
+- API GET `/api/activos` flattens both JSONB fields into root-level properties for frontend consumption
+- `historial_estado_activo.cambiado_por` must be a valid UUID or NULL — never a plain string
+- `plantillas.cargar()` returns a safe default `{ config: { medicion: 'km' }, grupos: [] }` when no template exists
+
+---
+
+## WhatsApp flow architecture
+
+Each module follows a class-based pattern extending `FlujoBase`:
+
+```
+modulos/inspecciones/compartido/
+├── baseFlujo.js      # Base class — Twilio validation, concurrency lock,
+│                     #   global nav (0=back, 9=menu), shared plate/odometer states
+├── twiml.js          # responderTwiml, escaparXml, firmaTwilioValida (single source)
+├── iniciadorFlujo.js # Factory — plate OCR + odometer OCR handlers
+├── kilometraje.js    # Shared km validation logic
+└── navegacion.js     # Menu text, esAtras(), esMenu(), PIE_NAV
+
+modulos/inspecciones/<module>/
+├── flujo.js          # Extends FlujoBase — only module-specific states
+├── estado.js         # State constants + session management
+├── mensajes.js       # All user-facing message templates
+├── validaciones.js   # Input validation (uses shared twiml.js)
+└── cierre.js         # Session close + PDF + notifications
+```
+
+**Critical pattern — state isolation:**
+When `onExitoPlaca` is called, `reiniciarDatosOperativos()` resets `sesion.vehiculo`
+and `sesion.conductor` to null. Always save and restore both before/after:
+
+```js
+onExitoPlaca: async function(sesion) {
+  var vehiculo = sesion.vehiculo;
+  var conductor = sesion.conductor;
+  estadoModulo.reiniciarDatosOperativos(sesion);
+  sesion.vehiculo = vehiculo;   // restore — reiniciar wipes this
+  sesion.conductor = conductor; // restore — reiniciar wipes this
+  // ... rest of logic
+}
+```
+
+**Critical pattern — state interception:**
+If a module needs custom handling for `ODOMETRO_CONFIRMACION`, it must intercept
+BEFORE calling `procesarEstadoCompartido`, otherwise `baseFlujo` handles it generically:
+
+```js
+async function procesarEstado(res, sesion, ...) {
+  // Handle module-specific states BEFORE shared handler
+  if (sesion.estado === ESTADOS.ODOMETRO_CONFIRMACION) { ... return; }
+  if (sesion.estado === ESTADOS.ODOMETRO_MANUAL) { ... return; }
+
+  var resultadoCompartido = await this.procesarEstadoCompartido(...);
+  if (resultadoCompartido !== null) return resultadoCompartido;
+  // ... module switch
+}
+```
+
+**UX rule:** max 2-minute flow. Single-number responses. `0` = back, `9` = main menu.
+
+---
+
+## Frontend pattern
+
+Each panel module splits into 4 objects:
+
+```js
+const ModuleAPI    = { ... }  // Fetch from API
+const ModuleLogic  = { ... }  // Business logic, data transforms
+const ModuleRender = { ... }  // HTML generation (strict Utils.escaparHTML)
+const Module = {
+  render()       // Orchestrate Drawer, Filters, Table
+  cargarDatos()  // Coordinate API → Logic → Render
+}
+```
+
+**Critical rules:**
+- API responses are flattened — read `row.soat_vencimiento`, NOT `row.documentos?.soat_vencimiento`
+- API PUT `/api/activos/:id` sends flat fields: `{ marca, soat_vencimiento, tecnomecanica_vencimiento }`, NOT `{ datos: {}, documentos: {} }`
+- State comparisons are case-insensitive: `datos.estado.toUpperCase() !== 'OK'`
+- `cambiado_por` must pass UUID validation before insert — strings like `'panel'` become `null`
+
+Routes: `/` landing · `/login` auth · `/panel` admin panel
+
+---
+
+## SOLID principles applied to CERO
+
+These principles govern every new file, module, and function in this codebase.
+
+**S — Single Responsibility**
+Each file has one job. `flujo.js` orchestrates state. `mensajes.js` formats text.
+`cierre.js` persists data. `estado.js` defines constants. Never mix these concerns.
+If a function does two things, split it.
+
+**O — Open/Closed**
+Add new inspection types by inserting rows in `plantillas_inspeccion`, `plantilla_grupos`,
+`plantilla_items` — zero code changes. The engine reads templates dynamically.
+New WhatsApp modules extend `FlujoBase`, never modify it.
+
+**L — Liskov Substitution**
+Any module extending `FlujoBase` must honor the base contract:
+- `procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrls)` must return a TwiML response
+- `inicializarSesion(sesion)` must set `sesion.tipo` and `sesion.estado`
+- `manejarAtras(res, sesion)` must return a TwiML response for every valid state
+
+**I — Interface Segregation**
+`data/` files expose only what their consumers need. `data/inspecciones.js` handles
+shared queries. `data/activos.js` handles asset state. Never import all of `data/activos.js`
+when you only need `obtenerActivoIdPorPlaca`.
+
+**D — Dependency Inversion**
+`cierre.js` depends on `data/` abstractions, not on Supabase directly.
+`flujo.js` depends on `servicios/plantillas.js`, not on `data/plantillas.js` directly.
+Route handlers depend on `data/` functions, not on raw `supabase` queries.
+Exception: `rutas/activos.js` uses supabase directly for simple CRUD — acceptable
+until a `data/activos.js` abstraction covers all cases.
+
+---
+
+## Multi-tenant rules (critical before second client)
+
+The architecture supports multiple companies. Before onboarding a second client:
+
+1. Every API endpoint must filter by `empresa_id` or `sede_id` from `req.usuario`
+2. `superadmin_plataforma` bypasses filters — sees all companies
+3. `admin_empresa` sees only their company's data
+4. RLS must be enabled in Supabase as defense-in-depth
+5. Test: log in as company B admin — must NOT see company A data
+
+Current gap: several dashboard queries do not filter by empresa_id. Audit required before client 2.
+
+---
+
+## Security — before production
+
+- [ ] RLS enabled in Supabase
+- [ ] Twilio webhook signature validation
+- [ ] Custom domain configured
+- [ ] All routes behind `verificarPermiso` middleware
+- [ ] No credentials in source code
+- [ ] Migrate onclick inline to addEventListener (CSP strict)
+- [ ] Audit all dashboard/panel queries for empresa_id filtering (multi-tenant)
+- [x] `.env` in `.gitignore` ✅
+- [x] Helmet active ✅
+- [x] Trust proxy = 1 (Railway) ✅
+- [x] Timing attack login fixed ✅
+- [x] bcrypt in all password flows ✅
+- [x] UUID validation on `cambiado_por` before historial insert ✅
+
+---
+
+## Pending before pilot
+
+| Item | Priority | Notes |
+|---|---|---|
+| Plantilla grúa (WDH689) | HIGH | Sin plantilla → preop falla para ese activo |
+| Limpieza BD y datos demo neutros | HIGH | Datos actuales son de prueba con nombres reales |
+| Ciclo completo conductor real | HIGH | Preop + posop + tanqueo mismo día verificado en panel |
+| RLS Supabase | MEDIUM | Antes de segundo cliente |
+| Audit empresa_id en queries | MEDIUM | Antes de segundo cliente |
+| Fix 10: sesiones WhatsApp race condition | MEDIUM | Necesario antes de flotas grandes |
+| Dominio propio | LOW | Antes de firma de contrato |
+
+---
+
+## Decision log (key decisions only)
+
+| Date | Decision | Reason |
+|---|---|---|
+| 19/04/2026 | Verificación post-migración v26 — 8 bugs encontrados y cerrados | Migración grande requiere prueba end-to-end antes de declarar completa |
+| 19/04/2026 | `plantillas.cargar()` retorna default en lugar de throw | Posop no requiere plantilla — el throw bloqueaba el flujo innecesariamente |
+| 19/04/2026 | PUT /api/activos acepta UUID o placa como parámetro | Frontend envía UUID, ruta esperaba placa — validación con UUID_REGEX |
+| 19/04/2026 | `cambiado_por` valida UUID antes de insert en historial | Strings 'panel'/'sistema' causaban error de tipo en PostgreSQL |
+| 19/04/2026 | `fotos_posoperacional` constraint ampliada a 6 tipos | Solo aceptaba 'odometro' y 'novedad' — faltaban estado_general, placa, factura, tablero |
+| 19/04/2026 | Columnas `plantilla_id` y `horometro` agregadas a `tanqueos` y `posoperacionales` | Schema no tenía estas columnas que el código intentaba insertar |
+| 18/04/2026 | Refactor flujos WhatsApp a clases (FlujoBase + herencia) | Eliminar código duplicado masivo (~50% reducción) |
+| 18/04/2026 | Centralizar TwiML en `compartido/twiml.js` | responderTwiml y escaparXml estaban copiados en 4 archivos |
+| 18/04/2026 | Factory pattern `iniciadorFlujo.js` para placa/km | Una sola implementación de OCR placa y odómetro para los 3 flujos |
+| 17/04/2026 | Rebranding a dialk — eliminar EDEMSA | Riesgo legal — EDEMSA no es cliente firmado |
+| 15/04/2026 | Frontend en 4 objetos (API/Logic/Render/Module) | Anti-XSS, separación de responsabilidades |
+| 14/04/2026 | Tanqueo v3 — OCR factura con score/tier/fallback | Validación cruzada 4 campos, antifraude |
+| 14/04/2026 | Refactor index.js — 925 → ~190 líneas | 6 archivos de rutas extraídos |
+| 10/04/2026 | ARCHITECTURE.md como fuente de verdad | Reemplaza archivos de sesión de diseño |
+| 19/04/2026 | v26 migration — tabla vehiculos eliminada, todo sobre activos | Modelo genérico para vehículos, grúas, motos, equipos |
+| 19/04/2026 | Plantillas dinámicas — plantillas_inspeccion + grupos + items | Agregar tipo inspección = insertar filas en BD, cero código nuevo |
+
+---
+
+## Cursor rules
+
+`rules.md` siempre activo. Para tareas específicas:
+
+| Tipo de tarea | Archivo adicional |
+|---|---|
+| Backend (rutas, data, servicios) | `.cursor/rules-backend.md` |
+| Frontend (public, CSS, HTML) | `.cursor/rules-frontend.md` |
+| WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
+
+<!-- AUTO-GENERATED START — no editar manualmente -->
+# CERO — Architecture
+
+Field operations management SaaS via WhatsApp + AI.
+**Tagline:** cero papel, cero accidentes
+**Regulatory framework:** PESV (Colombia road safety)
+**Deploy:** [cero-production.up.railway.app](https://cero-production.up.railway.app)
+
+> **Empresa:** dialk S.A.S. (en constitución). **Producto:** CERO.
+
+---
+
+## Stack
+
+| Layer | Technology | Version |
+|---|---|---|
+| Runtime | Node.js — CommonJS (`require`) | 20 |
+| Database | Supabase — PostgreSQL + Storage (São Paulo) | ^2.48.0 |
+| Deploy | Railway — auto-deploy from `desarrollo` | — |
+| WhatsApp | Twilio | ^5.3.5 |
+| AI | Google Gemini API — OCR + interpretation | ^0.21.0 |
+| PDF | PDFKit | ^0.15.1 |
+| Auth | JWT + bcrypt — 8h expiration | ^9.0.3 / ^3.0.3 |
+| HTTP security | Helmet | ^8.1.0 |
+| Frontend | HTML + CSS + JS — no frameworks, served by Express | — |
+| Scheduler | node-cron — daily document alerts | ^3.0.3 |
+
+**Rule:** never swap a technology without a documented technical reason.
+
+---
+
+## Repository & CI/CD
+
+- **Repo:** `sergioesv/CERO` (private) · **Main branch:** `desarrollo`
+- **Commit rule:** directly to `desarrollo` for fixes; new branch for complete new modules
+- **Workflows:** `backend.yml`, `frontend.yml`, `security.yml`, `update-architecture.yml` — all must pass before merge
+
+---
+
+## Project phases
+
+| Phase | Status |
+|---|---|
+| 1 — Vehicle control (WhatsApp inspections, fueling, alerts, registration, authorization v12) | ✅ COMPLETE |
+| 2 — Dashboard & admin panel (Flota, Preop, Alertas, Conductores, Posop, Tanqueos, Sedes, Usuarios) | ✅ COMPLETE |
+| 3 — Personnel safety (harness, ladder, ATS) | ⏳ FUTURE |
+
+---
+
 ## Database — key tables
 
 | Table | Purpose |
