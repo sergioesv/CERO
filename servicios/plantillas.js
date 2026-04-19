@@ -23,7 +23,15 @@ async function cargar(tipoActivoId, tipoInspeccion, empresaId) {
 
   var plantilla = await dataPlantillas.obtenerPlantillaActiva(tipoActivoId, tipoInspeccion, empresaId);
   if (!plantilla) {
-    throw new Error('No se encontró plantilla activa para el tipo de activo ' + tipoActivoId);
+    // Retornar config minimo por defecto - suficiente para flujos que solo leen config.medicion
+    var resultado = {
+      id: null,
+      nombre: 'Plantilla por defecto',
+      config: { medicion: 'km' },
+      grupos: []
+    };
+    cache[clave] = { timestamp: ahora, datos: resultado };
+    return resultado;
   }
 
   var grupos = await dataPlantillas.obtenerGruposEItems(plantilla.id);
