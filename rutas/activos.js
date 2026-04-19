@@ -156,17 +156,20 @@ router.get('/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), asyn
 // PUT /:placa — actualiza un activo
 router.put('/:placa', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
   try {
-    const placa = req.params.placa.toUpperCase();
+    const param = req.params.placa; // puede ser UUID o placa
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const esUuid = UUID_RE.test(param);
 
     // Obtener activo actual para merge de JSONB
     var resCurrent = await supabase
       .from('activos')
-      .select('id, datos, documentos')
-      .eq('placa', placa)
+      .select('id, placa, datos, documentos')
+      .eq(esUuid ? 'id' : 'placa', esUuid ? param : param.toUpperCase())
       .single();
 
     if (resCurrent.error) throw resCurrent.error;
     var activoId = resCurrent.data.id;
+    var placa = resCurrent.data.placa;
     var datosActuales = resCurrent.data.datos || {};
     var docsActuales = resCurrent.data.documentos || {};
 
