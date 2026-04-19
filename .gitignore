@@ -11,3 +11,6 @@ node_modules/
 *.pem
 *.key
 *_test*.pdf
+
+# Dumps tecnicos locales (generar: .\cero_powersell.ps1 -Modo whatsapp)
+CERO_dump_*.txt
