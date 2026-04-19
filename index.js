@@ -96,6 +96,9 @@ app.use('/api/preoperacionales', rutasPreoperacionales);
 const rutasAlertas = require('./rutas/alertas');
 app.use('/api/alertas', rutasAlertas);
 
+const rutasPlantillas = require('./rutas/plantillas');
+app.use('/api/plantillas', rutasPlantillas);
+
 // ───────────────────────────────────────────────────────────
 // DASHBOARD
 // ───────────────────────────────────────────────────────────
