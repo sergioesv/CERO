@@ -1,4 +1,4 @@
-var config = require('../../../config/config');
+var config = require('../../config/config');
 var preop = require('../inspecciones/preoperacional/validaciones');
 var twiml = require('../inspecciones/compartido/twiml');
 

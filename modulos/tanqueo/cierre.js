@@ -5,7 +5,7 @@
 
 'use strict';
 
-var tanqueosData = require('../../../data/tanqueos');
+var tanqueosData = require('../../data/tanqueos');
 var validaciones = require('./validaciones');
 
 /**

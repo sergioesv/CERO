@@ -5,8 +5,8 @@
 
 'use strict';
 
-var config       = require('../../../config/config');
-var sesiones     = require('../../../servicios/sesiones');
+var config       = require('../../config/config');
+var sesiones     = require('../../servicios/sesiones');
 var mensajes     = require('./mensajes');
 var validaciones = require('./validaciones');
 var estadoMod    = require('./estado');

@@ -9,9 +9,9 @@
 
 var FlujoBase  = require('../inspecciones/compartido/baseFlujo');
 var twiml      = require('../inspecciones/compartido/twiml');
-var storage    = require('../../../servicios/storage');
-var ocr        = require('../../../servicios/ocr');
-var sesiones   = require('../../../servicios/sesiones');
+var storage    = require('../../servicios/storage');
+var ocr        = require('../../servicios/ocr');
+var sesiones   = require('../../servicios/sesiones');
 var nav        = require('../inspecciones/compartido/navegacion');
 var validaciones = require('./validaciones');
 var estadoMod    = require('./estado');
