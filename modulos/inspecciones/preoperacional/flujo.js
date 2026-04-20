@@ -59,6 +59,10 @@ function crearFlujoPreoperacional() {
     mensajeKilometrajeFueraRango: mensajes.mensajeKilometrajeFueraRango,
     primerMensajeInspeccion: mensajes.primerMensajeInspeccion,
 
+    onKilometrajeConfirmado: async function(datosKm) {
+      return resolverKilometrajeConfirmadoPreoperacional(datosKm);
+    },
+
     onExitoPlaca: async function(sesion) {
       estadoPreop.reiniciarDatosOperativos(sesion);
       await this._onExitoPlacaDefault(sesion, 'preoperacional', {
@@ -73,45 +77,27 @@ function crearFlujoPreoperacional() {
     },
 
     onRegistrarKm: function(sesion, km, origen) {
-      kmCompartido.registrarKilometrajeConfirmado(sesion, km, origen, function(s, k, o) {
-        s.kilometraje = k;
-        storage.guardarFotoUnica(s, {
-          tipo: 'inicio_odometro', url: s.fotoOdometroTemporal,
-          descripcion: 'Foto del odometro', validacion: o, validada: true
-        });
-        s.kmDetectado = null;
-        s.kmLecturaFueraRango = false;
-        s.fotoOdometroTemporal = null;
-        if (s.sinPlantilla || !s.gruposInspeccion || !s.gruposInspeccion.length) {
-          return;
-        }
-        s.grupoActual = 0;
-        s.estado = 'GRUPO';
+      resolverKilometrajeConfirmadoPreoperacional({
+        sesion: sesion,
+        telefono: null,
+        kilometraje: km,
+        origen: origen,
+        alertas: [],
+        contexto: { fuente: 'legacy_registrar', prefijoMensaje: '' }
       });
     },
 
     onConfirmarKm: async function(res, sesion, telefono) {
-      if (sesion.sinPlantilla || !sesion.gruposInspeccion || !sesion.gruposInspeccion.length) {
-        if (telefono) sesiones.eliminarSesion(telefono);
-        return twiml.responderTwiml(res, mensajes.mensajeSinPlantillaInspeccion());
-      }
-      kmCompartido.registrarKilometrajeConfirmado(
-        sesion, sesion.kmDetectado,
-        'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',
-        function(s, k, o) {
-          s.kilometraje = k;
-          storage.guardarFotoUnica(s, {
-            tipo: 'inicio_odometro', url: s.fotoOdometroTemporal,
-            descripcion: 'Foto del odometro', validacion: o, validada: true
-          });
-          s.kmDetectado = null;
-          s.kmLecturaFueraRango = false;
-          s.fotoOdometroTemporal = null;
-          s.grupoActual = 0;
-          s.estado = 'GRUPO';
-        }
-      );
-      return twiml.responderTwiml(res, mensajes.primerMensajeInspeccion(sesion, sesion.gruposInspeccion));
+      var resultado = resolverKilometrajeConfirmadoPreoperacional({
+        res: res,
+        sesion: sesion,
+        telefono: telefono,
+        kilometraje: sesion.kmDetectado,
+        origen: 'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',
+        alertas: [],
+        contexto: { fuente: 'legacy_confirmar', prefijoMensaje: '' }
+      });
+      return twiml.responderTwiml(res, resultado.userMessage);
     }
   });
 
@@ -136,6 +122,53 @@ function avanzarDespuesDeInspeccion(res, sesion, prefijo) {
   var resumen = preop.generarResumen(sesion, sesion.gruposInspeccion);
   var mensaje = (prefijo ? prefijo + '\n\n' : '') + resumen + '\n\n' + mensajes.mensajeFotoNovedad(sesion, estadoPreop.prepararFotosNovedad);
   return twiml.responderTwiml(res, mensaje);
+}
+
+function resolverKilometrajeConfirmadoPreoperacional(datosKm) {
+  var sesion = datosKm.sesion;
+  var telefono = datosKm.telefono;
+  var contexto = datosKm.contexto || {};
+  var prefijo = contexto.prefijoMensaje || '';
+  var sinPlantilla = sesion.sinPlantilla || !sesion.gruposInspeccion || !sesion.gruposInspeccion.length;
+
+  if (sinPlantilla) {
+    if (telefono) sesiones.eliminarSesion(telefono);
+    return {
+      ok: false,
+      code: 'KM_NO_TEMPLATE',
+      userMessage: prefijo + mensajes.mensajeSinPlantillaInspeccion(),
+      payload: {
+        kilometraje: datosKm.kilometraje,
+        estadoSiguiente: sesion.estado
+      }
+    };
+  }
+
+  kmCompartido.registrarKilometrajeConfirmado(sesion, datosKm.kilometraje, datosKm.origen, function(s, k, o) {
+    s.kilometraje = k;
+    storage.guardarFotoUnica(s, {
+      tipo: 'inicio_odometro',
+      url: s.fotoOdometroTemporal,
+      descripcion: 'Foto del odometro',
+      validacion: o,
+      validada: true
+    });
+    s.kmDetectado = null;
+    s.kmLecturaFueraRango = false;
+    s.fotoOdometroTemporal = null;
+    s.grupoActual = 0;
+    s.estado = 'GRUPO';
+  });
+
+  return {
+    ok: true,
+    code: datosKm.alertas && datosKm.alertas.length ? 'KM_RECORDED_WITH_ALERT' : 'KM_RECORDED',
+    userMessage: prefijo + mensajes.primerMensajeInspeccion(sesion, sesion.gruposInspeccion),
+    payload: {
+      kilometraje: datosKm.kilometraje,
+      estadoSiguiente: 'GRUPO'
+    }
+  };
 }
 
 // ============================================================================

@@ -35,6 +35,7 @@ var config         = require('../../../config/config');
  * @param {Function} [opciones.onExitoPlaca]      — fn(sesion) callback tras placa exitosa
  * @param {Function} [opciones.onRegistrarKm]     — fn(sesion, km, origen) registrar km confirmado
  * @param {Function} [opciones.onConfirmarKm]     — fn(res, sesion, telefono) tras confirmar km OCR
+ * @param {Function} [opciones.onKilometrajeConfirmado] — fn({res, sesion, telefono, kilometraje, origen, alertas, contexto})
  * @param {string}   [opciones.estadoEsperandoFotoPlaca] — estado tras inicializar (default ESTADOS.ESPERANDO_FOTO_PLACA)
  * @param {Function} [opciones.procesarLecturaPos] — Solo posoperacional: procesar lectura custom
  */
@@ -51,6 +52,8 @@ function FlujoBase(opciones) {
   this._onExitoPlaca                 = opciones.onExitoPlaca || null;
   this._onRegistrarKm                = opciones.onRegistrarKm || null;
   this._onConfirmarKm                = opciones.onConfirmarKm || null;
+  this._onKilometrajeConfirmado      = opciones.onKilometrajeConfirmado || null;
+  this._politicaKilometraje          = opciones.politicaKilometraje || null;
   this._estadoEsperandoFotoPlaca     = opciones.estadoEsperandoFotoPlaca || null;
 
   // Crear manejadores de placa y odómetro con factory
@@ -59,13 +62,22 @@ function FlujoBase(opciones) {
   var mensajes = this.mensajes;
   var validaciones = this.validaciones;
 
-  this._manejarPlaca = iniciadorFlujo.crearManejadorPlaca({
+  this._manejarPlacaResultado = iniciadorFlujo.crearManejadorPlaca({
     ESTADOS: ESTADOS,
     mensajes: mensajes,
     validaciones: validaciones,
     tipoFlujo: this.tipo,
     mensajeConfirmacion: opciones.mensajeConfirmacionPlaca
   });
+
+  // Adaptador temporal: mantiene compatibilidad con caminos legacy
+  // que todavía esperan un string en lugar de resultado estructurado.
+  this._manejarPlaca = async function(sesion, telefono, mensajePlaca) {
+    var resultado = self._normalizarResultadoPlaca(
+      await self._manejarPlacaResultado(sesion, telefono, mensajePlaca)
+    );
+    return resultado.userMessage;
+  };
 
   this._procesarFotoPlaca = iniciadorFlujo.crearProcesadorFotoPlaca({
     ESTADOS: ESTADOS,
@@ -74,7 +86,7 @@ function FlujoBase(opciones) {
       mensajeFallbackPlaca: mensajes.mensajeFallbackPlaca || mensajes.fallbackPlaca
     },
     validaciones: validaciones,
-    manejarPlacaCompartido: this._manejarPlaca,
+    manejarPlacaCompartido: this._manejarPlacaResultado,
     tipoFotoPlaca: this.tipoFotoPlaca,
     onExitoPlaca: opciones.onExitoPlaca || null,
     contextoFlujo: self
@@ -197,8 +209,10 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
           return twiml.responderTwiml(res, msjSugerida(sesion));
         }
         var fotoSug = sesion.fotoPlacaTemporal;
-        var mensajeSug = await this._manejarPlaca(sesion, telefono, sesion.placaSugerida);
-        var esExito = this._esRespuestaExito(mensajeSug);
+        var resultadoSug = this._normalizarResultadoPlaca(
+          await this._manejarPlacaResultado(sesion, telefono, sesion.placaSugerida)
+        );
+        var esExito = resultadoSug.ok && resultadoSug.code === 'PLATE_CONFIRMED';
         if (esExito) {
           if (this._onExitoPlaca) await this._onExitoPlaca.call(this, sesion);
           if (fotoSug) {
@@ -212,12 +226,16 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
             });
           }
           sesion.placaOcrFoto = sesion.placaSugerida;
-          return twiml.responderTwiml(res, mensajeSug);
+          return twiml.responderTwiml(res, resultadoSug.userMessage);
         }
-        if (this._esVehiculoBloqueado(mensajeSug)) {
-          return twiml.responderTwiml(res, mensajeSug);
+        if (resultadoSug.code === 'PLATE_BLOCKED') {
+          return twiml.responderTwiml(res, resultadoSug.userMessage);
         }
-        return twiml.responderTwiml(res, mensajeSug || (this.mensajes.mensajeConfirmacionPlacaSugerida || this.mensajes.confirmarPlacaSugerida)(sesion));
+        return twiml.responderTwiml(
+          res,
+          resultadoSug.userMessage ||
+            (this.mensajes.mensajeConfirmacionPlacaSugerida || this.mensajes.confirmarPlacaSugerida)(sesion)
+        );
       }
       if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
         var estadoFoto = this._estadoEsperandoFotoPlaca ||
@@ -264,8 +282,10 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
       }
 
       var fotoPlacaManual = sesion.fotoPlacaTemporal;
-      var mensajeInicio = await this._manejarPlaca(sesion, telefono, placaManual);
-      var esExitoManual = this._esRespuestaExito(mensajeInicio);
+      var resultadoManual = this._normalizarResultadoPlaca(
+        await this._manejarPlacaResultado(sesion, telefono, placaManual)
+      );
+      var esExitoManual = resultadoManual.ok && resultadoManual.code === 'PLATE_CONFIRMED';
       if (esExitoManual) {
         if (this._onExitoPlaca) await this._onExitoPlaca.call(this, sesion);
         if (fotoPlacaManual) {
@@ -279,7 +299,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
         }
         sesion.placaOcrFoto = placaManual;
       }
-      return twiml.responderTwiml(res, mensajeInicio);
+      return twiml.responderTwiml(res, resultadoManual.userMessage);
 
     // ── FOTO ODÓMETRO ───────────────────────────────────────
     case ESTADOS.ESPERANDO_FOTO_ODOMETRO:
@@ -312,7 +332,7 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
   var ESTADOS = this.ESTADOS;
   var mensajes = this.mensajes;
 
-  return await kmCompartido.manejarConfirmacionOdometro(
+  var resultado = await kmCompartido.manejarConfirmacionOdometro(
     res, sesion, mensaje, numMedia, mediaUrls,
     {
       mensajesModulo: {
@@ -349,16 +369,28 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
       onConfirmarPreoperacional: async function(r, s, tel) {
         if (self._onConfirmarKm) return self._onConfirmarKm(r, s, tel);
         return self._confirmarKmDefault(r, s);
+      },
+      onKilometrajeConfirmado: self._onKilometrajeConfirmado
+        ? async function(data) {
+          return self._onKilometrajeConfirmado(data);
+        }
+        : null,
+      politicaKilometraje: self._politicaKilometraje,
+      contextoFlujo: {
+        tipoFlujo: self.tipo,
+        etapa: 'confirmacion_km'
       }
     }
   );
+
+  return this._resolverResultadoKilometraje(res, resultado);
 };
 
 FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, mensaje, numMedia, mediaUrls) {
   var self = this;
   var mensajes = this.mensajes;
 
-  return await kmCompartido.manejarOdometroManual(
+  var resultado = await kmCompartido.manejarOdometroManual(
     res, sesion, mensaje,
     {
       mensajeConfirmacionOdometro: mensajes.mensajeConfirmacionOdometro || mensajes.confirmarKmOcr,
@@ -387,9 +419,21 @@ FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, men
       esOpcion: nav.esOpcion,
       registrarKilometrajePreoperacional: self._onRegistrarKm || function(s, km, origen) {
         self._registrarKmDefault(s, km, origen);
+      },
+      onKilometrajeConfirmado: self._onKilometrajeConfirmado
+        ? async function(data) {
+          return self._onKilometrajeConfirmado(data);
+        }
+        : null,
+      politicaKilometraje: self._politicaKilometraje,
+      contextoFlujo: {
+        tipoFlujo: self.tipo,
+        etapa: 'km_manual'
       }
     }
   );
+
+  return this._resolverResultadoKilometraje(res, resultado);
 };
 
 // ============================================================================
@@ -402,6 +446,59 @@ FlujoBase.prototype._esRespuestaExito = function(msg) {
 
 FlujoBase.prototype._esVehiculoBloqueado = function(msg) {
   return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg)); // 🚫
+};
+
+FlujoBase.prototype._normalizarResultadoPlaca = function(resultado) {
+  if (resultado && typeof resultado === 'object' && typeof resultado.userMessage === 'string') {
+    return {
+      ok: !!resultado.ok,
+      code: resultado.code || (resultado.ok ? 'PLATE_CONFIRMED' : 'PLATE_RETRY'),
+      userMessage: resultado.userMessage,
+      payload: resultado.payload || null
+    };
+  }
+  if (typeof resultado === 'string') {
+    var esExito = this._esRespuestaExito(resultado);
+    var esBloqueado = this._esVehiculoBloqueado(resultado);
+    if (esExito) {
+      return { ok: true, code: 'PLATE_CONFIRMED', userMessage: resultado, payload: null };
+    }
+    if (esBloqueado) {
+      return { ok: false, code: 'PLATE_BLOCKED', userMessage: resultado, payload: null };
+    }
+    return { ok: false, code: 'PLATE_RETRY', userMessage: resultado, payload: null };
+  }
+  return { ok: false, code: 'PLATE_RETRY', userMessage: '', payload: null };
+};
+
+FlujoBase.prototype._normalizarResultadoKilometraje = function(resultado) {
+  if (typeof kmCompartido.normalizarResultadoKm === 'function') {
+    return kmCompartido.normalizarResultadoKm(resultado);
+  }
+  if (resultado && typeof resultado === 'object' && typeof resultado.userMessage === 'string') {
+    return {
+      ok: !!resultado.ok,
+      code: resultado.code || (resultado.ok ? 'KM_CONFIRMED' : 'KM_RETRY'),
+      userMessage: resultado.userMessage,
+      payload: resultado.payload || null
+    };
+  }
+  if (typeof resultado === 'string') {
+    return { ok: false, code: 'KM_LEGACY_STRING', userMessage: resultado, payload: null };
+  }
+  return { ok: false, code: 'KM_RETRY', userMessage: '', payload: null };
+};
+
+FlujoBase.prototype._resolverResultadoKilometraje = function(res, resultado) {
+  var normalizado = this._normalizarResultadoKilometraje(resultado);
+  if (
+    normalizado.code === 'KM_DELEGATED_RESPONSE' &&
+    normalizado.payload &&
+    normalizado.payload.response
+  ) {
+    return normalizado.payload.response;
+  }
+  return twiml.responderTwiml(res, normalizado.userMessage);
 };
 
 /** Mensaje por defecto tras confirmar km. Sobreescribir en hijos. */

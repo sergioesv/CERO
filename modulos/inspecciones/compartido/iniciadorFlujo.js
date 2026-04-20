@@ -12,6 +12,29 @@ var kmCompartido = require('./kilometraje');
 var ocr = require('../../../servicios/ocr');
 var storage = require('../../../servicios/storage');
 
+function crearResultadoPlaca(ok, code, userMessage, payload) {
+  return {
+    ok: !!ok,
+    code: code || (ok ? 'PLATE_CONFIRMED' : 'PLATE_RETRY'),
+    userMessage: String(userMessage || ''),
+    payload: payload || null
+  };
+}
+
+function normalizarResultadoPlaca(resultado) {
+  if (resultado && typeof resultado === 'object' && typeof resultado.userMessage === 'string') {
+    return crearResultadoPlaca(resultado.ok, resultado.code, resultado.userMessage, resultado.payload);
+  }
+  if (typeof resultado === 'string') {
+    var esExito = resultado.length > 0 && resultado.charCodeAt(0) === 0x2705; // ✅
+    var esBloqueado = (resultado.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(resultado)); // 🚫
+    if (esExito) return crearResultadoPlaca(true, 'PLATE_CONFIRMED', resultado, null);
+    if (esBloqueado) return crearResultadoPlaca(false, 'PLATE_BLOCKED', resultado, null);
+    return crearResultadoPlaca(false, 'PLATE_RETRY', resultado, null);
+  }
+  return crearResultadoPlaca(false, 'PLATE_RETRY', '', null);
+}
+
 /**
  * Crea manejador de placa configurado para un flujo específico.
  *
@@ -39,19 +62,34 @@ function crearManejadorPlaca(opciones) {
     // 1. Normalizar placa
     var placa = validaciones.normalizarPlaca(mensaje);
     if (!placa) {
-      return 'Escribe la placa sin espacios.\nEjemplo: *ABC123*';
+      return crearResultadoPlaca(
+        false,
+        'PLATE_INPUT_REQUIRED',
+        'Escribe la placa sin espacios.\nEjemplo: *ABC123*',
+        null
+      );
     }
 
     // 2. Validar formato si se proveyó validador
     if (validadorFormato && !validadorFormato(placa)) {
-      return '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*';
+      return crearResultadoPlaca(
+        false,
+        'PLATE_INVALID_FORMAT',
+        '\u26A0\uFE0F Formato de placa inválido.\nEjemplo: *ABC123*',
+        { placa: placa }
+      );
     }
 
     // 3. Buscar activo y conductor (función combinada)
     var carga = await activosData.cargarActivoYConductor(placa, telefono);
     if (carga.error || !carga.vehiculo) {
       console.log('[iniciadorFlujo] Activo no encontrado: ' + placa);
-      return 'Vehículo *' + placa + '* no encontrado.\n\nVerifica la placa y vuelve a intentarlo.';
+      return crearResultadoPlaca(
+        false,
+        'PLATE_NOT_FOUND',
+        'Vehículo *' + placa + '* no encontrado.\n\nVerifica la placa y vuelve a intentarlo.',
+        { placa: placa }
+      );
     }
 
     var vehiculo = carga.vehiculo;
@@ -60,15 +98,25 @@ function crearManejadorPlaca(opciones) {
     // 4. Validar no bloqueado
     if (vehiculo.bloqueado) {
       console.log('[iniciadorFlujo] Vehículo bloqueado: ' + placa);
-      return '\uD83D\uDEAB Vehículo *' + placa + '* bloqueado.\nMotivo: ' +
-        (vehiculo.motivo_bloqueo || 'Requiere autorización') +
-        '\n\nContacta al supervisor.';
+      return crearResultadoPlaca(
+        false,
+        'PLATE_BLOCKED',
+        '\uD83D\uDEAB Vehículo *' + placa + '* bloqueado.\nMotivo: ' +
+          (vehiculo.motivo_bloqueo || 'Requiere autorización') +
+          '\n\nContacta al supervisor.',
+        { placa: placa, vehiculoId: vehiculo.id }
+      );
     }
 
     // 5. Validar conductor encontrado
     if (!conductor) {
       console.log('[iniciadorFlujo] Conductor no encontrado: ' + telefono);
-      return '\u26A0\uFE0F Tu número no está registrado como conductor.\n\nContacta al administrador.';
+      return crearResultadoPlaca(
+        false,
+        'PLATE_DRIVER_NOT_FOUND',
+        '\u26A0\uFE0F Tu número no está registrado como conductor.\n\nContacta al administrador.',
+        { placa: placa }
+      );
     }
 
     // 6. Obtener referencia de kilometraje (usando activo_id)
@@ -89,7 +137,17 @@ function crearManejadorPlaca(opciones) {
     console.log('[iniciadorFlujo] Placa confirmada: ' + placa + ' -> estado: ' + estadoSiguiente);
 
     // 9. Retornar mensaje de confirmación
-    return mensajeConfirmacion(vehiculo, refKm);
+    return crearResultadoPlaca(
+      true,
+      'PLATE_CONFIRMED',
+      mensajeConfirmacion(vehiculo, refKm),
+      {
+        placa: placa,
+        vehiculoId: vehiculo.id,
+        conductorId: conductor.id || null,
+        kmReferencia: refKm.kilometraje
+      }
+    );
   };
 }
 
@@ -161,21 +219,15 @@ function crearProcesadorFotoPlaca(opciones) {
   var validaciones = opciones.validaciones;
   var manejarPlacaCompartido = opciones.manejarPlacaCompartido;
 
-  function respuestaExitoAlIniciarPlaca(msg) {
-    return typeof msg === 'string' && msg.length > 0 && msg.charCodeAt(0) === 0x2705;
-  }
-
-  function respuestaVehiculoBloqueadoPlaca(msg) {
-    return typeof msg === 'string' && (msg.indexOf('\uD83D\uDEAB') !== -1 || /bloqueado/i.test(msg));
-  }
-
   return async function(res, sesion, telefono, fotoUrl) {
     var lecturaPlaca = await ocr.extraerPlacaFoto(fotoUrl);
     var placaDetectada = validaciones.normalizarPlaca(lecturaPlaca.placa || '');
 
     if (lecturaPlaca.valida && placaDetectada) {
-      var mensajeInicio = await manejarPlacaCompartido(sesion, telefono, placaDetectada);
-      if (respuestaExitoAlIniciarPlaca(mensajeInicio)) {
+      var resultadoPlaca = normalizarResultadoPlaca(
+        await manejarPlacaCompartido(sesion, telefono, placaDetectada)
+      );
+      if (resultadoPlaca.ok && resultadoPlaca.code === 'PLATE_CONFIRMED') {
         if (typeof opciones.onExitoPlaca === 'function') {
           await opciones.onExitoPlaca.call(opciones.contextoFlujo, sesion);
         }
@@ -187,10 +239,10 @@ function crearProcesadorFotoPlaca(opciones) {
           validada: true
         });
         sesion.placaOcrFoto = placaDetectada; // Para tanqueo o uso futuro
-        return validaciones.responderTwiml(res, mensajeInicio);
+        return validaciones.responderTwiml(res, resultadoPlaca.userMessage);
       }
-      if (respuestaVehiculoBloqueadoPlaca(mensajeInicio)) {
-        return validaciones.responderTwiml(res, mensajeInicio);
+      if (resultadoPlaca.code === 'PLATE_BLOCKED') {
+        return validaciones.responderTwiml(res, resultadoPlaca.userMessage);
       }
     }
 
