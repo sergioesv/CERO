@@ -54,6 +54,25 @@ if (!SUPABASE_URL.includes('supabase.co')) {
   process.exit(1);
 }
 
+// ═══════════════════════════════════════════════════════════
+// TIMEOUTS DE SESIÓN WHATSAPP
+// ═══════════════════════════════════════════════════════════
+// Tras TIMEOUT_FLUJO_MS sin actividad, la sesión se marca EXPIRADA_RECUPERABLE.
+// El usuario tiene TIMEOUT_RECUPERACION_MS adicionales para elegir "continuar"
+// o "reiniciar"; pasado ese tiempo la sesión se purga definitivamente.
+
+const UN_MINUTO_MS = 60 * 1000;
+
+const TIMEOUT_FLUJO_MS = {
+  preoperacional: 30 * UN_MINUTO_MS,
+  posoperacional: 30 * UN_MINUTO_MS,
+  tanqueo:        10 * UN_MINUTO_MS,
+  inscripcion:    30 * UN_MINUTO_MS,
+  default:        30 * UN_MINUTO_MS
+};
+
+const TIMEOUT_RECUPERACION_MS = 5 * UN_MINUTO_MS;
+
 const TABLES = {
   activos: clean(process.env.DB_TABLE_ACTIVOS || 'activos'),
   conductores: clean(process.env.DB_TABLE_CONDUCTORES || 'conductores'),
@@ -116,5 +135,7 @@ module.exports = {
   MAX_KM_SALTO,
   STORAGE_BUCKET_PREOPERACIONALES,
   TABLES,
+  TIMEOUT_FLUJO_MS,
+  TIMEOUT_RECUPERACION_MS,
   jwtSecret
 };

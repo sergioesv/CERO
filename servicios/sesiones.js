@@ -3,11 +3,17 @@ var config = require('../config/config');
 var sesiones = new Map();
 var procesando = new Map(); // FIX: se reemplaza el Set por un Map con timestamp para liberar bloqueos vencidos.
 
-var TIMEOUT_MS = 30 * 60 * 1000;
 var LOCK_TIMEOUT_MS = 5 * 60 * 1000; // FIX: timeout de bloqueo para evitar sesiones eternamente bloqueadas si un flujo async no libera.
 var SESSIONES_TABLE = config.TABLES.sesionesActivas; // FIX: usa la configuracion centralizada para la tabla de sesiones activas.
 var persistenciaEnCadena = Promise.resolve(); // FIX: cola serializada para evitar carreras entre escrituras concurrentes en Supabase.
 var cargasPendientes = new Map(); // FIX: evita lecturas duplicadas de la misma sesion cuando se carga desde Supabase.
+
+function timeoutFlujo(sesion) {
+  // FIX: cada tipo de flujo tiene su propio timeout (ej: tanqueo = 10 min, resto = 30 min).
+  var tabla = config.TIMEOUT_FLUJO_MS || {};
+  if (sesion && sesion.tipo && typeof tabla[sesion.tipo] === 'number') return tabla[sesion.tipo];
+  return tabla.default || (30 * 60 * 1000);
+}
 
 function crearSesionBase() {
   return {
@@ -118,7 +124,7 @@ async function cargarSesionDesdeSupabase(telefono) {
     }
 
     var sesion = normalizarSesion(resultado.data.datos);
-    if (Date.now() - sesion.ultimaActividad > TIMEOUT_MS) {
+    if (Date.now() - sesion.ultimaActividad > timeoutFlujo(sesion)) {
       // FIX: si la sesion persistida ya vencio, se elimina en Supabase y no se reutiliza.
       await eliminarSesionPersistida(telefono);
       return null;
@@ -154,7 +160,7 @@ function expirarSiCorresponde(telefono) {
   if (!sesiones.has(telefono)) return;
 
   var sesion = sesiones.get(telefono);
-  if (Date.now() - sesion.ultimaActividad > TIMEOUT_MS) {
+  if (Date.now() - sesion.ultimaActividad > timeoutFlujo(sesion)) {
     sesiones.delete(telefono);
     procesando.delete(telefono);
     // FIX: al expirar en memoria tambien se agenda la eliminacion en Supabase.
@@ -224,7 +230,7 @@ var intervaloLimpieza = setInterval(function() {
   var desbloqueadas = 0;
 
   sesiones.forEach(function(sesion, telefono) {
-    if (ahora - sesion.ultimaActividad > TIMEOUT_MS) {
+    if (ahora - sesion.ultimaActividad > timeoutFlujo(sesion)) {
       sesiones.delete(telefono);
       procesando.delete(telefono);
       eliminadas++;
