@@ -15,6 +15,19 @@ function timeoutFlujo(sesion) {
   return tabla.default || (30 * 60 * 1000);
 }
 
+function ventanaRecuperacion() {
+  return config.TIMEOUT_RECUPERACION_MS || (5 * 60 * 1000);
+}
+
+function esSesionRecuperable(sesion) {
+  // FIX: la inscripcion son pocos pasos — no se recupera, se reinicia limpia.
+  // Sesiones sin tipo o en INICIO tampoco tienen progreso que valga la pena preservar.
+  if (!sesion || !sesion.tipo) return false;
+  if (sesion.tipo === 'inscripcion') return false;
+  if (!sesion.estado || sesion.estado === 'INICIO') return false;
+  return true;
+}
+
 function crearSesionBase() {
   return {
     estado: 'INICIO',
@@ -34,7 +47,8 @@ function crearSesionBase() {
     fotosNovedadPendientes: [],
     observacion: null,
     grupoActual: 0,
-    ultimaActividad: Date.now()
+    ultimaActividad: Date.now(),
+    expirada: false
   };
 }
 
@@ -52,6 +66,7 @@ function normalizarSesion(data) {
   if (!sesion.fotoPlacaTemporal) sesion.fotoPlacaTemporal = null;
   if (!sesion.fotoOdometroTemporal) sesion.fotoOdometroTemporal = null;
   if (!sesion.ultimaActividad) sesion.ultimaActividad = Date.now();
+  if (typeof sesion.expirada !== 'boolean') sesion.expirada = false;
   return sesion;
 }
 
@@ -124,10 +139,18 @@ async function cargarSesionDesdeSupabase(telefono) {
     }
 
     var sesion = normalizarSesion(resultado.data.datos);
-    if (Date.now() - sesion.ultimaActividad > timeoutFlujo(sesion)) {
-      // FIX: si la sesion persistida ya vencio, se elimina en Supabase y no se reutiliza.
-      await eliminarSesionPersistida(telefono);
-      return null;
+    var inactividad = Date.now() - sesion.ultimaActividad;
+    var timeout = timeoutFlujo(sesion);
+
+    if (inactividad > timeout) {
+      // FIX: dentro de la ventana de recuperacion se restaura marcada como expirada
+      // para que el canal pueda ofrecer "continuar" o "reiniciar". Fuera de esa ventana,
+      // o si el tipo no es recuperable (ej: inscripcion), se purga definitivamente.
+      if (!esSesionRecuperable(sesion) || inactividad > timeout + ventanaRecuperacion()) {
+        await eliminarSesionPersistida(telefono);
+        return null;
+      }
+      sesion.expirada = true;
     }
 
     sesiones.set(telefono, sesion);
@@ -160,12 +183,27 @@ function expirarSiCorresponde(telefono) {
   if (!sesiones.has(telefono)) return;
 
   var sesion = sesiones.get(telefono);
-  if (Date.now() - sesion.ultimaActividad > timeoutFlujo(sesion)) {
-    sesiones.delete(telefono);
-    procesando.delete(telefono);
-    // FIX: al expirar en memoria tambien se agenda la eliminacion en Supabase.
-    eliminarSesionPersistida(telefono);
+  var inactividad = Date.now() - sesion.ultimaActividad;
+  var timeout = timeoutFlujo(sesion);
+
+  if (inactividad <= timeout) return;
+
+  if (esSesionRecuperable(sesion) && inactividad <= timeout + ventanaRecuperacion()) {
+    // FIX: dentro de la ventana de recuperacion se preservan los datos y solo se marca la sesion.
+    // El canal detecta el flag y ofrece al usuario continuar o reiniciar.
+    // Se libera el bloqueo huerfano para evitar que el mensaje de recuperacion quede encolado.
+    if (!sesion.expirada) {
+      sesion.expirada = true;
+      procesando.delete(telefono);
+      persistirSnapshotSesiones();
+    }
+    return;
   }
+
+  // FIX: fuera de la ventana de recuperacion (o tipo no recuperable) se purga definitivamente.
+  sesiones.delete(telefono);
+  procesando.delete(telefono);
+  eliminarSesionPersistida(telefono);
 }
 
 async function obtenerSesion(telefono) {
@@ -179,7 +217,22 @@ async function obtenerSesion(telefono) {
   }
 
   var sesion = sesiones.get(telefono);
+  // FIX: entrar en la ventana de recuperacion NO cuenta como actividad.
+  // Solo el canal, al confirmar "continuar", reactiva la sesion limpiando el flag.
+  if (!sesion.expirada) {
+    sesion.ultimaActividad = Date.now();
+  }
+  return sesion;
+}
+
+function reactivarSesion(telefono) {
+  // FIX: invocado por el canal cuando el usuario elige "continuar" tras una expiracion.
+  // Limpia el flag y refresca la marca de actividad para reanudar la sesion en el mismo estado.
+  if (!sesiones.has(telefono)) return null;
+  var sesion = sesiones.get(telefono);
+  sesion.expirada = false;
   sesion.ultimaActividad = Date.now();
+  persistirSnapshotSesiones();
   return sesion;
 }
 
@@ -227,15 +280,30 @@ function guardarCambios() {
 var intervaloLimpieza = setInterval(function() {
   var ahora = Date.now();
   var eliminadas = 0;
+  var marcadas = 0;
   var desbloqueadas = 0;
 
   sesiones.forEach(function(sesion, telefono) {
-    if (ahora - sesion.ultimaActividad > timeoutFlujo(sesion)) {
-      sesiones.delete(telefono);
-      procesando.delete(telefono);
-      eliminadas++;
-      eliminarSesionPersistida(telefono);
+    var inactividad = ahora - sesion.ultimaActividad;
+    var timeout = timeoutFlujo(sesion);
+
+    if (inactividad <= timeout) return;
+
+    if (esSesionRecuperable(sesion) && inactividad <= timeout + ventanaRecuperacion()) {
+      // FIX: todavia dentro de la ventana de recuperacion — solo marcar, preservar datos.
+      if (!sesion.expirada) {
+        sesion.expirada = true;
+        procesando.delete(telefono);
+        marcadas++;
+      }
+      return;
     }
+
+    // FIX: fuera de ventana o no recuperable — purga definitiva.
+    sesiones.delete(telefono);
+    procesando.delete(telefono);
+    eliminadas++;
+    eliminarSesionPersistida(telefono);
   });
 
   procesando.forEach(function(inicioBloqueo, telefono) {
@@ -246,9 +314,16 @@ var intervaloLimpieza = setInterval(function() {
     }
   });
 
-  if (eliminadas > 0) {
+  if (eliminadas > 0 || marcadas > 0) {
     guardarCambios();
-    console.log('Limpieza: ' + eliminadas + ' sesion(es) expirada(s)');
+  }
+
+  if (eliminadas > 0) {
+    console.log('Limpieza: ' + eliminadas + ' sesion(es) purgada(s)');
+  }
+
+  if (marcadas > 0) {
+    console.log('Limpieza: ' + marcadas + ' sesion(es) marcada(s) como expirada(s) recuperable(s)');
   }
 
   if (desbloqueadas > 0) {
@@ -263,8 +338,10 @@ if (typeof intervaloLimpieza.unref === 'function') {
 module.exports = {
   obtenerSesion,
   eliminarSesion,
+  reactivarSesion,
   copiarSesion,
   bloquear,
   desbloquear,
-  guardarCambios
+  guardarCambios,
+  esSesionRecuperable
 };
