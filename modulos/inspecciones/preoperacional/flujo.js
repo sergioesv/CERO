@@ -76,29 +76,6 @@ function crearFlujoPreoperacional() {
       }
     },
 
-    onRegistrarKm: function(sesion, km, origen) {
-      resolverKilometrajeConfirmadoPreoperacional({
-        sesion: sesion,
-        telefono: null,
-        kilometraje: km,
-        origen: origen,
-        alertas: [],
-        contexto: { fuente: 'legacy_registrar', prefijoMensaje: '' }
-      });
-    },
-
-    onConfirmarKm: async function(res, sesion, telefono) {
-      var resultado = resolverKilometrajeConfirmadoPreoperacional({
-        res: res,
-        sesion: sesion,
-        telefono: telefono,
-        kilometraje: sesion.kmDetectado,
-        origen: 'Kilometraje confirmado desde foto: ' + sesion.kmDetectado + ' km',
-        alertas: [],
-        contexto: { fuente: 'legacy_confirmar', prefijoMensaje: '' }
-      });
-      return twiml.responderTwiml(res, resultado.userMessage);
-    }
   });
 
   flujo.inicializarSesion = function(sesion) {

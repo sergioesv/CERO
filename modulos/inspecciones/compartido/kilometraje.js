@@ -310,7 +310,7 @@ async function manejarConfirmacionOdometro(
     }
     // Si el conductor escribe el km directamente sin presionar 1 primero
     var kmDirecto = String(mensaje || '').replace(/[^0-9]/g, '');
-    if (kmDirecto.length >= 4 && opciones.registrarKilometrajePreoperacional) {
+    if (kmDirecto.length >= 4) {
       var kmDirectoNum = parseInt(kmDirecto, 10);
       var evalDirecto = evaluarKilometrajeContraHistorico(sesion, kmDirectoNum);
       if (evalDirecto.tipo === 'menor') {
@@ -400,8 +400,16 @@ async function manejarConfirmacionOdometro(
         }
       );
     }
-    var respuestaConfirmar = await opciones.onConfirmarPreoperacional(res, sesion, opciones.telefono);
-    return crearResultadoKmDelegado(respuestaConfirmar);
+    if (typeof opciones.onConfirmarPreoperacional === 'function') {
+      var respuestaConfirmar = await opciones.onConfirmarPreoperacional(res, sesion, opciones.telefono);
+      return crearResultadoKmDelegado(respuestaConfirmar);
+    }
+    return crearResultadoKm(
+      false,
+      'KM_CONFIRMATION_REQUIRED',
+      mensajes.mensajeConfirmacionOdometro(sesion),
+      { kmDetectado: sesion.kmDetectado }
+    );
   }
 
   if (msgLower === '2' || msgLower === '2️⃣') {

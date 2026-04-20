@@ -353,8 +353,6 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
       esAtrasOdometro: opcionesCompartidas.esAtrasOdometro,
       manejarAtrasDesdeOdometro: opcionesCompartidas.manejarAtrasDesdeOdometro,
       esOpcion: opcionesCompartidas.esOpcion,
-      registrarKilometrajePreoperacional: opcionesCompartidas.registrarKilometrajePreoperacional,
-      onConfirmarPreoperacional: opcionesCompartidas.onConfirmarPreoperacional,
       onKilometrajeConfirmado: opcionesCompartidas.onKilometrajeConfirmado,
       politicaKilometraje: opcionesCompartidas.politicaKilometraje,
       contextoFlujo: opcionesCompartidas.contextoFlujo,
@@ -399,7 +397,6 @@ FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, men
       volverMenuPrincipal: opcionesCompartidas.volverMenuPrincipal,
       telefono: opcionesCompartidas.telefono,
       esOpcion: opcionesCompartidas.esOpcion,
-      registrarKilometrajePreoperacional: opcionesCompartidas.registrarKilometrajePreoperacional,
       onKilometrajeConfirmado: opcionesCompartidas.onKilometrajeConfirmado,
       politicaKilometraje: opcionesCompartidas.politicaKilometraje,
       contextoFlujo: opcionesCompartidas.contextoFlujo
@@ -419,15 +416,6 @@ FlujoBase.prototype._crearOpcionesCompartidasOdometro = function(opciones) {
       return self._onKilometrajeConfirmado(data);
     }
     : null;
-  // 2) Fallback legacy de registro
-  var registrarKilometrajePreoperacional = self._onRegistrarKm || function(s, km, origen) {
-    self._registrarKmDefault(s, km, origen);
-  };
-  // 3) Fallback legacy puntual de confirmación
-  var onConfirmarPreoperacional = async function(r, s, tel) {
-    if (self._onConfirmarKm) return self._onConfirmarKm(r, s, tel);
-    return self._confirmarKmDefault(r, s);
-  };
 
   return {
     telefono: telefono,
@@ -452,8 +440,6 @@ FlujoBase.prototype._crearOpcionesCompartidasOdometro = function(opciones) {
     },
     esOpcion: nav.esOpcion,
     onKilometrajeConfirmado: onKilometrajeConfirmado,
-    registrarKilometrajePreoperacional: registrarKilometrajePreoperacional,
-    onConfirmarPreoperacional: onConfirmarPreoperacional,
     politicaKilometraje: self._politicaKilometraje,
     contextoFlujo: {
       tipoFlujo: self.tipo,
