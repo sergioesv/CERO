@@ -1,17 +1,22 @@
 # =============================================================================
 # CERO - PowerSell / Dump de contexto tecnico (PowerShell - Windows)
-# Estructura basada en ARCHITECTURE.md v26 (19/04/2026)
+#
+# Organizacion alineada con ARCHITECTURE.md - secciones:
+#   - WhatsApp flow architecture (FlujoBase, compartido, modulos)
+#   - Session lifecycle (config TIMEOUT_FLUJO_MS, servicios/sesiones.js, canal)
 #
 # Uso:
-#   .\cero_powersell.ps1 -Modo whatsapp    # Flujo WhatsApp completo
-#   .\cero_powersell.ps1 -Modo comercial   # Documento de ventas
-#   .\cero_powersell.ps1 -Modo full        # Todo junto
+#   .\cero_powersell.ps1 -Modo whatsapp              # Dump flujo WhatsApp
+#   .\cero_powersell.ps1 -Modo whatsapp -EjecutarTests  # Dump + node scripts/test-flujos.js
+#   .\cero_powersell.ps1 -Modo comercial             # Documento de ventas
+#   .\cero_powersell.ps1 -Modo full                  # Comercial + WhatsApp
 #
-# Corre desde la raíz del repo CERO.
+# Corre desde la raiz del repo CERO.
 # =============================================================================
 
 param(
-    [string]$Modo = "whatsapp"
+    [string]$Modo = "whatsapp",
+    [switch]$EjecutarTests
 )
 
 $Fecha   = Get-Date -Format "yyyyMMdd_HHmm"
@@ -86,21 +91,36 @@ Add-Content -LiteralPath $Output -Encoding UTF8 -Value "Modo:          $Modo"
 Add-Content -LiteralPath $Output -Encoding UTF8 -Value "Directorio:    $(Get-Location)"
 Add-Content -LiteralPath $Output -Encoding UTF8 -Value "Rama git:      $GitRama"
 Add-Content -LiteralPath $Output -Encoding UTF8 -Value "Ultimo commit: $GitCommit"
+Add-Content -LiteralPath $Output -Encoding UTF8 -Value ""
+Add-Content -LiteralPath $Output -Encoding UTF8 -Value "Estructura dump WhatsApp = ARCHITECTURE.md > WhatsApp flow architecture + Session lifecycle"
 Add-Content -LiteralPath $Output -Encoding UTF8 -Value $Sep
 
 # ===========================================================================
-# MODO whatsapp
+# MODO whatsapp - orden de dependencias (canal, servicios, compartido, modulos)
 # ===========================================================================
 function Dump-Whatsapp {
 
-    Cabecera "ENTRYPOINT + RUTAS"
+    # --- 1. Entrada del servidor (webhook + cron alertas) ---
+    Cabecera "1. INDEX - Express, registro de canales y cron"
     Agregar-Archivo "index.js"
-    Agregar-Dir "rutas"
 
-    Cabecera "CANAL WHATSAPP"
+    # --- 2. Config (TIMEOUT_FLUJO_MS, TIMEOUT_RECUPERACION_MS, Supabase, Twilio) ---
+    Cabecera "2. CONFIG - entorno y timeouts de sesion WhatsApp"
+    Agregar-Archivo "config/config.js"
+
+    # --- 3. Canal Twilio ---
+    Cabecera "3. CANAL - webhook WhatsApp (enrutador principal)"
     Agregar-Archivo "canales/whatsapp.js"
 
-    Cabecera "COMPARTIDO - baseFlujo + utilidades"
+    # --- 4. Servicios mensajeria / plantillas / OCR ---
+    Cabecera "4. SERVICIOS - sesion, OCR, storage, plantillas"
+    Agregar-Archivo "servicios/sesiones.js"
+    Agregar-Archivo "servicios/ocr.js"
+    Agregar-Archivo "servicios/storage.js"
+    Agregar-Archivo "servicios/plantillas.js"
+
+    # --- 5. Compartido inspecciones - mismo orden que ARCHITECTURE tree ---
+    Cabecera "5. INSPECCIONES COMPARTIDO - FlujoBase, TwiML, factory placa/km"
     Agregar-Archivo "modulos/inspecciones/compartido/baseFlujo.js"
     Agregar-Archivo "modulos/inspecciones/compartido/twiml.js"
     Agregar-Archivo "modulos/inspecciones/compartido/iniciadorFlujo.js"
@@ -108,54 +128,56 @@ function Dump-Whatsapp {
     Agregar-Archivo "modulos/inspecciones/compartido/navegacion.js"
     Agregar-Archivo "modulos/inspecciones/compartido/validacionVisual.js"
 
-    Cabecera "MODULO - PREOPERACIONAL"
+    # --- 6-9. Maquinas de estado por modulo ---
+    Cabecera "6. MODULO - preoperacional (flujo, estado, mensajes, validaciones, cierre, interpretacion)"
     Agregar-Dir "modulos/inspecciones/preoperacional"
 
-    Cabecera "MODULO - POSOPERACIONAL"
+    Cabecera "7. MODULO - posoperacional"
     Agregar-Dir "modulos/inspecciones/posoperacional"
 
-    Cabecera "MODULO - TANQUEO"
+    Cabecera "8. MODULO - tanqueo"
     Agregar-Dir "modulos/tanqueo"
 
-    Cabecera "MODULO - INSCRIPCION"
+    Cabecera "9. MODULO - inscripcion (conductor nuevo)"
     Agregar-Dir "modulos/inscripcion"
 
-    Cabecera "MODULO - ALERTAS"
+    # --- 10. Alertas WhatsApp (cron) ---
+    Cabecera "10. MODULO - alertas (notificador WhatsApp + reglas)"
     Agregar-Dir "modulos/alertas"
 
-    Cabecera "SERVICIOS"
-    Agregar-Archivo "servicios/sesiones.js"
-    Agregar-Archivo "servicios/ocr.js"
-    Agregar-Archivo "servicios/storage.js"
-    Agregar-Archivo "servicios/plantillas.js"
-    Agregar-Archivo "servicios/passwords.js"
-    Agregar-Archivo "servicios/logo.js"
-
-    Cabecera "SERVICIOS - PDF"
+    # --- 11. PDF cierre ---
+    Cabecera "11. SERVICIOS PDF - generacion y subida Storage"
     Agregar-Archivo "servicios/pdf/base.js"
     Agregar-Archivo "servicios/pdf/GeneradorPDFBase.js"
     Agregar-Archivo "servicios/pdf/GeneradorPDFPreoperacional.js"
     Agregar-Archivo "servicios/pdf/GeneradorPDFPosoperacional.js"
     Agregar-Archivo "servicios/pdf/preoperacional.js"
     Agregar-Archivo "servicios/pdf/posoperacional.js"
+    Agregar-Archivo "servicios/logo.js"
+    Agregar-Archivo "servicios/passwords.js"
 
-    Cabecera "DATA - Capa de acceso a base de datos"
+    # --- 12. Data usada por canal y cierres WhatsApp ---
+    Cabecera "12. DATA - persistencia usada por canal y cierres WhatsApp"
     Agregar-Archivo "data/activos.js"
     Agregar-Archivo "data/inspecciones.js"
-    Agregar-Archivo "data/tanqueos.js"
+    Agregar-Archivo "data/plantillas.js"
     Agregar-Archivo "data/posoperacionales.js"
+    Agregar-Archivo "data/tanqueos.js"
     Agregar-Archivo "data/autorizaciones.js"
     Agregar-Archivo "data/alertas.js"
-    Agregar-Archivo "data/plantillas.js"
-    Agregar-Archivo "data/conductores.js"
-    Agregar-Archivo "data/dashboard.js"
     Agregar-Archivo "data/permisos.js"
 
-    Cabecera "CONFIGURACION"
-    Agregar-Archivo "config/config.js"
-
-    Cabecera "MIDDLEWARES"
+    # --- 13. Middleware ---
+    Cabecera "13. MIDDLEWARES - auth (referencia compartida con API)"
     Agregar-Archivo "middlewares/auth.js"
+
+    # --- 14. Rutas REST ---
+    Cabecera "14. RUTAS HTTP - API REST (panel comparte backend con /webhook)"
+    Agregar-Dir "rutas"
+
+    # --- 15. Script verificacion carga modulos ---
+    Cabecera "15. SCRIPTS - prueba de carga de flujos WhatsApp"
+    Agregar-Archivo "scripts/test-flujos.js"
 }
 
 # ===========================================================================
@@ -167,7 +189,7 @@ function Dump-Comercial {
     Add-Content -LiteralPath $Output -Encoding UTF8 -Value "CERO - Propuesta comercial"
     Add-Content -LiteralPath $Output -Encoding UTF8 -Value $Sep
     Add-Content -LiteralPath $Output -Encoding UTF8 -Value ""
-    Add-Content -LiteralPath $Output -Encoding UTF8 -Value @"
+    $bloqueComercial = @'
 PROPUESTA DE VALOR
 ==================
 CERO digitaliza las operaciones de campo de flotas vehiculares en Colombia,
@@ -179,7 +201,7 @@ La empresa obtiene trazabilidad, PDFs con firma digital y control de novedades.
 
 FUNCIONALIDADES ACTIVAS
 ========================
-  Preoperacional    20 items, 4 bloques, plantillas dinamicas por tipo de activo
+  Preoperacional    Plantillas dinamicas por tipo de activo
   Posoperacional    Novedades al cierre de turno con PDF
   Tanqueo           OCR de factura con validacion cruzada antifraude
   Alertas           SOAT / tecno / licencias - semaforo 30/15/7 dias + cron 6AM
@@ -193,9 +215,9 @@ ARQUITECTURA
 ============
   Backend:    Node.js 20 + Express - CommonJS
   Base datos: Supabase PostgreSQL + Storage (Sao Paulo)
-  Despliegue: Railway - auto-deploy desde GitHub rama desarrollo
+  Despliegue: Railway - auto-deploy desde rama desarrollo
   Mensajeria: Twilio WhatsApp Business API
-  IA:         Google Gemini 2.0 Flash - OCR placas, odometros, facturas
+  IA:         Google Gemini - OCR placas, odometros, facturas
   Frontend:   HTML + CSS + JS vanilla
   Auth:       JWT + bcrypt - 8h expiracion
   Modelo:     Multi-empresa / multi-sede / multi-rol
@@ -218,11 +240,11 @@ MODELO COMERCIAL
 
   Empresa: dialk S.A.S. (en constitucion)
   Producto: CERO - cero papel, cero accidentes
-"@
+'@
+    Add-Content -LiteralPath $Output -Encoding UTF8 -Value $bloqueComercial
     Write-Host "  ok  Seccion comercial" -ForegroundColor Green
 }
 
-# Copia estable con nombre fijo (flujo WhatsApp incluido en full)
 function Copiar-DumpEstable {
     if ($Modo -eq "whatsapp" -or $Modo -eq "full") {
         $dest = Join-Path (Get-Location) "CERO_dump_whatsapp.txt"
@@ -241,12 +263,28 @@ switch ($Modo) {
     "full"     { Dump-Comercial; Dump-Whatsapp }
     default    {
         Write-Host "Modo desconocido: $Modo" -ForegroundColor Red
-        Write-Host "Uso: .\cero_powersell.ps1 -Modo [whatsapp|comercial|full]"
+        Write-Host "Uso: .\cero_powersell.ps1 -Modo [whatsapp|comercial|full] [-EjecutarTests]"
         exit 1
     }
 }
 
 Copiar-DumpEstable
+
+# ---------------------------------------------------------------------------
+# Pruebas de carga de flujos (opcional)
+# ---------------------------------------------------------------------------
+if ($EjecutarTests -and ($Modo -eq "whatsapp" -or $Modo -eq "full")) {
+    Write-Host ""
+    Write-Host "=== node scripts/test-flujos.js ===" -ForegroundColor Cyan
+    Push-Location (Get-Location)
+    node scripts/test-flujos.js
+    $code = $LASTEXITCODE
+    Pop-Location
+    if ($code -ne 0) {
+        Write-Host "test-flujos.js fallo con codigo $code" -ForegroundColor Red
+        exit $code
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Resumen
@@ -258,5 +296,5 @@ Write-Host ""
 Write-Host $Sep -ForegroundColor Green
 Write-Host "  Archivo: $Output"
 Write-Host "  Lineas:  $Lineas"
-Write-Host "  Tamanio: ${Tamanio} KB"
+Write-Host "  Tamano: $Tamanio KB"
 Write-Host $Sep -ForegroundColor Green
