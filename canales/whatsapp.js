@@ -9,7 +9,7 @@
 
 const twimlUtil = require('../modulos/inspecciones/compartido/twiml');
 
-const { obtenerSesion, eliminarSesion, guardarCambios } = require('../servicios/sesiones');
+const { obtenerSesion, eliminarSesion, reactivarSesion, guardarCambios } = require('../servicios/sesiones');
 const flujoPreoperacional = require('../modulos/inspecciones/preoperacional/flujo');
 const flujoPosoperacional = require('../modulos/inspecciones/posoperacional/flujo');
 const flujoTanqueo        = require('../modulos/tanqueo/flujo');
@@ -52,6 +52,14 @@ async function webhookWhatsApp(req, res) {
       return responderMenu(res);
     }
 
+    // ── Sesión EXPIRADA_RECUPERABLE → ofrecer continuar / reiniciar ──────────
+    // El usuario estuvo inactivo más que TIMEOUT_FLUJO_MS pero todavía dentro de
+    // TIMEOUT_RECUPERACION_MS. Interceptamos antes de enrutar al flujo para que el
+    // flujo siempre reciba sesiones activas (contrato simple).
+    if (sesion.expirada && sesion.tipo) {
+      return await manejarRecuperacionSesion(req, res, sesion, mensaje);
+    }
+
     // ── Enrutar según el tipo de flujo activo ─────────────────────────────────
     if (sesion.tipo === 'inscripcion') {
       return await flujoInscripcion.manejarInscripcion(req, res);
@@ -76,6 +84,39 @@ async function webhookWhatsApp(req, res) {
     console.error('❌ Error en webhook WhatsApp:', error);
     return responderError(res);
   }
+}
+
+// ============================================================================
+// RECUPERACIÓN DE SESIÓN EXPIRADA
+// ============================================================================
+
+/**
+ * Se invoca cuando el canal detecta sesion.expirada === true en una sesión con
+ * flujo activo. El usuario tiene 3 opciones:
+ *
+ *   1 → reanudar la sesión (se limpia el flag y se preserva el estado).
+ *        Se responde con el mensaje de reanudación; el próximo mensaje del
+ *        usuario sigue el flujo normal desde el estado preservado.
+ *   2 → eliminar la sesión y volver al menú principal.
+ *   9 / MENU / INICIO / CANCELAR → ya fue atrapado antes por la navegación global.
+ *   otro → se repite el mensaje de recuperación hasta que elija una opción válida.
+ */
+async function manejarRecuperacionSesion(req, res, sesion, mensaje) {
+  const telefono = req.body.From;
+
+  if (mensaje === '1') {
+    reactivarSesion(telefono);
+    guardarCambios();
+    return twimlUtil.responderTwiml(res, nav.textoSesionReanudada(sesion));
+  }
+
+  if (mensaje === '2') {
+    await eliminarSesion(telefono);
+    guardarCambios();
+    return responderMenu(res);
+  }
+
+  return twimlUtil.responderTwiml(res, nav.textoSesionExpirada(sesion));
 }
 
 // ============================================================================

@@ -80,8 +80,51 @@ function esOpcion(valor, opciones) {
   return opciones.indexOf(String(valor || '').trim().toLowerCase()) >= 0;
 }
 
+/**
+ * Descripción corta del tipo de flujo (para mensajes al usuario).
+ */
+function descripcionFlujo(sesion) {
+  if (!sesion) return '';
+  switch (sesion.tipo) {
+    case 'preoperacional': return 'preoperacional';
+    case 'posoperacional': return 'posoperacional';
+    case 'tanqueo':        return 'tanqueo';
+    default: return '';
+  }
+}
+
+/**
+ * Mensaje que se muestra cuando el canal detecta una sesión EXPIRADA_RECUPERABLE.
+ * El usuario puede elegir continuar (1), reiniciar (2) o ir al menú (9).
+ */
+function textoSesionExpirada(sesion) {
+  var nombre = descripcionFlujo(sesion);
+  var encabezado = '⏸️ Tu sesión' + (nombre ? ' de ' + nombre : '') + ' quedó pausada por inactividad.';
+  return (
+    encabezado + '\n\n' +
+    'Tienes unos minutos para decidir:\n\n' +
+    '*1* Continuar donde quedaste\n' +
+    '*2* Empezar de nuevo\n' +
+    '*9* Ir al menú principal'
+  );
+}
+
+/**
+ * Mensaje que confirma al usuario que la sesión fue reanudada tras elegir "continuar".
+ */
+function textoSesionReanudada(sesion) {
+  var nombre = descripcionFlujo(sesion);
+  return (
+    '✅ Sesión' + (nombre ? ' de ' + nombre : '') + ' reanudada.\n\n' +
+    'Envía tu próxima respuesta para continuar donde quedaste.'
+  );
+}
+
 module.exports = {
   textoMenuPrincipal,
+  textoSesionExpirada,
+  textoSesionReanudada,
+  descripcionFlujo,
   PIE_NAV,
   PIE_MENU,
   TECLA_ATRAS,
