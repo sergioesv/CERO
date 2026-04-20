@@ -132,6 +132,38 @@ async function procesarEstado(res, sesion, ...) {
 
 **UX rule:** max 2-minute flow. Single-number responses. `0` = back, `9` = main menu.
 
+### Session lifecycle — timeout + recoverable window
+
+Every session has two horizons, both defined in `config/config.js`:
+
+| Horizon | Constant | Default | What happens |
+|---|---|---|---|
+| Inactivity timeout (per flow) | `TIMEOUT_FLUJO_MS[tipo]` | 30 min (10 min for tanqueo) | Session marked `expirada = true`, data preserved, lock freed |
+| Recovery window | `TIMEOUT_RECUPERACION_MS` | 5 min | Additional time to resume; after this, session is purged |
+
+When a user sends a message and `sesion.expirada === true`, `canales/whatsapp.js`
+intercepts **before** routing to the flow and offers:
+
+- `1` → `reactivarSesion(telefono)` clears the flag and preserves every field.
+- `2` → `eliminarSesion(telefono)` + main menu.
+- `9` / `MENU` / `INICIO` / `CANCELAR` → handled by the global intercept (same as `2`).
+- Anything else → repeats the recovery message with `textoSesionExpirada(sesion)`.
+
+**Not recoverable:** `inscripcion` sessions (few steps, cleaner to restart) and
+sessions still in `INICIO` (no progress worth preserving). Both are purged
+directly on timeout.
+
+**Media retention (fotos):** session photos are Twilio CDN URLs, not uploaded to
+Supabase Storage. Only the generated PDF is uploaded at close. Twilio purges
+media automatically ~72h after the inbound message, so abandoned sessions do
+not create orphans in our infra. If explicit deletion is ever needed, use the
+Twilio REST API (`DELETE /Accounts/{sid}/Messages/{sid}/Media/{sid}`); no
+background job exists today.
+
+**Step labels:** `navegacion.js` exports a flat `LABEL_PASO` map from `sesion.estado`
+to human text for the recovery message. Keep this map synced with each module's
+`ESTADOS` when adding new states.
+
 ---
 
 ## Frontend pattern
@@ -242,6 +274,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 
 | Date | Decision | Reason |
 |---|---|---|
+| 19/04/2026 | Recuperación de sesión expirada (WhatsApp) — timeout 30 min + ventana recuperable 5 min, tanqueo con timeout propio de 10 min | UX: antes las sesiones se borraban silenciosamente al vencer y el usuario perdía todo el progreso. Ahora se ofrece continuar/reiniciar dentro de la ventana. Inscripción no es recuperable (son pocos pasos). Tanqueo tiene timeout menor porque el conductor está en la bomba. |
 | 19/04/2026 | Verificación post-migración v26 — 8 bugs encontrados y cerrados | Migración grande requiere prueba end-to-end antes de declarar completa |
 | 19/04/2026 | `plantillas.cargar()` retorna default en lugar de throw | Posop no requiere plantilla — el throw bloqueaba el flujo innecesariamente |
 | 19/04/2026 | PUT /api/activos acepta UUID o placa como parámetro | Frontend envía UUID, ruta esperaba placa — validación con UUID_REGEX |
