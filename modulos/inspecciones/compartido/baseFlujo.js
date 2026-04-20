@@ -37,7 +37,7 @@ var config         = require('../../../config/config');
  * @param {Function} [opciones.onConfirmarKm]     — fn(res, sesion, telefono) tras confirmar km OCR
  * @param {Function} [opciones.onKilometrajeConfirmado] — fn({res, sesion, telefono, kilometraje, origen, alertas, contexto})
  * @param {string}   [opciones.estadoEsperandoFotoPlaca] — estado tras inicializar (default ESTADOS.ESPERANDO_FOTO_PLACA)
- * @param {Function} [opciones.procesarLecturaPos] — Solo posoperacional: procesar lectura custom
+ * @param {Function} [opciones.procesarLecturaPos] — procesador opcional de lectura de odómetro
  */
 function FlujoBase(opciones) {
   this.tipo            = opciones.tipo;
@@ -92,7 +92,7 @@ function FlujoBase(opciones) {
     contextoFlujo: self
   });
 
-  // Odómetro — posoperacional usa procesarLecturaPos custom
+  // Odómetro — permite inyectar procesador custom de lectura
   var optsOdometro = {
     ESTADOS: ESTADOS,
     mensajes: {
@@ -183,18 +183,16 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
   var msgLower = mensaje.toLowerCase();
   var numMedia = mediaUrls.length;
   var ESTADOS = this.ESTADOS;
-  var self = this;
+  var estadoFotoPlaca = this._estadoEsperandoFotoPlaca ||
+    ESTADOS.ESPERANDO_FOTO_PLACA ||
+    'ESPERANDO_FOTO_FRONTAL';
 
   switch (sesion.estado) {
 
     // ── FOTO PLACA ──────────────────────────────────────────
     case ESTADOS.ESPERANDO_FOTO_PLACA:
-    case 'ESPERANDO_FOTO_FRONTAL': // preoperacional usa este string
+    case 'ESPERANDO_FOTO_FRONTAL': // compatibilidad con estado legacy
       if (numMedia === 0) {
-        // En preoperacional, también acepta texto como placa
-        if (sesion.estado === 'ESPERANDO_FOTO_FRONTAL' || sesion.estado === (ESTADOS.ESPERANDO_PLACA)) {
-          return twiml.responderTwiml(res, this._mensajeInicio());
-        }
         return twiml.responderTwiml(res, this._mensajeInicio());
       }
       return await this._procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
@@ -238,10 +236,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
         );
       }
       if (msgLower === '2' || msgLower === '2️⃣' || msgLower === 'foto') {
-        var estadoFoto = this._estadoEsperandoFotoPlaca ||
-          ESTADOS.ESPERANDO_FOTO_PLACA ||
-          'ESPERANDO_FOTO_FRONTAL';
-        sesion.estado = estadoFoto;
+        sesion.estado = estadoFotoPlaca;
         return twiml.responderTwiml(res, this._mensajeInicio());
       }
       if (msgLower === '3' || msgLower === '3️⃣') {
@@ -255,10 +250,7 @@ FlujoBase.prototype.procesarEstadoCompartido = async function(res, sesion, telef
     case ESTADOS.PLACA_FALLBACK:
       if (numMedia > 0) return await this._procesarFotoPlaca(res, sesion, telefono, mediaUrls[0]);
       if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'foto') {
-        var estadoFotoFb = this._estadoEsperandoFotoPlaca ||
-          ESTADOS.ESPERANDO_FOTO_PLACA ||
-          'ESPERANDO_FOTO_FRONTAL';
-        sesion.estado = estadoFotoFb;
+        sesion.estado = estadoFotoPlaca;
         return twiml.responderTwiml(res, this._mensajeInicio());
       }
       if (msgLower === '2' || msgLower === '2️⃣') {
@@ -332,6 +324,15 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
   var ESTADOS = this.ESTADOS;
   var mensajes = this.mensajes;
 
+  var opcionesCompartidas = this._crearOpcionesCompartidasOdometro({
+    telefono: telefono,
+    etapa: 'confirmacion_km',
+    estadoManual: ESTADOS.KM_MANUAL || ESTADOS.ODOMETRO_MANUAL,
+    estadoEsperandoFoto: ESTADOS.ESPERANDO_FOTO_ODOMETRO,
+    numMedia: numMedia,
+    mediaUrls: mediaUrls
+  });
+
   var resultado = await kmCompartido.manejarConfirmacionOdometro(
     res, sesion, mensaje, numMedia, mediaUrls,
     {
@@ -344,42 +345,21 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
         }
       },
       responderFn: twiml.responderTwiml,
-      estadoManual: ESTADOS.KM_MANUAL || ESTADOS.ODOMETRO_MANUAL,
-      estadoEsperandoFoto: ESTADOS.ESPERANDO_FOTO_ODOMETRO,
       maxKmSalto: config.MAX_KM_SALTO,
-      mensajeInicioOdometro: function(s) {
-        return self._mensajeInicioOdometro(s);
-      },
-      procesarFotoOdometro: function(r, s, url) {
-        return self._procesarFotoOdometro(r, s, url);
-      },
-      telefono: telefono,
-      volverMenuPrincipal: function(r, t) {
-        sesiones.eliminarSesion(t);
-        return twiml.responderTwiml(r, nav.textoMenuPrincipal());
-      },
-      esAtrasOdometro: nav.esAtras,
-      manejarAtrasDesdeOdometro: function(r, s) {
-        return self.manejarAtras(r, s, telefono);
-      },
-      esOpcion: nav.esOpcion,
-      registrarKilometrajePreoperacional: self._onRegistrarKm || function(s, km, origen) {
-        self._registrarKmDefault(s, km, origen);
-      },
-      onConfirmarPreoperacional: async function(r, s, tel) {
-        if (self._onConfirmarKm) return self._onConfirmarKm(r, s, tel);
-        return self._confirmarKmDefault(r, s);
-      },
-      onKilometrajeConfirmado: self._onKilometrajeConfirmado
-        ? async function(data) {
-          return self._onKilometrajeConfirmado(data);
-        }
-        : null,
-      politicaKilometraje: self._politicaKilometraje,
-      contextoFlujo: {
-        tipoFlujo: self.tipo,
-        etapa: 'confirmacion_km'
-      }
+      mensajeInicioOdometro: opcionesCompartidas.mensajeInicioOdometro,
+      procesarFotoOdometro: opcionesCompartidas.procesarFotoOdometro,
+      telefono: opcionesCompartidas.telefono,
+      volverMenuPrincipal: opcionesCompartidas.volverMenuPrincipal,
+      esAtrasOdometro: opcionesCompartidas.esAtrasOdometro,
+      manejarAtrasDesdeOdometro: opcionesCompartidas.manejarAtrasDesdeOdometro,
+      esOpcion: opcionesCompartidas.esOpcion,
+      registrarKilometrajePreoperacional: opcionesCompartidas.registrarKilometrajePreoperacional,
+      onConfirmarPreoperacional: opcionesCompartidas.onConfirmarPreoperacional,
+      onKilometrajeConfirmado: opcionesCompartidas.onKilometrajeConfirmado,
+      politicaKilometraje: opcionesCompartidas.politicaKilometraje,
+      contextoFlujo: opcionesCompartidas.contextoFlujo,
+      estadoManual: opcionesCompartidas.estadoManual,
+      estadoEsperandoFoto: opcionesCompartidas.estadoEsperandoFoto
     }
   );
 
@@ -389,6 +369,15 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
 FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, mensaje, numMedia, mediaUrls) {
   var self = this;
   var mensajes = this.mensajes;
+
+  var opcionesCompartidas = this._crearOpcionesCompartidasOdometro({
+    telefono: telefono,
+    etapa: 'km_manual',
+    estadoManual: self.ESTADOS.KM_MANUAL || self.ESTADOS.ODOMETRO_MANUAL,
+    estadoEsperandoFoto: self.ESTADOS.ESPERANDO_FOTO_ODOMETRO,
+    numMedia: numMedia,
+    mediaUrls: mediaUrls
+  });
 
   var resultado = await kmCompartido.manejarOdometroManual(
     res, sesion, mensaje,
@@ -402,38 +391,75 @@ FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, men
     },
     twiml.responderTwiml,
     {
-      numMedia: numMedia,
-      mediaUrls: mediaUrls,
-      procesarFotoOdometro: function(r, s, url) {
-        return self._procesarFotoOdometro(r, s, url);
-      },
-      esAtrasOdometro: nav.esAtras,
-      manejarAtrasDesdeOdometro: function(r, s) {
-        return self.manejarAtras(r, s, telefono);
-      },
-      volverMenuPrincipal: function(r, t) {
-        sesiones.eliminarSesion(t);
-        return twiml.responderTwiml(r, nav.textoMenuPrincipal());
-      },
-      telefono: telefono,
-      esOpcion: nav.esOpcion,
-      registrarKilometrajePreoperacional: self._onRegistrarKm || function(s, km, origen) {
-        self._registrarKmDefault(s, km, origen);
-      },
-      onKilometrajeConfirmado: self._onKilometrajeConfirmado
-        ? async function(data) {
-          return self._onKilometrajeConfirmado(data);
-        }
-        : null,
-      politicaKilometraje: self._politicaKilometraje,
-      contextoFlujo: {
-        tipoFlujo: self.tipo,
-        etapa: 'km_manual'
-      }
+      numMedia: opcionesCompartidas.numMedia,
+      mediaUrls: opcionesCompartidas.mediaUrls,
+      procesarFotoOdometro: opcionesCompartidas.procesarFotoOdometro,
+      esAtrasOdometro: opcionesCompartidas.esAtrasOdometro,
+      manejarAtrasDesdeOdometro: opcionesCompartidas.manejarAtrasDesdeOdometro,
+      volverMenuPrincipal: opcionesCompartidas.volverMenuPrincipal,
+      telefono: opcionesCompartidas.telefono,
+      esOpcion: opcionesCompartidas.esOpcion,
+      registrarKilometrajePreoperacional: opcionesCompartidas.registrarKilometrajePreoperacional,
+      onKilometrajeConfirmado: opcionesCompartidas.onKilometrajeConfirmado,
+      politicaKilometraje: opcionesCompartidas.politicaKilometraje,
+      contextoFlujo: opcionesCompartidas.contextoFlujo
     }
   );
 
   return this._resolverResultadoKilometraje(res, resultado);
+};
+
+FlujoBase.prototype._crearOpcionesCompartidasOdometro = function(opciones) {
+  var self = this;
+  var telefono = opciones.telefono;
+  // Prioridad de continuidad en km:
+  // 1) Camino moderno principal
+  var onKilometrajeConfirmado = self._onKilometrajeConfirmado
+    ? async function(data) {
+      return self._onKilometrajeConfirmado(data);
+    }
+    : null;
+  // 2) Fallback legacy de registro
+  var registrarKilometrajePreoperacional = self._onRegistrarKm || function(s, km, origen) {
+    self._registrarKmDefault(s, km, origen);
+  };
+  // 3) Fallback legacy puntual de confirmación
+  var onConfirmarPreoperacional = async function(r, s, tel) {
+    if (self._onConfirmarKm) return self._onConfirmarKm(r, s, tel);
+    return self._confirmarKmDefault(r, s);
+  };
+
+  return {
+    telefono: telefono,
+    etapa: opciones.etapa,
+    estadoManual: opciones.estadoManual,
+    estadoEsperandoFoto: opciones.estadoEsperandoFoto,
+    numMedia: opciones.numMedia,
+    mediaUrls: opciones.mediaUrls,
+    mensajeInicioOdometro: function(s) {
+      return self._mensajeInicioOdometro(s);
+    },
+    procesarFotoOdometro: function(r, s, url) {
+      return self._procesarFotoOdometro(r, s, url);
+    },
+    volverMenuPrincipal: function(r, t) {
+      sesiones.eliminarSesion(t);
+      return twiml.responderTwiml(r, nav.textoMenuPrincipal());
+    },
+    esAtrasOdometro: nav.esAtras,
+    manejarAtrasDesdeOdometro: function(r, s) {
+      return self.manejarAtras(r, s, telefono);
+    },
+    esOpcion: nav.esOpcion,
+    onKilometrajeConfirmado: onKilometrajeConfirmado,
+    registrarKilometrajePreoperacional: registrarKilometrajePreoperacional,
+    onConfirmarPreoperacional: onConfirmarPreoperacional,
+    politicaKilometraje: self._politicaKilometraje,
+    contextoFlujo: {
+      tipoFlujo: self.tipo,
+      etapa: opciones.etapa
+    }
+  };
 };
 
 // ============================================================================

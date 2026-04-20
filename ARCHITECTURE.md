@@ -114,20 +114,22 @@ onExitoPlaca: async function(sesion) {
 }
 ```
 
-**Critical pattern — state interception:**
-If a module needs custom handling for `ODOMETRO_CONFIRMACION`, it must intercept
-BEFORE calling `procesarEstadoCompartido`, otherwise `baseFlujo` handles it generically:
+**Critical pattern — shared odometer flow:**
+`preoperacional`, `posoperacional`, and `tanqueo` share odometer handling through
+`modulos/inspecciones/compartido/baseFlujo.js` + `modulos/inspecciones/compartido/kilometraje.js`.
+Flow children do not intercept `ODOMETRO_CONFIRMACION` / `ODOMETRO_MANUAL` locally.
+They delegate odometer handling to `procesarEstadoCompartido()` and define only what
+happens after odometer confirmation through extension points such as
+`onKilometrajeConfirmado` and `politicaKilometraje`.
 
 ```js
-async function procesarEstado(res, sesion, ...) {
-  // Handle module-specific states BEFORE shared handler
-  if (sesion.estado === ESTADOS.ODOMETRO_CONFIRMACION) { ... return; }
-  if (sesion.estado === ESTADOS.ODOMETRO_MANUAL) { ... return; }
-
-  var resultadoCompartido = await this.procesarEstadoCompartido(...);
-  if (resultadoCompartido !== null) return resultadoCompartido;
-  // ... module switch
-}
+var flujo = new FlujoBase({
+  // ...
+  onKilometrajeConfirmado: async function(datosKm) {
+    return resolverKilometrajeConfirmadoModulo(datosKm);
+  },
+  politicaKilometraje: crearPoliticaKilometrajeModulo()
+});
 ```
 
 **UX rule:** max 2-minute flow. Single-number responses. `0` = back, `9` = main menu.

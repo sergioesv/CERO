@@ -83,29 +83,6 @@ function crearFlujoTanqueo() {
 
     onKilometrajeConfirmado: async function(datosKm) {
       return resolverKilometrajeConfirmadoTanqueo(datosKm);
-    },
-
-    // Compatibilidad temporal: mantener callbacks legacy mientras conviven rutas antiguas.
-    onRegistrarKm: function(sesion, km, origen) {
-      resolverKilometrajeConfirmadoTanqueo({
-        sesion: sesion,
-        kilometraje: km,
-        origen: origen,
-        alertas: [],
-        contexto: { fuente: 'legacy_registrar', prefijoMensaje: '' }
-      });
-    },
-
-    onConfirmarKm: async function(res, sesion) {
-      var resultado = await resolverKilometrajeConfirmadoTanqueo({
-        res: res,
-        sesion: sesion,
-        kilometraje: sesion.kmDetectado,
-        origen: 'Km confirmado: ' + sesion.kmDetectado + ' km',
-        alertas: [],
-        contexto: { fuente: 'legacy_confirmar', prefijoMensaje: '' }
-      });
-      return twiml.responderTwiml(res, resultado.userMessage);
     }
   });
 
