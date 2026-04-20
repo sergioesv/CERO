@@ -34,7 +34,7 @@ var config         = require('../../../config/config');
  * @param {string}   [opciones.tipoFotoPlaca]     — tipo de foto para storage (default 'inicio_placa')
  * @param {Function} [opciones.onExitoPlaca]      — fn(sesion) callback tras placa exitosa
  * @param {Function} [opciones.onRegistrarKm]     — fn(sesion, km, origen) registrar km confirmado
- * @param {Function} [opciones.onConfirmarKm]     — fn(res, sesion) tras confirmar km OCR
+ * @param {Function} [opciones.onConfirmarKm]     — fn(res, sesion, telefono) tras confirmar km OCR
  * @param {string}   [opciones.estadoEsperandoFotoPlaca] — estado tras inicializar (default ESTADOS.ESPERANDO_FOTO_PLACA)
  * @param {Function} [opciones.procesarLecturaPos] — Solo posoperacional: procesar lectura custom
  */
@@ -151,7 +151,7 @@ FlujoBase.prototype.manejar = async function(req, res) {
 
   } catch (err) {
     console.error('[' + this.tipo + '] Error handler:', err.message);
-    return twiml.responderTwiml(res, 'Ocurrió un error. Escribe *9* para volver al menú.');
+    return twiml.responderTwiml(res, nav.MSG_ERROR_GENERICO);
   } finally {
     sesiones.desbloquear(telefono);
     sesiones.guardarCambios();
@@ -338,10 +338,7 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
         sesiones.eliminarSesion(t);
         return twiml.responderTwiml(r, nav.textoMenuPrincipal());
       },
-      esAtrasOdometro: function(m) {
-        var ml = String(m || '').trim().toLowerCase();
-        return ml === '0' || ml === '0️⃣';
-      },
+      esAtrasOdometro: nav.esAtras,
       manejarAtrasDesdeOdometro: function(r, s) {
         return self.manejarAtras(r, s, telefono);
       },
@@ -359,7 +356,6 @@ FlujoBase.prototype._manejarConfirmacionKm = async function(res, sesion, telefon
 
 FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, mensaje, numMedia, mediaUrls) {
   var self = this;
-  var ESTADOS = this.ESTADOS;
   var mensajes = this.mensajes;
 
   return await kmCompartido.manejarOdometroManual(
@@ -379,10 +375,7 @@ FlujoBase.prototype._manejarKmManual = async function(res, sesion, telefono, men
       procesarFotoOdometro: function(r, s, url) {
         return self._procesarFotoOdometro(r, s, url);
       },
-      esAtrasOdometro: function(m) {
-        var ml = String(m || '').trim().toLowerCase();
-        return ml === '0' || ml === '0️⃣';
-      },
+      esAtrasOdometro: nav.esAtras,
       manejarAtrasDesdeOdometro: function(r, s) {
         return self.manejarAtras(r, s, telefono);
       },
