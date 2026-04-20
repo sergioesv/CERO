@@ -33,8 +33,6 @@ var config         = require('../../../config/config');
  * @param {Function} [opciones.mensajeInicio]     — fn() -> string (mensaje cuando arranca el flujo)
  * @param {string}   [opciones.tipoFotoPlaca]     — tipo de foto para storage (default 'inicio_placa')
  * @param {Function} [opciones.onExitoPlaca]      — fn(sesion) callback tras placa exitosa
- * @param {Function} [opciones.onRegistrarKm]     — fn(sesion, km, origen) registrar km confirmado
- * @param {Function} [opciones.onConfirmarKm]     — fn(res, sesion, telefono) tras confirmar km OCR
  * @param {Function} [opciones.onKilometrajeConfirmado] — fn({res, sesion, telefono, kilometraje, origen, alertas, contexto})
  * @param {string}   [opciones.estadoEsperandoFotoPlaca] — estado tras inicializar (default ESTADOS.ESPERANDO_FOTO_PLACA)
  * @param {Function} [opciones.procesarLecturaPos] — procesador opcional de lectura de odómetro
@@ -50,8 +48,6 @@ function FlujoBase(opciones) {
   this._mensajeInicio                = opciones.mensajeInicio;
   this._mensajeInicioOdometro        = opciones.mensajeInicioOdometro;
   this._onExitoPlaca                 = opciones.onExitoPlaca || null;
-  this._onRegistrarKm                = opciones.onRegistrarKm || null;
-  this._onConfirmarKm                = opciones.onConfirmarKm || null;
   this._onKilometrajeConfirmado      = opciones.onKilometrajeConfirmado || null;
   this._politicaKilometraje          = opciones.politicaKilometraje || null;
   this._estadoEsperandoFotoPlaca     = opciones.estadoEsperandoFotoPlaca || null;
@@ -494,9 +490,6 @@ FlujoBase.prototype._normalizarResultadoKilometraje = function(resultado) {
       userMessage: resultado.userMessage,
       payload: resultado.payload || null
     };
-  }
-  if (typeof resultado === 'string') {
-    return { ok: false, code: 'KM_LEGACY_STRING', userMessage: resultado, payload: null };
   }
   return { ok: false, code: 'KM_RETRY', userMessage: '', payload: null };
 };

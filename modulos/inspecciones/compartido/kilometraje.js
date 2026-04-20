@@ -27,9 +27,6 @@ function normalizarResultadoKm(resultado) {
   if (resultado && typeof resultado === 'object' && typeof resultado.userMessage === 'string') {
     return crearResultadoKm(resultado.ok, resultado.code, resultado.userMessage, resultado.payload);
   }
-  if (typeof resultado === 'string') {
-    return crearResultadoKm(false, 'KM_LEGACY_STRING', resultado, null);
-  }
   return crearResultadoKm(false, 'KM_RETRY', '', null);
 }
 
@@ -94,14 +91,6 @@ async function resolverKilometrajeConfirmadoExitoso(res, sesion, telefono, opcio
     if (respuestaCallback && typeof respuestaCallback === 'object' && typeof respuestaCallback.userMessage === 'string') {
       return normalizarResultadoKm(respuestaCallback);
     }
-    if (typeof respuestaCallback === 'string') {
-      return crearResultadoKm(
-        true,
-        payloadBase.alertas.length ? 'KM_RECORDED_WITH_ALERT' : 'KM_RECORDED',
-        respuestaCallback,
-        payloadBase
-      );
-    }
     if (respuestaCallback != null) {
       return crearResultadoKmDelegado(respuestaCallback);
     }
@@ -119,9 +108,6 @@ async function resolverKilometrajeConfirmadoExitoso(res, sesion, telefono, opcio
       (data.prefijoMensaje || '') + textoSin,
       { km: data.kilometraje }
     );
-  }
-  if (typeof opciones.registrarKilometrajePreoperacional === 'function') {
-    opciones.registrarKilometrajePreoperacional(sesion, data.kilometraje, data.origen);
   }
   return crearResultadoKm(
     true,
@@ -238,7 +224,6 @@ function registrarKilometrajeConfirmado(sesion, km, origen, registrarEnSesion) {
  * Maneja respuestas en estado de confirmación de odómetro (preoperacional).
  *
  * @param {function} opciones.procesarFotoOdometro — referencia a procesarFotoOdometro enlazada con opciones preop
- * @param {function} opciones.onConfirmarPreoperacional — function(res, sesion) al confirmar km válido
  */
 async function manejarConfirmacionOdometro(
   res,
@@ -400,10 +385,6 @@ async function manejarConfirmacionOdometro(
         }
       );
     }
-    if (typeof opciones.onConfirmarPreoperacional === 'function') {
-      var respuestaConfirmar = await opciones.onConfirmarPreoperacional(res, sesion, opciones.telefono);
-      return crearResultadoKmDelegado(respuestaConfirmar);
-    }
     return crearResultadoKm(
       false,
       'KM_CONFIRMATION_REQUIRED',
@@ -526,7 +507,6 @@ async function manejarOdometroManual(
     opciones.telefono,
     {
       mensajesModulo: mensajesModulo,
-      registrarKilometrajePreoperacional: opciones.registrarKilometrajePreoperacional,
       onKilometrajeConfirmado: opciones.onKilometrajeConfirmado,
       contextoFlujo: opciones.contextoFlujo
     },

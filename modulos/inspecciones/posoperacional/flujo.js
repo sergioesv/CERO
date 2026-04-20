@@ -271,7 +271,6 @@ function crearPoliticaKilometrajePosoperacional() {
         ctx.opciones.telefono,
         {
           mensajesModulo: ctx.mensajesModulo,
-          registrarKilometrajePreoperacional: ctx.opciones.registrarKilometrajePreoperacional,
           onKilometrajeConfirmado: ctx.opciones.onKilometrajeConfirmado,
           contextoFlujo: ctx.opciones.contextoFlujo
         },
