@@ -81,41 +81,31 @@ function crearFlujoTanqueo() {
       return mensajes.kilometrajeConfirmadoPrefijo(s.kilometraje) + mensajes.solicitarFotoFactura();
     },
 
+    onKilometrajeConfirmado: async function(datosKm) {
+      return resolverKilometrajeConfirmadoTanqueo(datosKm);
+    },
+
+    // Compatibilidad temporal: mantener callbacks legacy mientras conviven rutas antiguas.
     onRegistrarKm: function(sesion, km, origen) {
-      sesion.kilometraje = km;
-      sesion.kmOcrOdometro = km;
-      aplicarReferenciaKm(sesion);
-      storage.guardarFotoUnica(sesion, {
-        tipo: 'odometro',
-        url: sesion.fotoOdometroTemporal,
-        descripcion: 'Foto del odómetro',
-        validacion: origen,
-        validada: true
+      resolverKilometrajeConfirmadoTanqueo({
+        sesion: sesion,
+        kilometraje: km,
+        origen: origen,
+        alertas: [],
+        contexto: { fuente: 'legacy_registrar', prefijoMensaje: '' }
       });
-      sesion.kmDetectado = null;
-      sesion.kmLecturaFueraRango = false;
-      sesion.fotoOdometroTemporal = null;
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
     },
 
     onConfirmarKm: async function(res, sesion) {
-      sesion.kilometraje = sesion.kmDetectado;
-      sesion.kmOcrOdometro = sesion.kmDetectado;
-      aplicarReferenciaKm(sesion);
-      storage.guardarFotoUnica(sesion, {
-        tipo: 'odometro',
-        url: sesion.fotoOdometroTemporal,
-        descripcion: 'Foto del odómetro',
-        validacion: 'Km confirmado: ' + sesion.kmDetectado + ' km',
-        validada: true
+      var resultado = await resolverKilometrajeConfirmadoTanqueo({
+        res: res,
+        sesion: sesion,
+        kilometraje: sesion.kmDetectado,
+        origen: 'Km confirmado: ' + sesion.kmDetectado + ' km',
+        alertas: [],
+        contexto: { fuente: 'legacy_confirmar', prefijoMensaje: '' }
       });
-      sesion.kmDetectado = null;
-      sesion.kmLecturaFueraRango = false;
-      sesion.fotoOdometroTemporal = null;
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
-      return twiml.responderTwiml(res,
-        mensajes.kilometrajeConfirmadoPrefijo(sesion.kilometraje) + mensajes.solicitarFotoFactura()
-      );
+      return twiml.responderTwiml(res, resultado.userMessage);
     }
   });
 
@@ -139,6 +129,44 @@ function aplicarReferenciaKm(sesion) {
   sesion.diferenciaKm = ev.diferenciaKm;
   sesion.inconsistenciaKm = ev.inconsistenciaKm;
   sesion.alertasKm = ev.alertasKm;
+}
+
+async function resolverKilometrajeConfirmadoTanqueo(datosKm) {
+  var sesion = datosKm.sesion;
+  var kilometraje = datosKm.kilometraje;
+  var contexto = datosKm.contexto || {};
+  var origen = datosKm.origen;
+  var prefijo = contexto.prefijoMensaje || '';
+
+  sesion.kilometraje = kilometraje;
+  sesion.kmOcrOdometro = kilometraje;
+  aplicarReferenciaKm(sesion);
+
+  if (contexto.fuente === 'confirmacion_ocr' && typeof kilometraje === 'number') {
+    origen = 'Km confirmado: ' + kilometraje + ' km';
+  }
+
+  storage.guardarFotoUnica(sesion, {
+    tipo: 'odometro',
+    url: sesion.fotoOdometroTemporal,
+    descripcion: 'Foto del odómetro',
+    validacion: origen,
+    validada: true
+  });
+  sesion.kmDetectado = null;
+  sesion.kmLecturaFueraRango = false;
+  sesion.fotoOdometroTemporal = null;
+  sesion.estado = ESTADOS.ESPERANDO_FOTO_FACTURA;
+
+  return {
+    ok: true,
+    code: datosKm.alertas && datosKm.alertas.length ? 'KM_RECORDED_WITH_ALERT' : 'KM_RECORDED',
+    userMessage: prefijo + mensajes.kilometrajeConfirmadoPrefijo(sesion.kilometraje) + mensajes.solicitarFotoFactura(),
+    payload: {
+      kilometraje: kilometraje,
+      estadoSiguiente: ESTADOS.ESPERANDO_FOTO_FACTURA
+    }
+  };
 }
 
 function extraerCamposOcr(sesion, datosOcr) {

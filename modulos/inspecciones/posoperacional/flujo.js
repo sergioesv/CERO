@@ -43,6 +43,12 @@ function crearFlujoPosoperacional() {
       return mensajes.mensajeVehiculoConfirmado(sesion.vehiculo, sesion.kmReferenciaMeta);
     },
 
+    politicaKilometraje: crearPoliticaKilometrajePosoperacional(),
+
+    onKilometrajeConfirmado: async function(datosKm) {
+      return resolverKilometrajeConfirmadoPosoperacional(datosKm);
+    },
+
     onExitoPlaca: async function(sesion) {
       var vehiculo = sesion.vehiculo;
       var conductor = sesion.conductor;
@@ -134,60 +140,152 @@ function asegurarNovedadesDesdeTextoLibre(sesion) {
   }
 }
 
-async function manejarConfirmacionKilometraje(sesion, mensaje) {
-  var msgLower = String(mensaje || '').trim().toLowerCase();
+function resolverKilometrajeConfirmadoPosoperacional(datosKm) {
+  var sesion = datosKm.sesion;
+  var contexto = datosKm.contexto || {};
+  var kilometraje = datosKm.kilometraje;
+  var alertas = Array.isArray(datosKm.alertas) ? datosKm.alertas : [];
+  var origen = datosKm.origen;
 
-  if (msgLower === '1' || msgLower === '1️⃣') {
-    var origenFinal = sesion.kmLecturaFueraRango
-      ? 'Confirmado con alerta: ' + sesion.kmDetectado + ' km'
-      : 'OCR confirmado: ' + sesion.kmDetectado + ' km';
-    estadoPosop.registrarFotoOdometro(sesion, sesion.fotoOdometroTemporal, sesion.kmDetectado, origenFinal);
-    sesion.estado = ESTADOS.FOTO_ESTADO_GENERAL;
-    return mensajes.mensajeFotoEstadoGeneral();
+  sesion.alertasKm = alertas;
+  sesion.inconsistenciaKm = alertas.length > 0;
+  sesion.diferenciaKm = typeof sesion.kmReferencia === 'number' ? kilometraje - sesion.kmReferencia : null;
+
+  if (contexto.fuente === 'confirmacion_ocr' && sesion.inconsistenciaKm) {
+    origen = 'Confirmado con alerta: ' + kilometraje + ' km';
+  } else if (contexto.fuente === 'confirmacion_ocr') {
+    origen = 'OCR confirmado: ' + kilometraje + ' km';
   }
 
-  if (msgLower === '2' || msgLower === '2️⃣') {
-    sesion.estado = ESTADOS.ODOMETRO_MANUAL;
-    return '\u2328\uFE0F Escribe el kilometraje correcto.\nEjemplo: *267354*' + nav.PIE_NAV;
-  }
-
-  if (msgLower === '3' || msgLower === '3️⃣') {
-    estadoPosop.volverAKilometraje(sesion);
-    return mensajes.mensajeVehiculoConfirmado(sesion.vehiculo, sesion.kmReferenciaMeta);
-  }
-
-  return mensajes.mensajeConfirmacionSegunKilometraje(sesion);
-}
-
-async function manejarKilometrajeManual(sesion, mensaje) {
-  var kmStr = String(mensaje || '').replace(/[^0-9]/g, '');
-  var kmNum = kmStr ? parseInt(kmStr, 10) : null;
-
-  if (kmNum == null || kmStr.length < 4) {
-    return '\u2328\uFE0F Escribe el kilometraje con números.\nEjemplo: *127892*' + nav.PIE_NAV;
-  }
-
-  var alertasManual = [];
-  if (typeof sesion.kmReferencia === 'number') {
-    if (kmNum < sesion.kmReferencia) {
-      alertasManual.push({ tipo: 'kilometraje_menor', mensaje: 'Kilometraje menor al último registrado' });
-    } else if (kmNum - sesion.kmReferencia > config.MAX_KM_SALTO) {
-      alertasManual.push({ tipo: 'kilometraje_alto', mensaje: 'Diferencia superior a ' + config.MAX_KM_SALTO + ' km' });
-    }
-  }
-
-  sesion.alertasKm = alertasManual;
-  sesion.inconsistenciaKm = alertasManual.length > 0;
-  sesion.diferenciaKm = typeof sesion.kmReferencia === 'number' ? kmNum - sesion.kmReferencia : null;
-
-  var origenManual = 'Kilometraje manual: ' + kmNum + ' km';
-  if (alertasManual.length > 0) origenManual += ' (con alerta)';
-
-  estadoPosop.registrarFotoOdometro(sesion, sesion.fotoOdometroTemporal, kmNum, origenManual);
+  estadoPosop.registrarFotoOdometro(sesion, sesion.fotoOdometroTemporal, kilometraje, origen);
   sesion.estado = ESTADOS.FOTO_ESTADO_GENERAL;
 
-  var aviso = alertasManual.length > 0 ? '\u26A0\uFE0F Kilometraje registrado con alerta.\n\n' : '';
-  return aviso + mensajes.mensajeFotoEstadoGeneral();
+  return {
+    ok: true,
+    code: sesion.inconsistenciaKm ? 'KM_RECORDED_WITH_ALERT' : 'KM_RECORDED',
+    userMessage: (contexto.prefijoMensaje || '') + mensajes.mensajeFotoEstadoGeneral(),
+    payload: {
+      kilometraje: kilometraje,
+      estadoSiguiente: ESTADOS.FOTO_ESTADO_GENERAL
+    }
+  };
+}
+
+function crearPoliticaKilometrajePosoperacional() {
+  return {
+    mensajeEntradaManual: function() {
+      return '⌨️ Escribe el kilometraje correcto.\nEjemplo: *267354*' + nav.PIE_NAV;
+    },
+    mensajeEntradaManualInvalida: function() {
+      return '⌨️ Escribe el kilometraje con números.\nEjemplo: *127892*' + nav.PIE_NAV;
+    },
+    resolverConfirmacionFueraRango: async function(ctx) {
+      var msgLower = ctx.msgLower;
+      var sesion = ctx.sesion;
+      var opciones = ctx.opciones;
+      var crearResultadoKm = ctx.crearResultadoKm;
+      var resolverKilometrajeConfirmadoExitoso = ctx.resolverKilometrajeConfirmadoExitoso;
+
+      if (msgLower === '1' || msgLower === '1️⃣' || msgLower === 'confirmar') {
+        return resolverKilometrajeConfirmadoExitoso(
+          ctx.res,
+          sesion,
+          opciones.telefono,
+          opciones,
+          {
+            kilometraje: sesion.kmDetectado,
+            origen: 'Confirmado con alerta: ' + sesion.kmDetectado + ' km',
+            alertas: Array.isArray(sesion.alertasKm) ? sesion.alertasKm : [{ tipo: 'lectura_fuera_rango' }],
+            fuente: 'confirmacion_ocr_alerta',
+            evaluacion: null,
+            prefijoMensaje: ''
+          }
+        );
+      }
+      if (msgLower === '2' || msgLower === '2️⃣') {
+        sesion.estado = opciones.estadoManual;
+        return crearResultadoKm(
+          false,
+          'KM_MANUAL_ENTRY_REQUIRED',
+          '⌨️ Escribe el kilometraje correcto.\nEjemplo: *267354*' + nav.PIE_NAV,
+          { motivo: 'lectura_fuera_rango' }
+        );
+      }
+      if (msgLower === '3' || msgLower === '3️⃣' || msgLower === 'foto') {
+        sesion.kmDetectado = null;
+        sesion.kmLecturaFueraRango = false;
+        sesion.inconsistenciaKm = false;
+        sesion.alertasKm = [];
+        sesion.diferenciaKm = null;
+        sesion.estado = opciones.estadoEsperandoFoto;
+        return crearResultadoKm(
+          false,
+          'KM_RETAKE_PHOTO_REQUESTED',
+          opciones.mensajeInicioOdometro(sesion),
+          null
+        );
+      }
+      return crearResultadoKm(
+        false,
+        'KM_OUT_OF_RANGE_CONFIRMATION_REQUIRED',
+        ctx.mensajesModulo.mensajeConfirmacionOdometro(sesion),
+        { kmDetectado: sesion.kmDetectado }
+      );
+    },
+    resolverIngresoManual: async function(ctx) {
+      var sesion = ctx.sesion;
+      var kmManual = ctx.kmManual;
+      var kmStr = String(ctx.mensaje || '').replace(/[^0-9]/g, '');
+      var crearResultadoKm = ctx.crearResultadoKm;
+
+      if (kmManual == null || kmStr.length < 4) {
+        return crearResultadoKm(
+          false,
+          'KM_INVALID_MANUAL_INPUT',
+          '⌨️ Escribe el kilometraje con números.\nEjemplo: *127892*' + nav.PIE_NAV,
+          null
+        );
+      }
+
+      var alertasPos = [];
+      if (typeof sesion.kmReferencia === 'number') {
+        if (kmManual < sesion.kmReferencia) {
+          alertasPos.push({ tipo: 'kilometraje_menor', mensaje: 'Kilometraje menor al último registrado' });
+        } else if (kmManual - sesion.kmReferencia > config.MAX_KM_SALTO) {
+          alertasPos.push({ tipo: 'kilometraje_alto', mensaje: 'Diferencia superior a ' + config.MAX_KM_SALTO + ' km' });
+        }
+        sesion.diferenciaKm = kmManual - sesion.kmReferencia;
+      } else {
+        sesion.diferenciaKm = null;
+      }
+      sesion.alertasKm = alertasPos;
+      sesion.inconsistenciaKm = alertasPos.length > 0;
+
+      var origenPos = 'Kilometraje manual: ' + kmManual + ' km';
+      if (alertasPos.length > 0) origenPos += ' (con alerta)';
+      var avisoPos = alertasPos.length > 0 ? '⚠️ Kilometraje registrado con alerta.\n\n' : '';
+
+      return ctx.resolverKilometrajeConfirmadoExitoso(
+        ctx.res,
+        sesion,
+        ctx.opciones.telefono,
+        {
+          mensajesModulo: ctx.mensajesModulo,
+          registrarKilometrajePreoperacional: ctx.opciones.registrarKilometrajePreoperacional,
+          onKilometrajeConfirmado: ctx.opciones.onKilometrajeConfirmado,
+          contextoFlujo: ctx.opciones.contextoFlujo
+        },
+        {
+          kilometraje: kmManual,
+          origen: origenPos,
+          alertas: alertasPos,
+          fuente: 'manual',
+          evaluacion: null,
+          prefijoMensaje: avisoPos
+        }
+      );
+    }
+  };
 }
 
 async function manejarConfirmacionFinal(sesion, telefono, mensaje) {
@@ -304,23 +402,6 @@ async function procesarEstado(res, sesion, telefono, mensaje, msgUpper, mediaUrl
     // Texto como placa
     var mensajePlaca = await this._manejarPlaca(sesion, telefono, mensaje);
     return twiml.responderTwiml(res, mensajePlaca);
-  }
-
-  // Manejar ODOMETRO_CONFIRMACION y ODOMETRO_MANUAL ANTES del compartido
-  // porque posop necesita ir a FOTO_ESTADO_GENERAL, no al siguiente estado del preop
-  if (sesion.estado === ESTADOS.ODOMETRO_CONFIRMACION) {
-    if (numMedia > 0 && mediaUrl) {
-      return await this._procesarFotoOdometro(res, sesion, mediaUrl);
-    }
-    return twiml.responderTwiml(res, await manejarConfirmacionKilometraje(sesion, mensaje));
-  }
-
-  if (sesion.estado === ESTADOS.ODOMETRO_MANUAL) {
-    if (mediaUrl) {
-      sesion.estado = ESTADOS.ESPERANDO_FOTO_ODOMETRO;
-      return await this._procesarFotoOdometro(res, sesion, mediaUrl);
-    }
-    return twiml.responderTwiml(res, await manejarKilometrajeManual(sesion, mensaje));
   }
 
   var resultadoCompartido = await this.procesarEstadoCompartido(res, sesion, telefono, mensaje, mediaUrls);
