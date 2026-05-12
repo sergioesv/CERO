@@ -334,7 +334,8 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── canon
 │       ├── CERO_ARCHITECTURE_RULES.md
 │       ├── CERO_CANON.md
-│       └── CERO_DATABASE_CONTRACT.md
+│       ├── CERO_DATABASE_CONTRACT.md
+│       └── CERO_RELEASE_CHECKLIST.md
 ├── instrucciones
 │   ├── fix-badge-rol-header.txt
 │   ├── fix-ci-frontend-eslint.txt
