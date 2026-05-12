@@ -307,7 +307,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-04-20 -->
+<!-- Última actualización: 2026-05-12 -->
 
 ## Folder structure
 
@@ -330,6 +330,9 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── revisionesEquipos.js  # Revision de equipos — arneses, escaleras, EPP (Fase 3)
 │   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
 │   └── tanqueos.js  # Tanqueos — registro de combustible
+├── docs
+│   └── canon
+│       └── CERO_CANON.md
 ├── instrucciones
 │   ├── fix-badge-rol-header.txt
 │   ├── fix-ci-frontend-eslint.txt
@@ -469,6 +472,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── cero_powersell.ps1
+├── CLAUDE.md
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
 └── package.json
