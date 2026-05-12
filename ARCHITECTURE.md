@@ -332,6 +332,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── tanqueos.js  # Tanqueos — registro de combustible
 ├── docs
 │   └── canon
+│       ├── CERO_ARCHITECTURE_RULES.md
 │       ├── CERO_CANON.md
 │       └── CERO_DATABASE_CONTRACT.md
 ├── instrucciones
