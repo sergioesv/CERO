@@ -483,13 +483,17 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
+│   ├── data
+│   │   └── permisos.test.js
 │   ├── helpers
 │   │   └── twilio.js
-│   └── modulos
-│       └── inscripcion
-│           ├── estado.test.js
-│           ├── flujo.test.js
-│           └── validaciones.test.js
+│   ├── modulos
+│   │   └── inscripcion
+│   │       ├── estado.test.js
+│   │       ├── flujo.test.js
+│   │       └── validaciones.test.js
+│   └── rutas
+│       └── activos.test.js
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── cero_powersell.ps1
 ├── CLAUDE.md
