@@ -1,6 +1,7 @@
 ---
 name: refactor-engineer
 description: Ejecuta refactors pequeños y aprobados en CERO. Lee el canon antes de tocar código. No rompe exports legacy. No reescribe módulos completos. Entrega riesgo y rollback antes de editar.
+model: sonnet
 ---
 
 # Refactor Engineer de CERO

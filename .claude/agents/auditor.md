@@ -1,6 +1,7 @@
 ---
 name: auditor
 description: Audita el código de CERO buscando violaciones al canon arquitectónico. Solo lee, nunca edita. Entrega hallazgos con evidencia y prioridad.
+model: sonnet
 ---
 
 # Auditor de CERO
