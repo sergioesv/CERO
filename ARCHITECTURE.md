@@ -307,7 +307,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-12 -->
+<!-- Última actualización: 2026-05-14 -->
 
 ## Folder structure
 
@@ -322,6 +322,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── alertas.js  # Alertas — vencimientos de documentos y licencias
 │   ├── ats.js  # ATS — Analisis de Trabajo Seguro (Fase 3)
 │   ├── autorizaciones.js  # Autorizaciones de novedades — pendientes, resueltas, decidir
+│   ├── conductores.js
 │   ├── dashboard.js  # Dashboard — consultas agregadas para el panel ejecutivo
 │   ├── inspecciones.js  # Inspecciones — consultas compartidas entre modulos
 │   ├── permisos.js  # Permisos — roles canonicos, seed de permisos base, classifyRoleName
@@ -331,6 +332,8 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
 │   └── tanqueos.js  # Tanqueos — registro de combustible
 ├── docs
+│   ├── adr
+│   │   └── 0001-twiml-compartido-y-data-conductores.md
 │   └── canon
 │       ├── CERO_ARCHITECTURE_RULES.md
 │       ├── CERO_CANON.md
@@ -349,6 +352,8 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── alertas
 │   │   ├── notificador.js  # Cron 6:00 AM — envia alertas de documentos por WhatsApp
 │   │   └── reglas.js  # Reglas de alerta — umbrales 30/15/7/0 dias, clasificacion
+│   ├── compartido
+│   │   └── twiml.js
 │   ├── inscripcion
 │   │   ├── estado.js  # Estados del flujo de auto-registro de conductores
 │   │   ├── flujo.js  # Flujo de inscripcion automatica de conductor nuevo
@@ -473,11 +478,22 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── plantillas.js
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+├── tests
+│   ├── __mocks__
+│   │   └── supabase.js
+│   ├── helpers
+│   │   └── twilio.js
+│   └── modulos
+│       └── inscripcion
+│           ├── estado.test.js
+│           ├── flujo.test.js
+│           └── validaciones.test.js
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── cero_powersell.ps1
 ├── CLAUDE.md
 ├── eslint.config.cjs  # ESLint — compatible con CommonJS
 ├── index.js  # Entrada Express — helmet, rutas, cron, endpoints API
+├── jest.config.js
 └── package.json
 ```
 
@@ -504,5 +520,6 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | `@eslint/js` | ^10.0.1 |
 | `eslint` | ^10.2.0 |
 | `globals` | ^17.4.0 |
+| `jest` | ^30.4.2 |
 
 <!-- AUTO-GENERATED END -->
