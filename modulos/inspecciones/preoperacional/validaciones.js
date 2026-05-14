@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// modulos/vehiculos/preoperacional/validaciones.js
+// modulos/inspecciones/preoperacional/validaciones.js
 // Definición de grupos, ítems, sub-preguntas de severidad
 // y funciones de clasificación del preoperacional.
 // CERO — v12 — Sistema de clasificación de novedades

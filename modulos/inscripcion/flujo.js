@@ -1,4 +1,4 @@
-// modulos/vehiculos/inscripcion/flujo.js
+// modulos/inscripcion/flujo.js
 // Flujo conversacional de registro de conductores nuevos por WhatsApp.
 // Se activa automáticamente desde whatsapp.js cuando el número no está registrado
 // en la tabla conductores.

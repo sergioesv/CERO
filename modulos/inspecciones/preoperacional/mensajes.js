@@ -1,4 +1,4 @@
-// modulos/vehiculos/preoperacional/mensajes.js
+// modulos/inspecciones/preoperacional/mensajes.js
 // Textos de UX del flujo preoperacional.
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto

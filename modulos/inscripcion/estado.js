@@ -1,4 +1,4 @@
-// modulos/vehiculos/inscripcion/estado.js
+// modulos/inscripcion/estado.js
 // Inicialización y limpieza del estado de sesión para el flujo de inscripción
 
 'use strict';

@@ -1,4 +1,4 @@
-// modulos/vehiculos/inscripcion/validaciones.js
+// modulos/inscripcion/validaciones.js
 // Reglas de validación y normalización de datos para el registro de conductores
 
 'use strict';

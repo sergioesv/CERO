@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// modulos/vehiculos/preoperacional/estado.js
+// modulos/inspecciones/preoperacional/estado.js
 // Manejo de sesión y datos operativos del preoperacional.
 // CERO — v12 — Soporte para sub-preguntas de severidad
 // ═══════════════════════════════════════════════════════════

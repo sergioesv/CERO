@@ -1,4 +1,4 @@
-// modulos/vehiculos/inscripcion/mensajes.js
+// modulos/inscripcion/mensajes.js
 // Textos de UX para el flujo de inscripción de conductores nuevos.
 // Sistema de diseño unificado CERO:
 //   Opciones  → 1️⃣ Texto
