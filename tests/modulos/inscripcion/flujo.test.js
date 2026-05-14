@@ -65,7 +65,6 @@ jest.mock('../../../modulos/inspecciones/compartido/navegacion', function() {
 
 var { manejarInscripcion } = require('../../../modulos/inscripcion/flujo');
 var estadoMod = require('../../../modulos/inscripcion/estado');
-var mensajes  = require('../../../modulos/inscripcion/mensajes');
 var { crearResFalso, crearReqFalso } = require('../../helpers/twilio');
 
 var ESTADOS = estadoMod.ESTADOS;

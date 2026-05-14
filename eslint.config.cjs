@@ -33,4 +33,12 @@ module.exports = [
       'no-undef': 'off',
     },
   },
+  {
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
 ];
