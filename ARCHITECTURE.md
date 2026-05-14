@@ -481,6 +481,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── supabase
 │   └── migrations
+│       └── 20260514120000_rename_permiso_vehiculos_a_activos.sql
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
