@@ -5,54 +5,15 @@
 
 'use strict';
 
-var config       = require('../../config/config');
-var sesiones     = require('../../servicios/sesiones');
-var mensajes     = require('./mensajes');
-var validaciones = require('./validaciones');
-var estadoMod    = require('./estado');
-var nav          = require('../inspecciones/compartido/navegacion');
-var twiml        = require('../compartido/twiml');
+var sesiones        = require('../../servicios/sesiones');
+var conductoresData = require('../../data/conductores');
+var mensajes        = require('./mensajes');
+var validaciones    = require('./validaciones');
+var estadoMod       = require('./estado');
+var nav             = require('../inspecciones/compartido/navegacion');
+var twiml           = require('../compartido/twiml');
 
 var ESTADOS = estadoMod.ESTADOS;
-
-// ============================================================================
-// GUARDAR CONDUCTOR EN SUPABASE
-// ============================================================================
-
-/**
- * Inserta el conductor nuevo en la tabla conductores.
- * Normaliza el teléfono antes de guardar.
- * @param {string} telefono - Número WhatsApp completo (ej: whatsapp:+573001234567)
- * @param {object} datos    - { nombre, cedula, licencia, cargo }
- * @returns {Promise<{ error: object|null, data: object|null }>}
- */
-async function guardarConductor(telefono, datos) {
-  // Quitar prefijo whatsapp: y espacios para guardar solo el número
-  var telefonoLimpio = String(telefono || '')
-    .replace(/^whatsapp:/i, '')
-    .trim();
-
-  var registro = {
-    nombre:             datos.nombre,
-    cedula:             datos.cedula,
-    telefono:           telefonoLimpio,
-    licencia_categoria: datos.licencia,
-    cargo:              datos.cargo,
-    activo:             true
-  };
-
-  var resultado = await config.supabase
-    .from('conductores')
-    .insert([registro])
-    .select()
-    .single();
-
-  if (resultado.error) {
-    return { error: resultado.error, data: null };
-  }
-
-  return { error: null, data: resultado.data };
-}
 
 // ============================================================================
 // MANEJADOR PRINCIPAL
@@ -168,7 +129,7 @@ async function manejarInscripcion(req, res) {
         );
       }
 
-      var guardado = await guardarConductor(telefono, sesion.inscripcion);
+      var guardado = await conductoresData.insertarConductor(telefono, sesion.inscripcion);
 
       if (guardado.error) {
         console.error('[INSCRIPCION] Error guardando conductor:', guardado.error.message);

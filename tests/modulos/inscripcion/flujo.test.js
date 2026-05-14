@@ -45,7 +45,7 @@ var mockFrom    = jest.fn(function() { return { insert: mockInsert }; });
 jest.mock('../../../config/config', function() {
   return {
     supabase: { from: mockFrom },
-    TABLES: { sesionesActivas: 'sesiones_activas' },
+    TABLES: { sesionesActivas: 'sesiones_activas', conductores: 'conductores' },
     TIMEOUT_FLUJO_MS: { default: 30 * 60 * 1000 },
     TIMEOUT_RECUPERACION_MS: 5 * 60 * 1000
   };
