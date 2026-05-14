@@ -478,6 +478,8 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── plantillas.js
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+├── supabase
+│   └── migrations
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
