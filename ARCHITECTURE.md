@@ -333,7 +333,8 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── tanqueos.js  # Tanqueos — registro de combustible
 ├── docs
 │   ├── adr
-│   │   └── 0001-twiml-compartido-y-data-conductores.md
+│   │   ├── 0001-twiml-compartido-y-data-conductores.md
+│   │   └── 0002-rename-permiso-vehiculos-a-activos.md
 │   └── canon
 │       ├── CERO_ARCHITECTURE_RULES.md
 │       ├── CERO_CANON.md
