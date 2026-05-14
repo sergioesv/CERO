@@ -1,7 +1,7 @@
 # ADR 0002: Rename del recurso de permisos `vehiculos` a `activos`
 
 ## Estado
-Aceptado — 2026-05-13
+Implementado — 2026-05-14
 
 ## Contexto
 
@@ -50,17 +50,17 @@ Patrón elegido: **rename progresivo en fases discretas, sin alias en código y 
 
 **Fase 0 — Tests de contrato.** Estado: **completada**. Publicada en `origin/desarrollo` como commit `2b51978`. Archivos creados: `tests/data/permisos.test.js`, `tests/rutas/activos.test.js`. Congela el comportamiento actual con `"vehiculos"`: 43/43 tests pasan contra el código actual. Estos tests funcionan como red de seguridad para Fase 1.
 
-**Fase 1 — Rename en código.** Modificar:
+**Fase 1 — Rename en código.** Estado: **completada**. Commit `62786ee` en `origin/desarrollo`. Archivos modificados:
 
-- `data/permisos.js`: reemplazar la clave `vehiculos` por `activos` en los 7 roles canónicos de `CANONICAL_ROLE_PERMISSIONS` (líneas 5, 18, 31, 40, 50, 67, 75).
-- `rutas/activos.js`: reemplazar el primer argumento de `verificarPermiso` de `'vehiculos'` a `'activos'` en las 8 llamadas (líneas 14, 54, 129, 140, 157, 232, 265, 298).
-- `tests/data/permisos.test.js` y `tests/rutas/activos.test.js`: actualizar las aserciones para usar `'activos'` en lugar de `'vehiculos'`. Si los tests pasan tras el rename, confirman que el comportamiento es idéntico.
+- `data/permisos.js`: clave `vehiculos` reemplazada por `activos` en los 7 roles canónicos de `CANONICAL_ROLE_PERMISSIONS`.
+- `rutas/activos.js`: primer argumento de `verificarPermiso` reemplazado de `'vehiculos'` a `'activos'` en las 8 llamadas.
+- `tests/data/permisos.test.js` y `tests/rutas/activos.test.js`: aserciones actualizadas a `'activos'`. Tests pasan tras el rename, confirmando comportamiento idéntico al previo.
 
-Efecto observable tras el deploy: el seed empieza a escribir `modulo:'activos'` en `permisos_rol` al arranque. Las filas previas con `modulo:'vehiculos'` quedan como ruido inerte hasta Fase 2 (no afectan acceso porque el middleware no consulta `permisos_rol` en runtime). Commit y PR independientes.
+Efecto observable: el seed escribe `modulo:'activos'` en `permisos_rol` al arranque. Las filas previas con `modulo:'vehiculos'` quedaron como ruido inerte hasta Fase 2.
 
-**Fase 2 — Migration de BD conflict-safe.** Crear `supabase/migrations/<YYYYMMDDHHMMSS>_rename_permiso_vehiculos_a_activos.sql`. Ver estrategia detallada en la siguiente sección. Commit y PR independientes. Requiere checklist obligatorio de `CERO_DATABASE_CONTRACT.md:172-183`.
+**Fase 2 — Migration de BD conflict-safe.** Estado: **completada**. Archivo: `supabase/migrations/20260514120000_rename_permiso_vehiculos_a_activos.sql`. Commit local `1152ba2` (pendiente de push al momento del cierre documental). Migration aplicada manualmente en Supabase el 2026-05-14. Resultado verificado post-migration: `permisos_rol` sin filas `modulo='vehiculos'` (P1: 0 filas), 21 filas `modulo='activos'` conservadas (P2), snapshot por módulo sin entrada `'vehiculos'` (P3). Las 8 precondiciones de schema listadas en este ADR fueron verificadas el 2026-05-14; el detalle queda documentado dentro del propio archivo `.sql` de la migration.
 
-**Fase 3 — Verificación y cierre.** Grep residual sobre el repo confirmando 0 ocurrencias de `"vehiculos"` como string de recurso de permiso en código productivo. Actualizar `supabase/migrations/README.md` (sección "H2.2 pendiente"). Actualizar este ADR a estado *Implementado*. Commit y PR independientes.
+**Fase 3 — Verificación y cierre.** Estado: **completada** (2026-05-14). Grep residual confirmó 0 ocurrencias de `"vehiculos"` como string de recurso de permiso en código productivo. `supabase/migrations/README.md` actualizado. Este ADR actualizado a estado *Implementado*.
 
 ### Estrategia conflict-safe de Fase 2 (pseudo-SQL — el SQL definitivo se redacta tras inspeccionar el schema real)
 
@@ -146,6 +146,8 @@ El SQL real no debe escribirse hasta inspeccionar el schema vigente de `permisos
 
 La inspección se realiza fuera de esta sesión (psql o Supabase Studio con aprobación humana). Esta auditoría queda como pre-requisito explícito de Fase 2.
 
+**Verificación completada el 2026-05-14.** Las 8 precondiciones fueron resueltas antes de redactar el SQL definitivo. El detalle de cada verificación (columnas, constraints, RLS, triggers, cardinalidad, soft-delete) queda documentado en `supabase/migrations/20260514120000_rename_permiso_vehiculos_a_activos.sql`.
+
 ### Fuera de alcance de este ADR
 
 Este ADR cubre exclusivamente el renombrado del **recurso de permisos** `vehiculos` → `activos`. Quedan explícitamente fuera de alcance:
@@ -157,6 +159,7 @@ Este ADR cubre exclusivamente el renombrado del **recurso de permisos** `vehicul
 - **RLS sobre `permisos_rol`.** Decisión separada con su propio ADR.
 - **Refactor de `seedPermisosBase`** para que `buildSeedRowsForRoles` quede exportada y testeable directamente (señal arquitectónica detectada en Fase 0, no resuelta aquí).
 - **Cambios en otros recursos de `CANONICAL_ROLE_PERMISSIONS`** (`conductores`, `usuarios`, `flota`, etc.).
+- **H2.7 — Funciones SQL legacy** que referencian la tabla `vehiculos` (ya eliminada en migración v26). Detectadas durante la inspección de Fase 2 (`verificar_vehiculo_operable`, `actualizar_kilometraje_posoperacional`, `actualizar_kilometraje_tanqueo`, `alertas_documentos_activas`, `bloquear_vehiculos_vencidos`, `verificar_pico_placa`). Deuda técnica pendiente; requiere ADR propio antes de ejecutarse.
 
 ---
 
