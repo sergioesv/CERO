@@ -5,7 +5,7 @@
  *
  * Tests de contrato — Fase 0 Plan H2.2.
  * Prueba el middleware verificarPermiso (de middlewares/auth.js) en el contexto
- * del recurso 'vehiculos', simulando los req/res/next que rutas/activos.js
+ * del recurso 'activos', simulando los req/res/next que rutas/activos.js
  * le pasaría en producción.
  *
  * NO se carga rutas/activos.js ni se levanta Express.
@@ -91,15 +91,15 @@ beforeEach(function() {
 });
 
 // ============================================================================
-// Test 1: supervisor con acción 'ver' → next() (supervisor tiene 'ver' en vehiculos)
+// Test 1: supervisor con acción 'ver' → next() (supervisor tiene 'ver' en activos)
 // ============================================================================
 
-describe("verificarPermiso('vehiculos','ver') — rol supervisor", function() {
+describe("verificarPermiso('activos','ver') — rol supervisor", function() {
 
   it('debería llamar next() cuando el usuario tiene rol supervisor', async function() {
-    // supervisor.vehiculos = ['ver','editar','autorizar']  — data/permisos.js línea 40
+    // supervisor.activos = ['ver','editar','autorizar']  — data/permisos.js línea 40
     // classifyRoleName('supervisor') → 'supervisor'        — data/permisos.js línea 103
-    // getAllowedCanonicalRolesForItem('vehiculos','ver') incluye 'supervisor' — línea 118-122
+    // getAllowedCanonicalRolesForItem('activos','ver') incluye 'supervisor' — línea 118-122
 
     // La BD devuelve el rol 'supervisor' para este usuario
     mockEqFinal.mockResolvedValueOnce({
@@ -111,7 +111,7 @@ describe("verificarPermiso('vehiculos','ver') — rol supervisor", function() {
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
@@ -121,13 +121,13 @@ describe("verificarPermiso('vehiculos','ver') — rol supervisor", function() {
 });
 
 // ============================================================================
-// Test 2: supervisor con acción 'crear' → 403 (supervisor NO tiene 'crear' en vehiculos)
+// Test 2: supervisor con acción 'crear' → 403 (supervisor NO tiene 'crear' en activos)
 // ============================================================================
 
-describe("verificarPermiso('vehiculos','crear') — rol supervisor", function() {
+describe("verificarPermiso('activos','crear') — rol supervisor", function() {
 
-  it('debería responder 403 cuando supervisor intenta crear vehiculos', async function() {
-    // supervisor.vehiculos = ['ver','editar','autorizar']  — data/permisos.js línea 40
+  it('debería responder 403 cuando supervisor intenta crear activos', async function() {
+    // supervisor.activos = ['ver','editar','autorizar']  — data/permisos.js línea 40
     // 'crear' NO está en ese array, por lo tanto no pasa el some() en auth.js línea 45
 
     mockEqFinal.mockResolvedValueOnce({
@@ -139,7 +139,7 @@ describe("verificarPermiso('vehiculos','crear') — rol supervisor", function() 
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'crear');
+    var middleware = verificarPermiso('activos', 'crear');
     await middleware(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
@@ -149,10 +149,10 @@ describe("verificarPermiso('vehiculos','crear') — rol supervisor", function() 
 });
 
 // ============================================================================
-// Test 3: rol sin acceso a vehiculos ('conductor') → 403
+// Test 3: rol sin acceso a activos ('conductor') → 403
 // ============================================================================
 
-describe("verificarPermiso('vehiculos','ver') — rol conductor (sin acceso)", function() {
+describe("verificarPermiso('activos','ver') — rol conductor (sin acceso)", function() {
 
   it('debería responder 403 cuando el usuario tiene rol conductor', async function() {
     // classifyRoleName('conductor') → null  — data/permisos.js línea 104
@@ -168,7 +168,7 @@ describe("verificarPermiso('vehiculos','ver') — rol conductor (sin acceso)", f
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
@@ -185,7 +185,7 @@ describe("verificarPermiso('vehiculos','ver') — rol conductor (sin acceso)", f
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
@@ -198,7 +198,7 @@ describe("verificarPermiso('vehiculos','ver') — rol conductor (sin acceso)", f
 // Test 4: superadmin_plataforma → cortocircuita sin consultar Supabase
 // ============================================================================
 
-describe("verificarPermiso('vehiculos','ver') — rol superadmin_plataforma", function() {
+describe("verificarPermiso('activos','ver') — rol superadmin_plataforma", function() {
 
   it('debería llamar next() inmediatamente sin consultar supabase.from()', async function() {
     // auth.js línea 29:
@@ -210,7 +210,7 @@ describe("verificarPermiso('vehiculos','ver') — rol superadmin_plataforma", fu
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
@@ -225,7 +225,7 @@ describe("verificarPermiso('vehiculos','ver') — rol superadmin_plataforma", fu
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
@@ -244,10 +244,10 @@ describe("verificarPermiso('vehiculos','ver') — rol superadmin_plataforma", fu
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
-    // superadmin_emp SÍ tiene 'ver' en vehiculos (data/permisos.js línea 18),
+    // superadmin_emp SÍ tiene 'ver' en activos (data/permisos.js línea 18),
     // por lo que el resultado final es next() — pero SÍ consultó Supabase.
     expect(mockFromSb).toHaveBeenCalledWith('usuarios_roles');
     expect(next).toHaveBeenCalledTimes(1);
@@ -274,7 +274,7 @@ describe("verificarPermiso — error de Supabase → 500", function() {
     var res  = buildRes();
     var next = jest.fn();
 
-    var middleware = verificarPermiso('vehiculos', 'ver');
+    var middleware = verificarPermiso('activos', 'ver');
     await middleware(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);

@@ -11,7 +11,7 @@ const activosData = require('../data/activos');
 const autorizacionesData = require('../data/autorizaciones');
 
 // GET / — lista todos los activos con placa (vehículos)
-router.get('/', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
+router.get('/', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('activos')
@@ -51,7 +51,7 @@ router.get('/', verificarToken, verificarPermiso('vehiculos', 'ver'), async func
 });
 
 // POST / — crea un activo (vehículo)
-router.post('/', verificarToken, verificarPermiso('vehiculos', 'crear'), async function (req, res) {
+router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async function (req, res) {
   try {
     if (!req.body.placa) {
       return res.status(400).json({ ok: false, error: 'El campo placa es obligatorio' });
@@ -126,7 +126,7 @@ router.post('/', verificarToken, verificarPermiso('vehiculos', 'crear'), async f
 });
 
 // GET /:placa/historial — timeline completo del activo (antes de /:placa)
-router.get('/:placa/historial', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
+router.get('/:placa/historial', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
     var resultado = await autorizacionesData.obtenerHistorialActivo(req.params.placa);
     res.json({ ok: true, vehiculo: resultado.vehiculo, historial: resultado.historial });
@@ -137,7 +137,7 @@ router.get('/:placa/historial', verificarToken, verificarPermiso('vehiculos', 'v
 });
 
 // GET /:placa — obtiene un activo por placa
-router.get('/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), async function (req, res) {
+router.get('/:placa', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
     const { data, error } = await supabase
       .from('activos')
@@ -154,7 +154,7 @@ router.get('/:placa', verificarToken, verificarPermiso('vehiculos', 'ver'), asyn
 });
 
 // PUT /:placa — actualiza un activo
-router.put('/:placa', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
+router.put('/:placa', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     const param = req.params.placa; // puede ser UUID o placa
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -229,7 +229,7 @@ router.put('/:placa', verificarToken, verificarPermiso('vehiculos', 'editar'), a
 });
 
 // POST /:placa/bloquear — bloquea un activo
-router.post('/:placa/bloquear', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
+router.post('/:placa/bloquear', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     var placa = req.params.placa.toUpperCase();
     var activoId = await activosData.obtenerActivoIdPorPlaca(placa);
@@ -262,7 +262,7 @@ router.post('/:placa/bloquear', verificarToken, verificarPermiso('vehiculos', 'e
 });
 
 // POST /:placa/desbloquear — desbloquea un activo
-router.post('/:placa/desbloquear', verificarToken, verificarPermiso('vehiculos', 'editar'), async function (req, res) {
+router.post('/:placa/desbloquear', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     var placa = req.params.placa.toUpperCase();
     var activoId = await activosData.obtenerActivoIdPorPlaca(placa);
@@ -295,7 +295,7 @@ router.post('/:placa/desbloquear', verificarToken, verificarPermiso('vehiculos',
 });
 
 // DELETE /:placa — elimina un activo (solo si no tiene historial)
-router.delete('/:placa', verificarToken, verificarPermiso('vehiculos', 'eliminar'), async function (req, res) {
+router.delete('/:placa', verificarToken, verificarPermiso('activos', 'eliminar'), async function (req, res) {
   try {
     const placa = req.params.placa.toUpperCase();
     var activoId = await activosData.obtenerActivoIdPorPlaca(placa);

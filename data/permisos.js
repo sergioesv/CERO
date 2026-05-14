@@ -2,7 +2,7 @@ const { supabase } = require('../config/config');
 
 const CANONICAL_ROLE_PERMISSIONS = {
   superadmin_plataforma: {
-    vehiculos: ['ver', 'crear', 'editar', 'autorizar', 'eliminar'],
+    activos: ['ver', 'crear', 'editar', 'autorizar', 'eliminar'],
     conductores: ['ver', 'crear', 'editar'],
     sedes: ['ver', 'crear', 'editar'],
     usuarios: ['ver', 'crear', 'editar'],
@@ -15,7 +15,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     autorizaciones: ['ver', 'editar']
   },
   superadmin_emp: {
-    vehiculos: ['ver', 'crear', 'editar', 'eliminar'],
+    activos: ['ver', 'crear', 'editar', 'eliminar'],
     conductores: ['ver', 'crear', 'editar'],
     sedes: ['ver', 'crear', 'editar'],
     usuarios: ['ver', 'crear', 'editar'],
@@ -28,7 +28,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     autorizaciones: ['ver', 'editar']
   },
   administrador: {
-    vehiculos: ['ver', 'crear', 'editar'],
+    activos: ['ver', 'crear', 'editar'],
     conductores: ['ver', 'crear', 'editar'],
     flota: ['ver'],
     preoperacionales: ['ver'],
@@ -37,7 +37,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     alertas: ['ver']
   },
   supervisor: {
-    vehiculos: ['ver', 'editar', 'autorizar'],
+    activos: ['ver', 'editar', 'autorizar'],
     flota: ['ver'],
     preoperacionales: ['ver', 'autorizar'],
     posoperacionales: ['ver', 'autorizar'],
@@ -47,7 +47,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     autorizaciones: ['ver']
   },
   operador: {
-    vehiculos: ['ver'],
+    activos: ['ver'],
     flota: ['ver'],
     preoperacionales: ['ver'],
     posoperacionales: ['ver'],
@@ -61,7 +61,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     dashboard: ['ver']
   },
   auditor: {
-    vehiculos: ['ver'],
+    activos: ['ver'],
     conductores: ['ver'],
     flota: ['ver'],
     preoperacionales: ['ver'],
@@ -72,7 +72,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     autorizaciones: ['ver']
   },
   reportes: {
-    vehiculos: ['ver'],
+    activos: ['ver'],
     conductores: ['ver'],
     flota: ['ver'],
     preoperacionales: ['ver'],

@@ -4,7 +4,7 @@
  * tests/data/permisos.test.js
  *
  * Tests de contrato — Fase 0 Plan H2.2.
- * Congela el comportamiento actual del recurso 'vehiculos' en data/permisos.js
+ * Congela el comportamiento actual del recurso 'activos' en data/permisos.js
  * ANTES de cualquier rename. Todos los tests deben pasar contra el código actual.
  *
  * Funciones bajo prueba:
@@ -67,9 +67,9 @@ var seedPermisosBase            = permisos.seedPermisosBase;
 // Constantes de referencia derivadas del código real
 // ---------------------------------------------------------------------------
 
-// Los 7 roles canónicos de la consigna que SÍ tienen la clave 'vehiculos'.
-// (El octavo rol canónico, 'sst', no tiene vehiculos — no está en esta lista.)
-var ROLES_CON_VEHICULOS = [
+// Los 7 roles canónicos de la consigna que SÍ tienen la clave 'activos'.
+// (El octavo rol canónico, 'sst', no tiene activos — no está en esta lista.)
+var ROLES_CON_ACTIVOS = [
   'superadmin_plataforma',
   'superadmin_emp',
   'administrador',
@@ -80,140 +80,140 @@ var ROLES_CON_VEHICULOS = [
 ];
 
 // ============================================================================
-// 1. CANONICAL_ROLE_PERMISSIONS — presencia de la clave 'vehiculos'
+// 1. CANONICAL_ROLE_PERMISSIONS — presencia de la clave 'activos'
 // ============================================================================
 
-describe("CANONICAL_ROLE_PERMISSIONS — clave 'vehiculos' por rol canónico", function() {
+describe("CANONICAL_ROLE_PERMISSIONS — clave 'activos' por rol canónico", function() {
 
-  ROLES_CON_VEHICULOS.forEach(function(rol) {
-    it("debería contener la clave 'vehiculos' para el rol '" + rol + "'", function() {
+  ROLES_CON_ACTIVOS.forEach(function(rol) {
+    it("debería contener la clave 'activos' para el rol '" + rol + "'", function() {
       expect(CANONICAL_ROLE_PERMISSIONS[rol]).toBeDefined();
-      expect(CANONICAL_ROLE_PERMISSIONS[rol].vehiculos).toBeDefined();
-      expect(Array.isArray(CANONICAL_ROLE_PERMISSIONS[rol].vehiculos)).toBe(true);
-      expect(CANONICAL_ROLE_PERMISSIONS[rol].vehiculos.length).toBeGreaterThan(0);
+      expect(CANONICAL_ROLE_PERMISSIONS[rol].activos).toBeDefined();
+      expect(Array.isArray(CANONICAL_ROLE_PERMISSIONS[rol].activos)).toBe(true);
+      expect(CANONICAL_ROLE_PERMISSIONS[rol].activos.length).toBeGreaterThan(0);
     });
   });
 
 });
 
 // ============================================================================
-// 2. getAllowedCanonicalRolesForItem('vehiculos', 'ver')
+// 2. getAllowedCanonicalRolesForItem('activos', 'ver')
 // ============================================================================
 
-describe("getAllowedCanonicalRolesForItem — acción 'ver' sobre 'vehiculos'", function() {
+describe("getAllowedCanonicalRolesForItem — acción 'ver' sobre 'activos'", function() {
 
   it('debería retornar un array', function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'ver');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'ver');
     expect(Array.isArray(resultado)).toBe(true);
   });
 
-  // Los 7 roles de la consigna todos tienen 'ver' en vehiculos.
-  ROLES_CON_VEHICULOS.forEach(function(rol) {
+  // Los 7 roles de la consigna todos tienen 'ver' en activos.
+  ROLES_CON_ACTIVOS.forEach(function(rol) {
     it("debería incluir el rol '" + rol + "'", function() {
-      var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'ver');
+      var resultado = getAllowedCanonicalRolesForItem('activos', 'ver');
       expect(resultado).toContain(rol);
     });
   });
 
-  it("NO debería incluir 'sst' (sst no tiene la clave vehiculos)", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'ver');
+  it("NO debería incluir 'sst' (sst no tiene la clave activos)", function() {
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'ver');
     expect(resultado).not.toContain('sst');
   });
 
   it("NO debería incluir 'conductor' (conductor no es rol canónico con permisos)", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'ver');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'ver');
     expect(resultado).not.toContain('conductor');
   });
 
 });
 
 // ============================================================================
-// 3. getAllowedCanonicalRolesForItem('vehiculos', 'crear')
+// 3. getAllowedCanonicalRolesForItem('activos', 'crear')
 // ============================================================================
 
-describe("getAllowedCanonicalRolesForItem — acción 'crear' sobre 'vehiculos'", function() {
+describe("getAllowedCanonicalRolesForItem — acción 'crear' sobre 'activos'", function() {
 
-  // Roles con 'crear' en vehiculos según data/permisos.js:
+  // Roles con 'crear' en activos según data/permisos.js:
   //   superadmin_plataforma : ['ver','crear','editar','autorizar','eliminar']  línea 5
   //   superadmin_emp        : ['ver','crear','editar','eliminar']               línea 18
   //   administrador         : ['ver','crear','editar']                          línea 31
-  // supervisor, operador, auditor, reportes NO tienen 'crear' en vehiculos.
+  // supervisor, operador, auditor, reportes NO tienen 'crear' en activos.
 
-  it('debería retornar exactamente los roles con crear en vehiculos', function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+  it('debería retornar exactamente los roles con crear en activos', function() {
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     var esperados = ['superadmin_plataforma', 'superadmin_emp', 'administrador'];
 
     expect(resultado.sort()).toEqual(esperados.sort());
   });
 
   it("debería incluir 'superadmin_plataforma'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     expect(resultado).toContain('superadmin_plataforma');
   });
 
   it("debería incluir 'superadmin_emp'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     expect(resultado).toContain('superadmin_emp');
   });
 
   it("debería incluir 'administrador'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     expect(resultado).toContain('administrador');
   });
 
-  it("NO debería incluir 'supervisor' (supervisor.vehiculos no tiene 'crear')", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+  it("NO debería incluir 'supervisor' (supervisor.activos no tiene 'crear')", function() {
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     expect(resultado).not.toContain('supervisor');
   });
 
   it("NO debería incluir 'operador'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'crear');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'crear');
     expect(resultado).not.toContain('operador');
   });
 
 });
 
 // ============================================================================
-// 4. getAllowedCanonicalRolesForItem('vehiculos', 'autorizar')
+// 4. getAllowedCanonicalRolesForItem('activos', 'autorizar')
 // ============================================================================
 
-describe("getAllowedCanonicalRolesForItem — acción 'autorizar' sobre 'vehiculos'", function() {
+describe("getAllowedCanonicalRolesForItem — acción 'autorizar' sobre 'activos'", function() {
 
-  // Roles con 'autorizar' en vehiculos según data/permisos.js:
+  // Roles con 'autorizar' en activos según data/permisos.js:
   //   superadmin_plataforma : ['ver','crear','editar','autorizar','eliminar']  línea 5
   //   supervisor            : ['ver','editar','autorizar']                      línea 40
-  // El resto NO tiene 'autorizar' en vehiculos.
+  // El resto NO tiene 'autorizar' en activos.
   // La consigna esperaba exactamente ['superadmin_plataforma','supervisor'] — coincide.
 
   it("debería retornar exactamente ['superadmin_plataforma', 'supervisor']", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'autorizar');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'autorizar');
     expect(resultado.sort()).toEqual(['superadmin_plataforma', 'supervisor'].sort());
   });
 
   it("debería incluir 'superadmin_plataforma'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'autorizar');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'autorizar');
     expect(resultado).toContain('superadmin_plataforma');
   });
 
   it("debería incluir 'supervisor'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'autorizar');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'autorizar');
     expect(resultado).toContain('supervisor');
   });
 
-  it("NO debería incluir 'superadmin_emp' (no tiene 'autorizar' en vehiculos)", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'autorizar');
+  it("NO debería incluir 'superadmin_emp' (no tiene 'autorizar' en activos)", function() {
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'autorizar');
     expect(resultado).not.toContain('superadmin_emp');
   });
 
   it("NO debería incluir 'administrador'", function() {
-    var resultado = getAllowedCanonicalRolesForItem('vehiculos', 'autorizar');
+    var resultado = getAllowedCanonicalRolesForItem('activos', 'autorizar');
     expect(resultado).not.toContain('administrador');
   });
 
 });
 
 // ============================================================================
-// 5. seedPermisosBase — invoca upsert con filas que contienen modulo:'vehiculos'
+// 5. seedPermisosBase — invoca upsert con filas que contienen modulo:'activos'
 //    y con onConflict:'rol_id,modulo,accion'
 //
 //    buildSeedRowsForRoles no está exportado (ver NOTA DE DISCREPANCIA RESUELTA).
@@ -232,7 +232,7 @@ describe('seedPermisosBase — contrato con Supabase (mock)', function() {
     mockUpsert.mockClear();
 
     // from('roles').select() devuelve roles de prueba que incluyen 'supervisor'
-    // para garantizar que habrá filas con modulo:'vehiculos' en el upsert.
+    // para garantizar que habrá filas con modulo:'activos' en el upsert.
     mockSelectSb.mockResolvedValueOnce({
       data: [
         { id: 'uuid-sup-001', nombre: 'supervisor' },
@@ -264,25 +264,25 @@ describe('seedPermisosBase — contrato con Supabase (mock)', function() {
     expect(opciones.onConflict).toBe('rol_id,modulo,accion');
   });
 
-  it("debería incluir al menos una fila con modulo:'vehiculos' para supervisor", async function() {
+  it("debería incluir al menos una fila con modulo:'activos' para supervisor", async function() {
     await seedPermisosBase();
 
     var filas = mockUpsert.mock.calls[0][0]; // primer argumento: array de filas
     expect(Array.isArray(filas)).toBe(true);
 
-    var filasVehiculos = filas.filter(function(f) { return f.modulo === 'vehiculos'; });
-    expect(filasVehiculos.length).toBeGreaterThan(0);
+    var filasActivos = filas.filter(function(f) { return f.modulo === 'activos'; });
+    expect(filasActivos.length).toBeGreaterThan(0);
   });
 
-  it("las filas de vehiculos para supervisor deben tener rol_id:'uuid-sup-001' y permitido:true", async function() {
+  it("las filas de activos para supervisor deben tener rol_id:'uuid-sup-001' y permitido:true", async function() {
     await seedPermisosBase();
 
     var filas = mockUpsert.mock.calls[0][0];
     var filasSupVeh = filas.filter(function(f) {
-      return f.modulo === 'vehiculos' && f.rol_id === 'uuid-sup-001';
+      return f.modulo === 'activos' && f.rol_id === 'uuid-sup-001';
     });
 
-    // supervisor.vehiculos = ['ver','editar','autorizar'] — 3 filas esperadas
+    // supervisor.activos = ['ver','editar','autorizar'] — 3 filas esperadas
     expect(filasSupVeh.length).toBe(3);
 
     filasSupVeh.forEach(function(f) {
