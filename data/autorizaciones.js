@@ -288,6 +288,47 @@ async function registrarDecision(autorizacionId, decision, justificacion, superv
   return { ok: true };
 }
 
+// ─────────────────────────────────────────────────────────────────
+// CREAR AUTORIZACIÓN DESDE BLOQUEO
+// Llamado por cierre.js cuando clasificacion='BLOQUEO'
+// ─────────────────────────────────────────────────────────────────
+
+async function crearAutorizacionDesdeBloqueo(preopId, novedadesBloqueo, activoId, conductorId) {
+  // 1. Idempotencia: verificar si ya existe autorización para ese preoperacional
+  var resExiste = await config.supabase
+    .from('autorizaciones_novedad')
+    .select('id')
+    .eq('preoperacional_id', preopId)
+    .limit(1);
+
+  if (resExiste.error) throw resExiste.error;
+
+  if (resExiste.data && resExiste.data.length > 0) {
+    return { ok: true, autorizacionId: resExiste.data[0].id, creada: false };
+  }
+
+  // 2. INSERT del registro nuevo
+  var resInsert = await config.supabase
+    .from('autorizaciones_novedad')
+    .insert({
+      preoperacional_id: preopId,
+      activo_id: activoId,
+      conductor_id: conductorId,
+      novedades_bloqueo: novedadesBloqueo,
+      decision: null,
+      supervisor_id: null,
+      justificacion: null,
+      timestamp_alerta: new Date().toISOString(),
+      timestamp_decision: null
+    })
+    .select()
+    .single();
+
+  if (resInsert.error) throw resInsert.error;
+
+  return { ok: true, autorizacionId: resInsert.data.id, creada: true };
+}
+
 function construirMensajeDecision(placa, conductorNombre, decision, justificacion) {
   var iconos = { autorizar: '✅', taller: '🔧', restringir: '🚫' };
   var textos = {
@@ -458,5 +499,6 @@ module.exports = {
   obtenerAutorizacionesPendientes,
   obtenerAutorizacionesResueltas,
   registrarDecision,
+  crearAutorizacionDesdeBloqueo,
   obtenerHistorialActivo
 };

@@ -3,6 +3,7 @@ var pdf = require('../../../servicios/pdf/preoperacional');
 var config = require('../../../config/config');
 var inspeccionesData = require('../../../data/inspecciones');
 var activosData = require('../../../data/activos');
+var autorizacionesData = require('../../../data/autorizaciones');
 var alertasReglas = require('../../alertas/reglas');
 var alertasNotificador = require('../../alertas/notificador');
 
@@ -192,6 +193,23 @@ async function guardarPreoperacionalCompleto(sesion, telefono, grupos) {
     var resVehiculo = await inspeccionesData.actualizarKilometrajeActivo(sesion.vehiculo.id, sesion.kilometraje);
     if (resVehiculo.error) {
       console.error('Error actualizando kilometraje:', resVehiculo.error);
+    }
+  }
+
+  if (datosPreoperacional.clasificacion === 'BLOQUEO') {
+    var novedadesBloqueo = (datosPreoperacional.novedades || [])
+      .filter(function(n) { return n.severidad === 'bloqueo'; });
+    if (novedadesBloqueo.length > 0) {
+      try {
+        await autorizacionesData.crearAutorizacionDesdeBloqueo(
+          preop.id,
+          novedadesBloqueo,
+          datosPreoperacional.activo_id,
+          datosPreoperacional.conductor_id
+        );
+      } catch (errAut) {
+        console.error('Error creando autorizacion de novedad:', errAut.message || errAut);
+      }
     }
   }
 
