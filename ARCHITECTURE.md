@@ -307,7 +307,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-14 -->
+<!-- Última actualización: 2026-05-15 -->
 
 ## Folder structure
 
@@ -481,19 +481,24 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── supabase
 │   └── migrations
-│       └── 20260514120000_rename_permiso_vehiculos_a_activos.sql
+│       ├── 20260514120000_rename_permiso_vehiculos_a_activos.sql
+│       └── 20260514130000_backfill_autorizacion_mso120.sql
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
 │   ├── data
+│   │   ├── autorizaciones.test.js
 │   │   └── permisos.test.js
 │   ├── helpers
 │   │   └── twilio.js
 │   ├── modulos
-│   │   └── inscripcion
-│   │       ├── estado.test.js
-│   │       ├── flujo.test.js
-│   │       └── validaciones.test.js
+│   │   ├── inscripcion
+│   │   │   ├── estado.test.js
+│   │   │   ├── flujo.test.js
+│   │   │   └── validaciones.test.js
+│   │   └── inspecciones
+│   │       └── preoperacional
+│   │           └── cierre.test.js
 │   └── rutas
 │       └── activos.test.js
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
