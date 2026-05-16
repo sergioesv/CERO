@@ -66,6 +66,13 @@ const Sidebar = {
           { id: 'usuarios',   label: 'Usuarios',   route: 'usuarios' },
           { id: 'plantillas', label: 'Plantillas', route: 'plantillas' }
         ]
+      },
+      {
+        title: 'Comercial',
+        soloSuperAdmin: true,
+        items: [
+          { id: 'metricas', label: 'Métricas', route: 'metricas', soloSuperAdmin: true }
+        ]
       }
     ];
 
