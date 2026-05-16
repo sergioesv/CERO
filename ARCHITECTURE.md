@@ -307,7 +307,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-15 -->
+<!-- Última actualización: 2026-05-16 -->
 
 ## Folder structure
 
