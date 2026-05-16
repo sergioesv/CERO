@@ -83,6 +83,9 @@ const AlertasModule = {
       this.datos.documentos = resDocumentos.datos || [];
       this.datos.pendientes = resPendientes.datos || [];
       this.datos.resueltas = resResueltas.datos || [];
+
+      // Deep-link desde dashboard: #alertas?autorizacion=<id>&accion=<decision>
+      this._procesarDeepLink();
     } catch (error) {
       Toast.error('Error cargando alertas');
       this.datos.documentos = [];
@@ -378,6 +381,39 @@ const AlertasModule = {
   },
 
   // ─────────────────────────────────────────────────────────
+  // DEEP-LINK DESDE DASHBOARD
+  // ─────────────────────────────────────────────────────────
+
+  _procesarDeepLink() {
+    if (!window.Router || typeof Router.getQuery !== 'function') return;
+    var params = Router.getQuery();
+    var autorizacionId = params.get('autorizacion');
+    if (!autorizacionId) return;
+    var accionPre = params.get('accion');
+    // Limpiar query del hash para que un refresh no re-dispare la accion
+    if (window.history && history.replaceState) {
+      history.replaceState(null, '', '#alertas');
+    }
+    this.abrirDetalleConAccion(autorizacionId, accionPre);
+  },
+
+  async abrirDetalleConAccion(autorizacionId, accionPre) {
+    var itemId = 'pend_' + autorizacionId;
+    var lista = this.construirLista();
+    var existe = lista.find(function(i) { return i._id === itemId; });
+    if (!existe) {
+      Toast.error('Autorización ya resuelta o no encontrada');
+      return;
+    }
+    await this.seleccionarItem(itemId);
+    var accionesValidas = { autorizar: true, taller: true, restringir: true };
+    if (accionPre && accionesValidas[accionPre]) {
+      var btn = document.querySelector('#alertas-detalle [data-accion="' + accionPre + '"]');
+      if (btn) btn.focus();
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────
   // PANEL DETALLE
   // ─────────────────────────────────────────────────────────
 
@@ -468,9 +504,9 @@ const AlertasModule = {
         ${docsHtml}
       </div>
       <div style="display:flex; gap:var(--spacing-sm); margin-bottom:var(--spacing-xl);">
-        <button class="btn btn-success btn-sm" onclick="AlertasModule.abrirModalAutorizar('${Utils.escaparHTML(idAut)}', '${Utils.escaparHTML(item.placa)}')">Autorizar</button>
-        <button class="btn btn-warning btn-sm" onclick="AlertasModule.decidirAutorizacion('${Utils.escaparHTML(idAut)}', 'taller', '${Utils.escaparHTML(item.placa)}')">Taller</button>
-        <button class="btn btn-danger btn-sm" onclick="AlertasModule.decidirAutorizacion('${Utils.escaparHTML(idAut)}', 'restringir', '${Utils.escaparHTML(item.placa)}')">Restringir</button>
+        <button data-accion="autorizar" class="btn btn-success btn-sm" onclick="AlertasModule.abrirModalAutorizar('${Utils.escaparHTML(idAut)}', '${Utils.escaparHTML(item.placa)}')">Autorizar</button>
+        <button data-accion="taller" class="btn btn-warning btn-sm" onclick="AlertasModule.decidirAutorizacion('${Utils.escaparHTML(idAut)}', 'taller', '${Utils.escaparHTML(item.placa)}')">Taller</button>
+        <button data-accion="restringir" class="btn btn-danger btn-sm" onclick="AlertasModule.decidirAutorizacion('${Utils.escaparHTML(idAut)}', 'restringir', '${Utils.escaparHTML(item.placa)}')">Restringir</button>
       </div>
     `;
   },
