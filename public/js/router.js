@@ -13,8 +13,25 @@ const Router = {
     window.location.hash = path;
   },
 
+  /**
+   * Devuelve el path del hash sin querystring.
+   * `#alertas?autorizacion=X&accion=Y` -> 'alertas'
+   */
   getPath() {
-    return window.location.hash.slice(1) || 'dashboard';
+    const raw = window.location.hash.slice(1) || 'dashboard';
+    const q = raw.indexOf('?');
+    return q === -1 ? raw : raw.slice(0, q);
+  },
+
+  /**
+   * Devuelve los parametros de la query del hash como URLSearchParams.
+   * `#alertas?autorizacion=X&accion=Y` -> URLSearchParams { autorizacion, accion }
+   * Sin querystring -> URLSearchParams vacio.
+   */
+  getQuery() {
+    const raw = window.location.hash.slice(1) || '';
+    const q = raw.indexOf('?');
+    return q === -1 ? new URLSearchParams() : new URLSearchParams(raw.slice(q + 1));
   },
 
   /**
