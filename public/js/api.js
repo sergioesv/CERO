@@ -92,7 +92,11 @@ const API = {
     ejecutar() { return API.post('/alertas/ejecutar'); },
     resumen() { return API.get('/alertas/resumen'); }
   },
-  
+
+  autorizaciones: {
+    pendientes() { return API.get('/autorizaciones/pendientes'); }
+  },
+
   dashboard: {
     resumen() { return API.get('/dashboard/resumen'); },
     hoy() { return API.get('/dashboard/hoy'); },
