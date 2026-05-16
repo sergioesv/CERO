@@ -276,6 +276,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 
 | Date | Decision | Reason |
 |---|---|---|
+| 16/05/2026 | Zona 2 del dashboard consume `/api/dashboard/general` + `/api/dashboard/activos` en paralelo. Card "Documentación" muestra `documentos_por_vencer` como proxy de "vencidos" | Endpoint `/api/dashboard/general` no expone los campos `inspecciones.total`, `novedades.criticas`, `novedades.con_novedades` ni `documentacion.vencidos`. Revisar cuando `data/dashboard.js` exponga esos campos en sprint propio. |
 | 19/04/2026 | Recuperación de sesión expirada (WhatsApp) — timeout 30 min + ventana recuperable 5 min, tanqueo con timeout propio de 10 min | UX: antes las sesiones se borraban silenciosamente al vencer y el usuario perdía todo el progreso. Ahora se ofrece continuar/reiniciar dentro de la ventana. Inscripción no es recuperable (son pocos pasos). Tanqueo tiene timeout menor porque el conductor está en la bomba. |
 | 19/04/2026 | Verificación post-migración v26 — 8 bugs encontrados y cerrados | Migración grande requiere prueba end-to-end antes de declarar completa |
 | 19/04/2026 | `plantillas.cargar()` retorna default en lugar de throw | Posop no requiere plantilla — el throw bloqueaba el flujo innecesariamente |
