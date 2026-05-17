@@ -148,6 +148,7 @@ const PreopRender = {
         }
       ],
       data: data,
+      sticky: true,
       rowClass: function (row) { return row.clasificacion === 'critico' ? 'row-danger' : ''; },
       emptyMessage: 'No hay inspecciones para los filtros seleccionados'
     });

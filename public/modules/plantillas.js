@@ -68,6 +68,7 @@ const PlantillasModule = {
         }
       ],
       data: this.data,
+      sticky: true,
       emptyMessage: 'No hay plantillas registradas.'
     });
   },

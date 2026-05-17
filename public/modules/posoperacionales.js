@@ -113,6 +113,7 @@ const PosopRender = {
         }
       ],
       data: dataFiltrada,
+      sticky: true,
       emptyMessage: 'No hay posoperacionales para los filtros seleccionados'
     });
   },

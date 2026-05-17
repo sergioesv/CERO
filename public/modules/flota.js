@@ -108,6 +108,7 @@ const VehiculosFlota = {
         ` }
       ],
       data: datos,
+      sticky: true,
       rowClass: row => {
         if (row.estado === 'bloqueado') return 'row-danger';
         if (row.estado === 'retirado') return 'row-muted';
