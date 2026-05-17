@@ -342,6 +342,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │       ├── CERO_DATABASE_CONTRACT.md
 │       └── CERO_RELEASE_CHECKLIST.md
 ├── instrucciones
+│   ├── cambio-3-tabla-sticky-v1.txt
 │   ├── fix-badge-rol-header.txt
 │   ├── fix-ci-frontend-eslint.txt
 │   ├── fix-drawer-labels-spacing.txt
