@@ -4,6 +4,12 @@
 // CERO — Sistema de gestión de operaciones de campo
 // ═══════════════════════════════════════════════════════════
 
+// Cargar variables de entorno desde .env SOLO en desarrollo local.
+// En Railway (produccion) las variables ya estan inyectadas en el runtime.
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const express = require('express');
 const helmet = require('helmet');
 const { registrarCanalWhatsapp } = require('./canales/whatsapp');
