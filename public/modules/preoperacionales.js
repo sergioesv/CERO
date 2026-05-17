@@ -111,22 +111,22 @@ const PreopRender = {
           }
         },
         {
-          key: 'activo', label: 'Activo',
+          key: 'activo', label: 'Activo', mobileHidden: true,
           render: function (_, row) {
             var nombre = row.activos ? row.activos.nombre : (row.activo_nombre || '—');
             return Utils.escaparHTML(nombre || '—');
           }
         },
         {
-          key: 'conductor_nombre', label: 'Conductor',
+          key: 'conductor_nombre', label: 'Conductor', mobileHidden: true,
           render: function (v) { return Utils.escaparHTML(v || '—'); }
         },
         {
-          key: 'kilometraje', label: 'Km', width: '90px',
+          key: 'kilometraje', label: 'Km', width: '90px', mobileHidden: true,
           render: function (v) { return Utils.formatearNumero(v); }
         },
         {
-          key: 'total_novedades', label: 'Novedades', width: '90px',
+          key: 'total_novedades', label: 'Novedades', width: '90px', mobileHidden: true,
           render: function (_, row) {
             if (row.total_novedades === 0) return '<span class="text-secondary">0</span>';
             var texto = String(row.total_novedades);
