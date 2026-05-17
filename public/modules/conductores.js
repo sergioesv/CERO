@@ -51,11 +51,11 @@ window.ConductoresModule = (() => {
             <thead>
               <tr>
                 <th>Nombre</th>
-                <th>Cédula</th>
-                <th>Cargo</th>
-                <th>Sede</th>
-                <th>Categoría</th>
-                <th>Licencia vence</th>
+                <th class="col-hidden-mobile">Cédula</th>
+                <th class="col-hidden-mobile">Cargo</th>
+                <th class="col-hidden-mobile">Sede</th>
+                <th class="col-hidden-mobile">Categoría</th>
+                <th class="col-hidden-mobile">Licencia vence</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -168,9 +168,9 @@ window.ConductoresModule = (() => {
               <span>${c.nombre}</span>
             </div>
           </td>
-          <td style="color:var(--color-text-secondary);font-size:13px;">${c.cedula || '—'}</td>
-          <td>${c.cargo || '—'}</td>
-          <td>
+          <td class="col-hidden-mobile" style="color:var(--color-text-secondary);font-size:13px;">${c.cedula || '—'}</td>
+          <td class="col-hidden-mobile">${c.cargo || '—'}</td>
+          <td class="col-hidden-mobile">
             ${c.sede_id
               ? `<span style="
                   display:inline-flex;align-items:center;gap:4px;
@@ -181,8 +181,8 @@ window.ConductoresModule = (() => {
               : '<span style="color:var(--color-text-tertiary);font-size:12px;">Sin sede</span>'
             }
           </td>
-          <td style="font-size:13px;">${c.licencia_categoria || '—'}</td>
-          <td class="${estadoLicencia.clase}" style="font-size:13px;">${estadoLicencia.texto}</td>
+          <td class="col-hidden-mobile" style="font-size:13px;">${c.licencia_categoria || '—'}</td>
+          <td class="col-hidden-mobile ${estadoLicencia.clase}" style="font-size:13px;">${estadoLicencia.texto}</td>
           <td>${c.activo
             ? '<span class="badge badge-success">Activo</span>'
             : '<span class="badge badge-danger">Inactivo</span>'
