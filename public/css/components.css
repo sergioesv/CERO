@@ -304,6 +304,7 @@ body {
   color: var(--text-secondary);
   font-size: 18px;
   line-height: 1;
+  margin-right: var(--spacing-xs);
 }
 .drawer-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 
