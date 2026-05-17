@@ -44,10 +44,11 @@ const PlantillasModule = {
           label: 'Nombre', 
           render: v => `<span class="font-medium">${Utils.escaparHTML(v)}</span>` 
         },
-        { 
-          key: 'tipo_activo', 
-          label: 'Tipo Activo', 
-          render: v => Utils.escaparHTML(v || 'General') 
+        {
+          key: 'tipo_activo',
+          label: 'Tipo Activo',
+          mobileHidden: true,
+          render: v => Utils.escaparHTML(v || 'General')
         },
         { 
           key: 'estado', 
