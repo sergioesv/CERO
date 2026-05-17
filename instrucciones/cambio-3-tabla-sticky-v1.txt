@@ -1,0 +1,98 @@
+Usa el agente cero-orchestrator.
+
+CONTEXTO
+========
+Demo Enerlight: martes 19/05/2026 9:00am. Tiempo disponible: 72h.
+Estado: working tree limpio. Último commit pusheado: 8fbb602.
+Tests: 101 verde (baseline a mantener).
+
+Esta es la primera de dos instrucciones de panel pre-demo. La segunda
+(Operación del día) viene después de que ésta cierre con commit pusheado.
+
+CAMBIO A IMPLEMENTAR — CAMBIO 3
+================================
+Hacer que la columna de acción ("Ver detalle" o equivalente) esté SIEMPRE
+visible en pantallas pequeñas (<1366px), sin scroll horizontal.
+
+Aplica al componente reutilizable: public/components/table.js
+Aplica a todos los módulos que usan Table.render() — el orchestrator ya
+auditó cuáles son.
+
+EXPLÍCITAMENTE FUERA DE ESTE CAMBIO
+====================================
+- public/modules/tanqueos.js — no usa Table.render() (HTML manual en
+  TanqueosRender.tabla()). Se queda como está. Deuda técnica para post-demo.
+- No tocar canales/dashboard.js — la violación de capas detectada en la
+  auditoría previa NO se resuelve aquí.
+- No tocar BD, ni WhatsApp, ni endpoints.
+- No tocar otros módulos que no usan Table.
+
+ENFOQUE TÉCNICO PROPUESTO
+=========================
+El orchestrator ya recomendó: extender table.js con flag opcional
+`sticky: true`. Validar este enfoque y ajustar si encuentra algo mejor
+durante implementación. Específicamente:
+
+1. Agregar flag opcional `sticky` (default false) a la API de Table.
+2. CSS: position: sticky en la última columna (acción). Borde divisorio
+   visible para distinguir de columnas scrolleables.
+3. Compatibilidad: si sticky=false, comportamiento actual sin cambios.
+4. Tema claro + tema oscuro: ambos deben verse bien (probar background-color
+   del sticky column en ambos temas).
+5. Sin breakpoints específicos — sticky funciona siempre, no solo en pantalla
+   pequeña. Es más simple y no hay regla canon que diga "solo móvil".
+
+CADENCIA OBLIGATORIA (regla de tu metodología v3)
+==================================================
+NO hacer un solo commit grande. Dividir en commits atómicos:
+
+Commit 1 — feat(table): agregar flag sticky a Table.render
+- Solo extensión de API, sin uso aún
+- Tests del componente Table actualizados si aplica
+- Pasar tests verde
+
+Commit 2 — feat(panel): aplicar sticky a módulos que usan Table
+- Módulos: flota, conductores, preoperacionales, posoperacionales, alertas,
+  sedes, usuarios (los que el orchestrator confirmó en auditoría)
+- Cada módulo recibe sticky: true en su llamada a Table.render()
+- Smoke manual por módulo
+
+Commit 3 — style(table): tema claro + tema oscuro sticky column
+- Variables CSS de variables.css usadas correctamente
+- Sin colores hardcoded
+
+Commit 4 (opcional, solo si hay tiempo) — test(table): cobertura sticky
+- Si el componente Table tiene tests, agregar uno para sticky=true
+- No bloqueante para cerrar el cambio
+
+REGLAS ESTRICTAS
+================
+1. Diff revisado ANTES de aplicar cada commit. Mostrar el diff a Sergio
+   para aprobación explícita.
+2. Tests verde después de cada commit. Si bajan del baseline (101), parar.
+3. Smoke manual antes de pushear: abrir el panel en navegador, probar al
+   menos 3 módulos en pantalla angosta (devtools, viewport 1280px). El
+   botón debe estar visible sin scroll horizontal.
+4. Sin canon nuevo, sin ADR. Este cambio NO requiere ADR (no es decisión
+   arquitectónica, es ajuste visual de componente existente).
+5. Si encuentras algo que viola SOLID o canon durante el camino, registra
+   en el commit message como deuda y CONTINÚA. No te desvíes a arreglarlo.
+
+ENTREGABLES
+===========
+- 3-4 commits pusheados a desarrollo
+- Tests verde
+- Smoke manual aprobado por Sergio
+- Comentario final del orchestrator: ¿qué quedó? ¿qué viene en la siguiente
+  instrucción (Cambio 1)?
+
+CRITERIO DE ÉXITO
+=================
+En el navegador a 1280px de ancho, la columna de acción de cualquier módulo
+que usa Table es visible sin necesidad de scrollear horizontalmente.
+
+CRITERIO DE ABORTO
+==================
+Si después de las primeras 2h de trabajo el orchestrator detecta que el
+cambio es más complejo de lo estimado (4h totales), notificar y parar.
+No forzar. Mejor llegar a la demo sin Cambio 3 que con Cambio 3 a medias.
