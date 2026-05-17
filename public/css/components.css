@@ -103,6 +103,27 @@ body {
 .table tr:hover { background: var(--table-row-hover); }
 .table tr.row-danger { background: var(--danger-bg); }
 
+/* sticky column */
+.th-sticky,
+.td-sticky {
+  position: sticky;
+  right: 0;
+  z-index: var(--z-sticky);
+  box-shadow: -2px 0 4px rgba(0,0,0,0.08);
+}
+
+.th-sticky {
+  background: var(--table-header-bg);
+}
+
+.td-sticky {
+  background: var(--bg-primary);
+}
+
+.table tr:hover .td-sticky {
+  background: var(--table-row-hover);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
