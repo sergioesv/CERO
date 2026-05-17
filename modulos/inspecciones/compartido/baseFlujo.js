@@ -161,8 +161,8 @@ FlujoBase.prototype.manejar = async function(req, res) {
     console.error('[' + this.tipo + '] Error handler:', err.message);
     return twiml.responderTwiml(res, nav.MSG_ERROR_GENERICO);
   } finally {
+    await sesiones.guardarCambios();
     sesiones.desbloquear(telefono);
-    sesiones.guardarCambios();
   }
 };
 
