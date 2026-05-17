@@ -7,7 +7,10 @@ const Table = {
       return `
         <div class="table-container">
           <table class="table">
-            <thead><tr>${columns.map((c, i) => `<th${sticky && i === lastIdx ? ' class="th-sticky"' : ''}>${c.label}</th>`).join('')}</tr></thead>
+            <thead><tr>${columns.map((c, i) => {
+              const classes = [sticky && i === lastIdx ? 'th-sticky' : '', c.mobileHidden ? 'col-hidden-mobile' : ''].filter(Boolean).join(' ');
+              return `<th${classes ? ` class="${classes}"` : ''}>${c.label}</th>`;
+            }).join('')}</tr></thead>
             <tbody><tr><td colspan="${columns.length}" style="text-align:center;padding:32px;"><span class="text-secondary">${emptyMessage}</span></td></tr></tbody>
           </table>
         </div>
@@ -20,7 +23,8 @@ const Table = {
         let val = row[col.key];
         if (col.render) val = col.render(val, row);
         else val = Utils.escaparHTML(String(val ?? '—'));
-        return `<td${sticky && i === lastIdx ? ' class="td-sticky"' : ''}>${val}</td>`;
+        const classes = [sticky && i === lastIdx ? 'td-sticky' : '', col.mobileHidden ? 'col-hidden-mobile' : ''].filter(Boolean).join(' ');
+        return `<td${classes ? ` class="${classes}"` : ''}>${val}</td>`;
       }).join('');
       return `<tr class="${cls}">${cells}</tr>`;
     }).join('');
@@ -28,7 +32,10 @@ const Table = {
     return `
       <div class="table-container">
         <table class="table">
-          <thead><tr>${columns.map((c, i) => `<th${sticky && i === lastIdx ? ' class="th-sticky"' : ''} style="${c.width ? 'width:' + c.width : ''}">${c.label}</th>`).join('')}</tr></thead>
+          <thead><tr>${columns.map((c, i) => {
+            const classes = [sticky && i === lastIdx ? 'th-sticky' : '', c.mobileHidden ? 'col-hidden-mobile' : ''].filter(Boolean).join(' ');
+            return `<th${classes ? ` class="${classes}"` : ''} style="${c.width ? 'width:' + c.width : ''}">${c.label}</th>`;
+          }).join('')}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>

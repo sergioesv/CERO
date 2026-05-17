@@ -124,6 +124,11 @@ body {
   background: var(--table-row-hover);
 }
 
+/* responsive mobile */
+@media (max-width: 768px) {
+  .col-hidden-mobile { display: none; }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
