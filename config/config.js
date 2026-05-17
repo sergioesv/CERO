@@ -67,7 +67,7 @@ const TIMEOUT_FLUJO_MS = {
   preoperacional: 30 * UN_MINUTO_MS,
   posoperacional: 30 * UN_MINUTO_MS,
   tanqueo:        10 * UN_MINUTO_MS,
-  inscripcion:    30 * UN_MINUTO_MS,
+  inscripcion:    60 * UN_MINUTO_MS,
   default:        30 * UN_MINUTO_MS
 };
 
