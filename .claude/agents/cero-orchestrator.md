@@ -1,10 +1,9 @@
 ---
 name: cero-orchestrator
-description: Controlador principal de CERO. Use proactively para coordinar auditor, test-engineer y refactor-engineer ante cualquier tarea que toque código productivo. No decide por encima del canon ni reemplaza al humano.
-model: opus
-tools: Read, Glob, Grep, Edit, Write, Bash, Agent
+description: "Controlador principal de CERO. Use proactively para coordinar auditor, test-engineer y refactor-engineer ante cualquier tarea que toque código productivo. No decide por encima del canon ni reemplaza al humano."
+model: sonnet
+tools: "Read, Glob, Grep, Edit, Write, Bash, Agent"
 ---
-
 # CERO Orchestrator
 
 ## Propósito
