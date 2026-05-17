@@ -308,7 +308,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-16 -->
+<!-- Última actualización: 2026-05-17 -->
 
 ## Folder structure
 
@@ -346,6 +346,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   ├── fix-ci-frontend-eslint.txt
 │   ├── fix-drawer-labels-spacing.txt
 │   ├── fix-trust-proxy-security.txt
+│   ├── setup-local-dotenv-v1.txt
 │   ├── update-architecture-usuarios.txt
 │   └── usuarios-panel-v1.txt
 ├── middlewares
@@ -438,6 +439,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   │   ├── conductores.js  # Modulo Conductores del panel
 │   │   ├── dashboard.js  # Modulo Dashboard — 4 pestanas, Indice de Seguridad Operativa
 │   │   ├── flota.js  # Modulo Flota — gestion de activos con drawer de detalle
+│   │   ├── metricas.js
 │   │   ├── plantillas.js
 │   │   ├── posoperacionales.js  # Modulo Posoperacionales del panel
 │   │   ├── preoperacionales.js  # Modulo Preoperacionales — lista, filtros, drawer con autorizacion
@@ -519,6 +521,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | `@supabase/supabase-js` | ^2.48.0 |
 | `axios` | ^1.7.9 |
 | `bcryptjs` | ^3.0.3 |
+| `dotenv` | ^17.4.2 |
 | `express` | ^4.21.2 |
 | `express-rate-limit` | ^8.3.2 |
 | `helmet` | ^8.1.0 |
