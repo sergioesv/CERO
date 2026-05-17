@@ -395,7 +395,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -406,8 +406,8 @@ body {
   background: var(--bg-hover);
 }
 .drawer-bloque-arrow {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
   transition: transform var(--transition-fast);
 }
 .drawer-bloque-items {
