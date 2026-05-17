@@ -234,26 +234,26 @@ function aliasPorItem(nombre) {
     if (!STOPWORDS.has(token)) alias.add(token);
   });
 
-  if (clave.indexOf('aceite motor') >= 0) ['aceite', 'motor'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('refrigerante') >= 0) ['refrigerante', 'agua'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('liquido frenos') >= 0) ['liquido frenos', 'liquido', 'freno', 'frenos'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('fugas visibles') >= 0) ['fuga', 'fugas', 'goteo', 'goteando'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('luces delanteras traseras') >= 0) ['luz', 'luces', 'faro', 'faros'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('stops y direccionales') >= 0) ['stop', 'stops', 'direccional', 'direccionales'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('pito y alarma reversa') >= 0) ['pito', 'alarma', 'reversa', 'corneta', 'bocina'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('tablero instrumentos') >= 0) ['tablero', 'instrumento', 'instrumentos', 'indicador', 'indicadores'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('baterias') >= 0) ['bateria', 'baterias'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('freno de parqueo') >= 0) ['freno', 'frenos', 'parqueo', 'mano'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('estado llantas') >= 0) ['llanta', 'llantas', 'neumatico', 'neumaticos'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('pernos de ruedas') >= 0) ['perno', 'pernos', 'rueda', 'ruedas', 'tuerca', 'tuercas'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('llanta repuesto') >= 0) ['repuesto', 'respuesto', 'llanta repuesto', 'rueda repuesto'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('cinturones seguridad') >= 0) ['cinturon', 'cinturones', 'seguridad'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('retrovisores') >= 0) ['retrovisor', 'retrovisores', 'espejo', 'espejos'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('pedales') >= 0) ['pedal', 'pedales'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('vidrios y limpiabrisas') >= 0) ['vidrio', 'vidrios', 'limpiabrisas', 'plumilla', 'plumillas'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('aseo y elementos sueltos') >= 0) ['aseo', 'limpieza', 'suelto', 'sueltos', 'elemento', 'elementos'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('aire acondicionado') >= 0) ['aire', 'acondicionado', 'ac'].forEach(function(v) { alias.add(v); });
-  if (clave.indexOf('equipo carretera') >= 0) ['equipo', 'carretera', 'botiquin', 'extintor', 'cono', 'conos'].forEach(function(v) { alias.add(v); });
+  if (/aceite/.test(clave) && /motor/.test(clave)) ['aceite', 'motor'].forEach(function(v) { alias.add(v); });
+  if (/refrigerante/.test(clave)) ['refrigerante', 'agua'].forEach(function(v) { alias.add(v); });
+  if (/liquido/.test(clave) && /freno/.test(clave)) ['liquido frenos', 'liquido', 'freno', 'frenos'].forEach(function(v) { alias.add(v); });
+  if (/fugas?/.test(clave)) ['fuga', 'fugas', 'goteo', 'goteando'].forEach(function(v) { alias.add(v); });
+  if (/luces?|faros?/.test(clave)) ['luz', 'luces', 'faro', 'faros'].forEach(function(v) { alias.add(v); });
+  if (/stops?|direccionales?/.test(clave)) ['stop', 'stops', 'direccional', 'direccionales'].forEach(function(v) { alias.add(v); });
+  if (/pito|bocina/.test(clave) || (/alarma/.test(clave) && /reversa/.test(clave))) ['pito', 'alarma', 'reversa', 'corneta', 'bocina'].forEach(function(v) { alias.add(v); });
+  if (/tablero/.test(clave)) ['tablero', 'instrumento', 'instrumentos', 'indicador', 'indicadores'].forEach(function(v) { alias.add(v); });
+  if (/bater/.test(clave)) ['bateria', 'baterias'].forEach(function(v) { alias.add(v); });
+  if (/parqueo/.test(clave) || (/freno/.test(clave) && /mano/.test(clave))) ['freno', 'frenos', 'parqueo', 'mano'].forEach(function(v) { alias.add(v); });
+  if (/llanta/.test(clave) && !/repuesto/.test(clave)) ['llanta', 'llantas', 'neumatico', 'neumaticos'].forEach(function(v) { alias.add(v); });
+  if (/perno/.test(clave)) ['perno', 'pernos', 'rueda', 'ruedas', 'tuerca', 'tuercas'].forEach(function(v) { alias.add(v); });
+  if (/repuesto/.test(clave)) ['repuesto', 'respuesto', 'llanta repuesto', 'rueda repuesto'].forEach(function(v) { alias.add(v); });
+  if (/cinturon/.test(clave)) ['cinturon', 'cinturones', 'seguridad'].forEach(function(v) { alias.add(v); });
+  if (/retrovisor|espejo/.test(clave)) ['retrovisor', 'retrovisores', 'espejo', 'espejos'].forEach(function(v) { alias.add(v); });
+  if (/pedal/.test(clave)) ['pedal', 'pedales'].forEach(function(v) { alias.add(v); });
+  if (/vidrio|limpiabrisas|plumilla/.test(clave)) ['vidrio', 'vidrios', 'limpiabrisas', 'plumilla', 'plumillas'].forEach(function(v) { alias.add(v); });
+  if (/aseo|limpieza/.test(clave)) ['aseo', 'limpieza', 'suelto', 'sueltos', 'elemento', 'elementos'].forEach(function(v) { alias.add(v); });
+  if (/aire/.test(clave) && /acondicionado|acond/.test(clave)) ['aire', 'acondicionado', 'ac'].forEach(function(v) { alias.add(v); });
+  if (/equipo/.test(clave) && /carretera/.test(clave)) ['equipo', 'carretera', 'botiquin', 'extintor', 'cono', 'conos'].forEach(function(v) { alias.add(v); });
 
   return Array.from(alias);
 }
@@ -373,7 +373,10 @@ function interpretarNovedadPorReglas(texto, items) {
   for (var i = 0; i < segmentos.length; i++) {
     var segmento = segmentos[i];
     var item = encontrarMejorItem(segmento, items);
-    if (!item) continue;
+    if (!item) {
+      console.warn('[ocr] segmento sin match:', JSON.stringify(segmento), '| items bloque:', items.join(', '));
+      continue;
+    }
     if (vistos[item]) continue;
 
     vistos[item] = true;
@@ -723,3 +726,11 @@ module.exports = {
   extraerDatosFacturaCombustible,
   descargarImagen
 };
+
+if (process.env.NODE_ENV === 'test') {
+  module.exports._test = {
+    aliasPorItem: aliasPorItem,
+    interpretarNovedadPorReglas: interpretarNovedadPorReglas,
+    separarSegmentos: separarSegmentos
+  };
+}
