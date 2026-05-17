@@ -99,9 +99,9 @@ const VehiculosFlota = {
     const html = Table.render({
       columns: [
         { key: 'codigo', label: 'Código / Placa', width: '130px', render: (_, row) => row.placa || row.codigo },
-        { key: 'nombre', label: 'Nombre', render: (_, row) => row.nombre || '—' },
-        { key: 'soat_vencimiento', label: 'SOAT', render: (_, row) => Badge.documento(row.soat_vencimiento) },
-        { key: 'tecnomecanica_vencimiento', label: 'Tecno', render: (_, row) => Badge.documento(row.tecnomecanica_vencimiento) },
+        { key: 'nombre', label: 'Nombre', mobileHidden: true, render: (_, row) => row.nombre || '—' },
+        { key: 'soat_vencimiento', label: 'SOAT', mobileHidden: true, render: (_, row) => Badge.documento(row.soat_vencimiento) },
+        { key: 'tecnomecanica_vencimiento', label: 'Tecno', mobileHidden: true, render: (_, row) => Badge.documento(row.tecnomecanica_vencimiento) },
         { key: 'estado', label: 'Estado', render: v => this.badgeEstado(v) },
         { key: 'acciones', label: '', width: '80px', render: (_, row) => `
           <button class="btn btn-sm btn-secondary" onclick="VehiculosFlota.editar('${row.id}')">Editar</button>
