@@ -230,7 +230,10 @@ window.PosoperacionalesModule = {
 
   async render() {
     const hoy = fechaHoyBogota();
-    this.filtros.fecha_inicio = this.filtros.fecha_inicio || hoy;
+    const d7po = new Date(hoy + 'T00:00:00');
+    d7po.setDate(d7po.getDate() - 6);
+    const hace7dias = d7po.toISOString().split('T')[0];
+    this.filtros.fecha_inicio = this.filtros.fecha_inicio || hace7dias;
     this.filtros.fecha_fin = this.filtros.fecha_fin || hoy;
 
     const main = document.getElementById('main');

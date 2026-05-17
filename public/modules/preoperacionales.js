@@ -294,7 +294,10 @@ const Preoperacionales = {
 
   async render() {
     var hoy = fechaHoyBogota();
-    this.filtros.desde = this.filtros.desde || hoy;
+    var d7p = new Date(hoy + 'T00:00:00');
+    d7p.setDate(d7p.getDate() - 6);
+    var hace7dias = d7p.toISOString().split('T')[0];
+    this.filtros.desde = this.filtros.desde || hace7dias;
     this.filtros.hasta = this.filtros.hasta || hoy;
 
     var main = document.getElementById('main');
