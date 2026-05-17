@@ -79,25 +79,25 @@ const PosopRender = {
           }
         },
         {
-          key: 'activo', label: 'Activo',
+          key: 'activo', label: 'Activo', mobileHidden: true,
           render: (_, row) => {
             const activo = row.activos ? row.activos.nombre : (row.activo_nombre || '—');
             return Utils.escaparHTML(activo || '—');
           }
         },
         {
-          key: 'conductor_nombre', label: 'Conductor',
+          key: 'conductor_nombre', label: 'Conductor', mobileHidden: true,
           render: (valor, row) => Utils.escaparHTML((row.conductores && row.conductores.nombre) || valor || '—')
         },
         {
-          key: 'medicion_inicial', label: 'Medición Inicial', width: '110px',
+          key: 'medicion_inicial', label: 'Medición Inicial', width: '110px', mobileHidden: true,
           render: (_, row) => {
             const val = row.horometro_final != null ? row.horometro_inicial : row.kilometraje_inicial;
             return Utils.formatearNumero(val || row.km_referencia);
           }
         },
         {
-          key: 'medicion_final', label: 'Medición Final', width: '110px',
+          key: 'medicion_final', label: 'Medición Final', width: '110px', mobileHidden: true,
           render: (_, row) => {
             const val = row.horometro_final != null ? row.horometro_final : row.kilometraje_final;
             return Utils.formatearNumero(val);
