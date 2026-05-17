@@ -152,9 +152,9 @@ const TanqueosRender = {
       '<td onclick="event.stopPropagation()" style="width:36px;">' + check + '</td>' +
       '<td>' + Utils.escaparHTML(fecha) + '</td>' +
       '<td><strong>' + Utils.escaparHTML(t.vehiculo_placa || '-') + '</strong></td>' +
-      '<td>' + Utils.escaparHTML(conductor) + '</td>' +
-      '<td>' + Utils.escaparHTML(TanqueosLogic.formatearCantidad(t.cantidad, t.unidad_medida)) + '</td>' +
-      '<td>' + Utils.escaparHTML(TanqueosLogic.formatearValor(t.valor_total)) + '</td>' +
+      '<td class="col-hidden-mobile">' + Utils.escaparHTML(conductor) + '</td>' +
+      '<td class="col-hidden-mobile">' + Utils.escaparHTML(TanqueosLogic.formatearCantidad(t.cantidad, t.unidad_medida)) + '</td>' +
+      '<td class="col-hidden-mobile">' + Utils.escaparHTML(TanqueosLogic.formatearValor(t.valor_total)) + '</td>' +
       '<td>' + TanqueosLogic.badgeEstado(t.estado_validacion) + alerta + '</td>' +
       '</tr>';
   },
@@ -171,7 +171,7 @@ const TanqueosRender = {
     return '<table class="table" data-testid="tabla-tanqueos">' +
       '<thead><tr>' +
       '<th style="width:36px;">' + (haySeleccionables ? '<input type="checkbox" onchange="Tanqueos.toggleTodos(this.checked)" data-testid="check-todos">' : '') + '</th>' +
-      '<th>Fecha</th><th>Placa</th><th>Conductor</th><th>Cantidad</th><th>Valor</th><th>Estado</th>' +
+      '<th>Fecha</th><th>Placa</th><th class="col-hidden-mobile">Conductor</th><th class="col-hidden-mobile">Cantidad</th><th class="col-hidden-mobile">Valor</th><th>Estado</th>' +
       '</tr></thead>' +
       '<tbody>' + filas + '</tbody>' +
       '</table>';
@@ -322,8 +322,10 @@ const Tanqueos = {
 
   async render() {
     var hoy = fechaHoyBogota();
-    var hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    this.filtros.fecha_inicio = this.filtros.fecha_inicio || hace30;
+    var d7 = new Date(hoy + 'T00:00:00');
+    d7.setDate(d7.getDate() - 6);
+    var hace7 = d7.toISOString().split('T')[0];
+    this.filtros.fecha_inicio = this.filtros.fecha_inicio || hace7;
     this.filtros.fecha_fin = this.filtros.fecha_fin || hoy;
     if (!this.consolidadoMes) this.consolidadoMes = hoy.substring(0, 7);
 
