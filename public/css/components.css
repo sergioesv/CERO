@@ -244,12 +244,12 @@ body {
   right: -100vw;
   width: 400px;
   height: 100%;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   z-index: 999;
   transition: right 0.3s ease;
   overflow-y: auto;
   border-left: var(--border-width) solid var(--border-secondary);
-  box-shadow: var(--shadow-lg);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
 }
@@ -288,7 +288,24 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-lg);
+  background: var(--bg-secondary);
 }
+
+.drawer-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+}
+.drawer-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 /* Tarjetas de info */
 .drawer-info-grid {

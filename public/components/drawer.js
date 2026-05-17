@@ -8,7 +8,7 @@ const Drawer = {
           <div class="drawer" id="global-drawer-panel">
             <div class="drawer-header">
               <h3 class="drawer-title" id="global-drawer-title"></h3>
-              <button class="modal-close" onclick="Drawer.close()">&times;</button>
+              <button class="drawer-close" aria-label="Cerrar panel" onclick="Drawer.close()">&times;</button>
             </div>
             <div class="drawer-body" id="global-drawer-content" style="padding:0;"></div>
           </div>
