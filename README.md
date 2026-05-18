@@ -1,9 +1,13 @@
-# CERO — Refactor Estructural v26.1 (Corte Limpio)
+# CERO — Refactor Estructural v6 (Corte Limpio)
 
 Este repositorio contiene el núcleo operativo de **CERO**, una plataforma SaaS para la gestión de operaciones de campo mediante WhatsApp e Inteligencia Artificial.
 
-## Estado Actual: Refactor Completo (Fase 2 ✅)
-Se ha completado la transición crítica desde una arquitectura rígida basada en vehículos hacia un sistema dinámico basado en **Activos y Plantillas**.
+**Stack:** Node.js 20 CommonJS · Supabase PostgreSQL (São Paulo) · Railway · Twilio · Gemini 2.0 Flash
+**Rama activa:** desarrollo
+**Cliente activo:** Enerlight (negociación)
+
+## Estado Actual: Fase 2 Completa ✅
+Se ha completado la transición crítica desde una arquitectura rígida basada en vehículos hacia un sistema dinámico basado en **Activos y Plantillas**. El panel de administración web está operativo (gestión de flota, preoperacionales, posoperacionales, tanqueos, conductores, alertas, sedes, usuarios).
 
 ### Cambios Estructurales Principales
 - **Base de Datos:** Eliminada la tabla `vehiculos`. Todo opera sobre `activos` (UUID).
@@ -24,7 +28,8 @@ Se ha completado la transición crítica desde una arquitectura rígida basada e
 ## Documentación de Referencia
 Para detalles técnicos profundos, consulte:
 - [ARCHITECTURE.md](ARCHITECTURE.md): Mapa completo de archivos y dependencias.
-- `.cursor/rules.md`: Reglas de desarrollo y convenciones de código.
+- [docs/DECISION_LOG.md](docs/DECISION_LOG.md): Registro de decisiones arquitectónicas.
+- `.cursor/rules-*.md`: Reglas de desarrollo por dominio (backend, frontend, WhatsApp) utilizadas por agentes Claude Code.
 
 ---
 **CERO** — Gestión de Operaciones de Campo
