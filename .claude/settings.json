@@ -10,6 +10,7 @@
       "Bash(git log *)",
       "Bash(git branch)",
       "Bash(npm test)",
+      "Bash(npm test -- *)",
       "Bash(npm run test)",
       "Bash(npm run test:*)",
       "Bash(npm run lint)"
@@ -37,7 +38,8 @@
       "Bash(wget *)",
       "Bash(ssh *)",
       "Bash(scp *)",
-      "Bash(npm publish *)"
+      "Bash(npm publish *)",
+      "Bash(git add .)"
     ]
   }
 }

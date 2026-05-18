@@ -272,40 +272,18 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 
 ---
 
-## Decision log (key decisions only)
+## Agent rules
 
-| Date | Decision | Reason |
+Agentes en `.claude/agents/` — invocar con "Usa el agente cero-orchestrator".
+El orquestador pasa las reglas de dominio a los subagentes según el área tocada:
+
+| Dominio | Archivos | Rules a usar |
 |---|---|---|
-| 16/05/2026 | Zona 2 del dashboard consume `/api/dashboard/general` + `/api/dashboard/activos` en paralelo. Card "Documentación" muestra `documentos_por_vencer` como proxy de "vencidos" | Endpoint `/api/dashboard/general` no expone los campos `inspecciones.total`, `novedades.criticas`, `novedades.con_novedades` ni `documentacion.vencidos`. Revisar cuando `data/dashboard.js` exponga esos campos en sprint propio. |
-| 19/04/2026 | Recuperación de sesión expirada (WhatsApp) — timeout 30 min + ventana recuperable 5 min, tanqueo con timeout propio de 10 min | UX: antes las sesiones se borraban silenciosamente al vencer y el usuario perdía todo el progreso. Ahora se ofrece continuar/reiniciar dentro de la ventana. Inscripción no es recuperable (son pocos pasos). Tanqueo tiene timeout menor porque el conductor está en la bomba. |
-| 19/04/2026 | Verificación post-migración v26 — 8 bugs encontrados y cerrados | Migración grande requiere prueba end-to-end antes de declarar completa |
-| 19/04/2026 | `plantillas.cargar()` retorna default en lugar de throw | Posop no requiere plantilla — el throw bloqueaba el flujo innecesariamente |
-| 19/04/2026 | PUT /api/activos acepta UUID o placa como parámetro | Frontend envía UUID, ruta esperaba placa — validación con UUID_REGEX |
-| 19/04/2026 | `cambiado_por` valida UUID antes de insert en historial | Strings 'panel'/'sistema' causaban error de tipo en PostgreSQL |
-| 19/04/2026 | `fotos_posoperacional` constraint ampliada a 6 tipos | Solo aceptaba 'odometro' y 'novedad' — faltaban estado_general, placa, factura, tablero |
-| 19/04/2026 | Columnas `plantilla_id` y `horometro` agregadas a `tanqueos` y `posoperacionales` | Schema no tenía estas columnas que el código intentaba insertar |
-| 18/04/2026 | Refactor flujos WhatsApp a clases (FlujoBase + herencia) | Eliminar código duplicado masivo (~50% reducción) |
-| 18/04/2026 | Centralizar TwiML en `compartido/twiml.js` | responderTwiml y escaparXml estaban copiados en 4 archivos |
-| 18/04/2026 | Factory pattern `iniciadorFlujo.js` para placa/km | Una sola implementación de OCR placa y odómetro para los 3 flujos |
-| 17/04/2026 | Rebranding a dialk — eliminar EDEMSA | Riesgo legal — EDEMSA no es cliente firmado |
-| 15/04/2026 | Frontend en 4 objetos (API/Logic/Render/Module) | Anti-XSS, separación de responsabilidades |
-| 14/04/2026 | Tanqueo v3 — OCR factura con score/tier/fallback | Validación cruzada 4 campos, antifraude |
-| 14/04/2026 | Refactor index.js — 925 → ~190 líneas | 6 archivos de rutas extraídos |
-| 10/04/2026 | ARCHITECTURE.md como fuente de verdad | Reemplaza archivos de sesión de diseño |
-| 19/04/2026 | v26 migration — tabla vehiculos eliminada, todo sobre activos | Modelo genérico para vehículos, grúas, motos, equipos |
-| 19/04/2026 | Plantillas dinámicas — plantillas_inspeccion + grupos + items | Agregar tipo inspección = insertar filas en BD, cero código nuevo |
+| Backend | `rutas/`, `data/`, `servicios/`, `middlewares/` | `.cursor/rules-backend.md` |
+| Frontend | `public/` | `.cursor/rules-frontend.md` |
+| WhatsApp | `modulos/`, `canales/whatsapp.js`, `servicios/sesiones.js` | `.cursor/rules-whatsapp.md` |
 
----
-
-## Cursor rules
-
-`rules.md` siempre activo. Para tareas específicas:
-
-| Tipo de tarea | Archivo adicional |
-|---|---|
-| Backend (rutas, data, servicios) | `.cursor/rules-backend.md` |
-| Frontend (public, CSS, HTML) | `.cursor/rules-frontend.md` |
-| WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
+Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
 <!-- Última actualización: 2026-05-18 -->

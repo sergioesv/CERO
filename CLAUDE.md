@@ -1,64 +1,67 @@
-# CERO Instructions for Claude
+# CERO — CLAUDE.md
+# Punto de entrada del orquestador. Máximo 80 líneas. Denso y directo.
 
-## Estado real
+## Proyecto
+SaaS de gestión de operaciones de campo vía WhatsApp. Colombia, PESV (Res. 40595/2022).
+Stack: Node.js 20 CommonJS · Supabase PostgreSQL (São Paulo) · Railway · Twilio · Gemini 2.0 Flash
+Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en push a desarrollo
 
-CERO aún no está en producción.
-Funciona, pero debe prepararse para piloto y producción.
+## Estado actual
+- Fase 1 completa: preop, posop, tanqueo, alertas, inscripción, autorización v12
+- Fase 2 completa: panel admin web (flota, preop, posop, tanqueos, conductores, alertas, sedes, usuarios)
+- Cliente activo: Enerlight (negociación — requiere estabilización antes de cierre)
 
-## Prioridad
-
-Optimizar por control, verificabilidad y reversibilidad.
-
-## Fuente de verdad
-
-Antes de proponer cambios de arquitectura, leer:
-
+## Canon arquitectónico (leer si la tarea lo requiere)
 1. docs/canon/CERO_CANON.md
-2. ARCHITECTURE.md
+2. docs/canon/CERO_ARCHITECTURE_RULES.md
+3. docs/canon/CERO_DATABASE_CONTRACT.md
+4. docs/canon/CERO_RELEASE_CHECKLIST.md
 
-Si el código contradice el canon:
-- No cambies el canon automáticamente.
-- Reporta la contradicción.
-- Propón una decisión explícita.
+## Reglas de dominio para subagentes
+- Backend (rutas/, data/, servicios/, middlewares/): .cursor/rules-backend.md
+- Frontend (public/): .cursor/rules-frontend.md
+- WhatsApp (modulos/, canales/whatsapp.js, servicios/sesiones.js): .cursor/rules-whatsapp.md
 
-## Proceso obligatorio
+## Schema de BD
+- Fuente de verdad: supabase/schema.sql (extraer de Supabase si no existe)
+- Tablas clave: activos, conductores, preoperacionales, posoperacionales, tanqueos,
+  autorizaciones_novedad, historial_estado_activo, empresas, sedes, usuarios_panel,
+  plantillas_inspeccion, plantilla_grupos, plantilla_items
+- v26: tabla vehiculos eliminada — todo sobre activos con activo_id (UUID)
+- JSONB: activos.documentos (merge siempre), activos.datos, preoperacionales.respuestas
 
-Antes de editar código productivo:
+## Violaciones SOLID activas (pendientes de corrección)
+| ID  | Archivo                                          | Prioridad | Descripción |
+|-----|--------------------------------------------------|-----------|-------------|
+| V-03 | modulos/inspecciones/preoperacional/interpretacion.js | ALTA | Código muerto — no importado por producción. Eliminar. |
+| V-01 | servicios/ocr.js línea 3                        | ALTA | Importa de modulos/ — dirección prohibida |
+| V-02 | servicios/ocr.js líneas 228-404                 | ALTA | Lógica de dominio de inspecciones en capa servicios |
+| V-04 | interpretacion.js vs seed-templates.js          | MEDIA | Alias hardcodeados desincronizados con BD real |
+| V-05 | ocr.js línea 354                                | MEDIA | Fallback implícito clasifica cualquier texto no reconocido como BLOQUEO |
+| V-06 | ocr.js vs interpretacion.js                     | MEDIA | 5 funciones duplicadas con reglas divergentes |
+| V-07 | modulos/inspecciones/estado.js líneas 104-122   | BAJA  | Tercera implementación del mismo matching de nombres |
 
-1. Explicar objetivo.
-2. Listar archivos a tocar.
-3. Listar pruebas a crear o ejecutar.
-4. Explicar riesgo.
-5. Explicar rollback.
-6. Esperar aprobación humana.
+Orden de corrección: V-03 → V-01/V-02 → V-04/V-06 → V-05 → V-07
 
-## Prohibido
+## Pendientes críticos antes del segundo cliente
+- [ ] supabase/schema.sql — extraer y versionar
+- [ ] docs/DECISION_LOG.md — separar del ARCHITECTURE.md
+- [ ] Multi-tenant audit — todos los endpoints filtran por empresa_id
+- [ ] RLS Supabase
+- [ ] Sesiones WhatsApp en memoria → migrar a supabase.sesiones_activas (Fix 10)
 
-- Leer .env o archivos de secretos.
-- Hacer git push.
-- Ejecutar deploy.
-- Ejecutar migrations contra remoto.
-- Crear nuevas dependencias directas de Supabase en modulos/.
-- Crear nueva lógica de negocio en data/.
-- Reescribir módulos completos sin plan incremental.
-- Inventar que CERO ya está en producción.
+## Patrones críticos (no olvidar)
+- onExitoPlaca: guardar vehiculo/conductor antes de reiniciarDatosOperativos, restaurar después
+- JSONB: siempre merge ({ ...anterior, campo: valor }), nunca sobreescribir
+- cambiado_por en historial: UUID válido o null — nunca string
+- Timezone: siempre America/Bogota (UTC-5)
+- RLS se activa automáticamente en tablas nuevas — hacer DISABLE ROW LEVEL SECURITY después de crear
+- PostgREST: NOTIFY pgrst, 'reload schema' después de cambios de schema
+- Twilio media: proxy server-side obligatorio — browser no autentica con Twilio
 
-## Permitido
-
-- Leer código.
-- Auditar.
-- Proponer planes.
-- Crear documentación de control.
-- Crear tests.
-- Hacer refactors pequeños aprobados.
-
-## Estrategia
-
-1. Tests de comportamiento actual.
-2. Interfaces.
-3. Adapters.
-4. Fachadas legacy.
-5. Casos de uso.
-6. Dominio puro.
-7. Migración gradual.
-8. Eliminación de legacy solo cuando no haya consumidores.
+## Git
+- Conventional commits obligatorios: feat/fix/docs/chore/refactor/test(scope): mensaje en español
+- git add [archivos exactos] — nunca git add .
+- git push solo el humano
+- ARCHITECTURE.md: árbol auto-generado por update-architecture.yml en cada push
+- DECISION_LOG.md: actualizar manualmente en el mismo commit si hay decisión arquitectónica
