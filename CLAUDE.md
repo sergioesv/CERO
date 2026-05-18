@@ -33,7 +33,6 @@ Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en pus
 ## Violaciones SOLID activas (pendientes de corrección)
 | ID  | Archivo                                          | Prioridad | Descripción |
 |-----|--------------------------------------------------|-----------|-------------|
-| V-03 | modulos/inspecciones/preoperacional/interpretacion.js | ALTA | Código muerto — no importado por producción. Eliminar. |
 | V-01 | servicios/ocr.js línea 3                        | ALTA | Importa de modulos/ — dirección prohibida |
 | V-02 | servicios/ocr.js líneas 228-404                 | ALTA | Lógica de dominio de inspecciones en capa servicios |
 | V-04 | interpretacion.js vs seed-templates.js          | MEDIA | Alias hardcodeados desincronizados con BD real |
@@ -41,7 +40,7 @@ Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en pus
 | V-06 | ocr.js vs interpretacion.js                     | MEDIA | 5 funciones duplicadas con reglas divergentes |
 | V-07 | modulos/inspecciones/estado.js líneas 104-122   | BAJA  | Tercera implementación del mismo matching de nombres |
 
-Orden de corrección: V-03 → V-01/V-02 → V-04/V-06 → V-05 → V-07
+Orden de corrección: V-01/V-02 → V-04/V-06 → V-05 → V-07
 
 ## Pendientes críticos antes del segundo cliente
 - [ ] supabase/schema.sql — extraer y versionar

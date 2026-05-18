@@ -181,19 +181,6 @@ test('exporta webhookWhatsApp', function() {
   assert(typeof whatsapp.webhookWhatsApp === 'function');
 });
 
-// ── 9. interpretacion.js ──
-console.log('\n9. preoperacional/interpretacion.js');
-var interp = require('../modulos/inspecciones/preoperacional/interpretacion');
-
-test('exporta normalizarTextoBase', function() {
-  assert(typeof interp.normalizarTextoBase === 'function');
-  assert(interp.normalizarTextoBase('Áéíóú') === 'aeiou');
-});
-
-test('exporta interpretarNovedadLocal', function() {
-  assert(typeof interp.interpretarNovedadLocal === 'function');
-});
-
 // ── Resultado ──
 console.log('\n\u2550\u2550\u2550 Resultado \u2550\u2550\u2550');
 console.log('Total: ' + total + '  |  \u2705 ' + ok + '  |  \u274c ' + fail);
