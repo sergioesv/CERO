@@ -360,7 +360,6 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │       ├── cierre.js  # Cierre preoperacional — PDF, novedades, autorizaciones
 │   │       ├── estado.js  # Estados del flujo preoperacional
 │   │       ├── flujo.js  # Maquina de estados del preoperacional WhatsApp
-│   │       ├── interpretacion.js  # Interpretacion de novedades via AI/Reglas
 │   │       ├── mensajes.js  # Mensajes y preguntas del preoperacional
 │   │       └── validaciones.js  # Validaciones de respuestas del preoperacional
 │   ├── seguridad-campo
