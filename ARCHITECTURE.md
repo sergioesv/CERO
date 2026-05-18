@@ -308,7 +308,7 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 | WhatsApp (modulos/inspecciones, sesiones) | `.cursor/rules-whatsapp.md` |
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-17 -->
+<!-- Última actualización: 2026-05-18 -->
 
 ## Folder structure
 
@@ -503,8 +503,10 @@ Current gap: several dashboard queries do not filter by empresa_id. Audit requir
 │   │   └── inspecciones
 │   │       └── preoperacional
 │   │           └── cierre.test.js
-│   └── rutas
-│       └── activos.test.js
+│   ├── rutas
+│   │   └── activos.test.js
+│   └── servicios
+│       └── ocr.novedades.test.js
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── cero_powersell.ps1
 ├── CLAUDE.md
