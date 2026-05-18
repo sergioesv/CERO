@@ -74,6 +74,17 @@ jest.mock('../../../../data/autorizaciones', function() {
   };
 });
 
+// data/alertas: mock para bloquearActivo (nuevo — aún no importado en cierre.js)
+var mockBloquearActivo = jest.fn().mockResolvedValue({ ok: true });
+
+jest.mock('../../../../data/alertas', function() {
+  return {
+    bloquearActivo: mockBloquearActivo,
+    desbloquearActivo: jest.fn().mockResolvedValue({ ok: true }),
+    obtenerBloqueoActivo: jest.fn().mockResolvedValue(null)
+  };
+});
+
 // data/inspecciones: crearPreoperacional devuelve preop con id conocido
 var mockCrearPreoperacional = jest.fn().mockResolvedValue({
   error: null,
@@ -151,6 +162,10 @@ jest.mock('../../../../servicios/sesiones', function() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 var cierre = require('../../../../modulos/inspecciones/preoperacional/cierre');
+
+// Referencias a los mocks ya registrados, para usarlas en asserts
+var alertasNotificadorMock = require('../../../../modulos/alertas/notificador');
+var alertasDataMock = require('../../../../data/alertas');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. HELPERS
@@ -265,6 +280,158 @@ describe('guardarPreoperacionalCompleto — integración con crearAutorizacionDe
 
     // assert: crearAutorizacionDesdeBloqueo NO fue invocada
     expect(mockCrearAutorizacionDesdeBloqueo).not.toHaveBeenCalled();
+  });
+
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. TESTS — bloqueo automático de activo y notificación WhatsApp
+//
+// Estos tests (A y B) FALLARÁN hasta que el refactor-engineer agregue en
+// cierre.js:
+//   1. import de data/alertas
+//   2. llamada a alertasData.bloquearActivo dentro del bloque BLOQUEO
+//   3. llamada a alertasNotificador.enviarWhatsApp dentro del bloque BLOQUEO
+//
+// Tests C y D verifican comportamientos ya presentes o de resiliencia.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('guardarPreoperacionalCompleto — bloqueo de activo y WhatsApp al conductor', function() {
+
+  beforeEach(function() {
+    mockBloquearActivo.mockClear();
+    mockCrearAutorizacionDesdeBloqueo.mockClear();
+    mockCrearPreoperacional.mockClear();
+    alertasNotificadorMock.enviarWhatsApp.mockClear();
+    alertasDataMock.bloquearActivo.mockResolvedValue({ ok: true });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST A — bloqueo automático ocurre y es ANTERIOR a crearAutorizacionDesdeBloqueo
+  // FALLA hasta que el refactor-engineer aplique el fix en cierre.js
+  // ──────────────────────────────────────────────────────────────────────────
+  it('[A] debería llamar alertasData.bloquearActivo con vehiculo.id ANTES de crearAutorizacionDesdeBloqueo cuando clasificacion es BLOQUEO', async function() {
+    var novedades = [
+      { grupo: 'g1', item: 'frenos', severidad: 'bloqueo', critico: true }
+    ];
+    var sesion = crearSesionMinima(novedades);
+    sesion.vehiculo.id = 'activo-abc';
+
+    // Registrar el orden de invocación usando una lista compartida
+    var ordenLlamadas = [];
+    mockBloquearActivo.mockImplementation(function() {
+      ordenLlamadas.push('bloquearActivo');
+      return Promise.resolve({ ok: true });
+    });
+    mockCrearAutorizacionDesdeBloqueo.mockImplementation(function() {
+      ordenLlamadas.push('crearAutorizacionDesdeBloqueo');
+      return Promise.resolve({ ok: true, autorizacionId: 'mock-uuid', creada: true });
+    });
+
+    var resultado = await cierre.guardarPreoperacionalCompleto(sesion, '+573001234567', GRUPOS_VACIOS);
+
+    // La función no debe lanzar error
+    expect(resultado.error).toBeNull();
+
+    // bloquearActivo debe haber sido llamado exactamente una vez
+    expect(mockBloquearActivo).toHaveBeenCalledTimes(1);
+
+    // El primer argumento debe ser el vehiculo.id
+    var primerArg = mockBloquearActivo.mock.calls[0][0];
+    expect(primerArg).toBe('activo-abc');
+
+    // El segundo argumento (motivo) debe contener alguna referencia a bloqueo o críticas
+    var motivoArg = mockBloquearActivo.mock.calls[0][1];
+    expect(typeof motivoArg).toBe('string');
+    var motivoLower = motivoArg.toLowerCase();
+    expect(
+      motivoLower.includes('bloqueo') || motivoLower.includes('cr') || motivoLower.includes('novedades')
+    ).toBe(true);
+
+    // bloquearActivo debe haberse llamado ANTES que crearAutorizacionDesdeBloqueo
+    var idxBloquear = ordenLlamadas.indexOf('bloquearActivo');
+    var idxAutorizacion = ordenLlamadas.indexOf('crearAutorizacionDesdeBloqueo');
+    expect(idxBloquear).toBeGreaterThanOrEqual(0);
+    expect(idxAutorizacion).toBeGreaterThanOrEqual(0);
+    expect(idxBloquear).toBeLessThan(idxAutorizacion);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST B — WhatsApp al conductor con placa y "bloqueado"
+  // FALLA hasta que el refactor-engineer aplique el fix en cierre.js
+  // ──────────────────────────────────────────────────────────────────────────
+  it('[B] debería llamar alertasNotificador.enviarWhatsApp con el teléfono del conductor y un mensaje con la placa y "bloqueado"', async function() {
+    var novedades = [
+      { grupo: 'g1', item: 'frenos', severidad: 'bloqueo', critico: true }
+    ];
+    var sesion = crearSesionMinima(novedades);
+    sesion.conductor.telefono = '+573009999999';
+    sesion.placa = 'XYZ999';
+
+    var resultado = await cierre.guardarPreoperacionalCompleto(sesion, '+573009999999', GRUPOS_VACIOS);
+
+    expect(resultado.error).toBeNull();
+
+    // enviarWhatsApp debe haber sido llamado al menos una vez con el teléfono del conductor
+    var llamadasWhatsApp = alertasNotificadorMock.enviarWhatsApp.mock.calls;
+    var llamadaBloqueo = llamadasWhatsApp.find(function(args) {
+      return args[0] === '+573009999999';
+    });
+    expect(llamadaBloqueo).toBeDefined();
+
+    // El mensaje debe contener la placa y alguna variante de "bloqueado"
+    var mensaje = llamadaBloqueo[1];
+    expect(typeof mensaje).toBe('string');
+    expect(mensaje).toContain('XYZ999');
+    var mensajeLower = mensaje.toLowerCase();
+    expect(
+      mensajeLower.includes('bloqueado') || mensajeLower.includes('bloqueo') || mensajeLower.includes('bloqueada')
+    ).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST C — sin BLOQUEO, no se llama bloquearActivo
+  // Debe PASAR con el código actual (el bloque BLOQUEO no se ejecuta)
+  // ──────────────────────────────────────────────────────────────────────────
+  it('[C] debería NO llamar alertasData.bloquearActivo cuando clasificacion no es BLOQUEO', async function() {
+    // Solo una novedad de alerta — clasificacion resultante: ALERTA o INFORMATIVO
+    var novedades = [
+      { grupo: 'g1', item: 'limpiaparabrisas', severidad: 'alerta', critico: false }
+    ];
+    var sesion = crearSesionMinima(novedades);
+
+    var resultado = await cierre.guardarPreoperacionalCompleto(sesion, '+573001234567', GRUPOS_VACIOS);
+
+    expect(resultado.error).toBeNull();
+
+    // bloquearActivo no debe haber sido llamado
+    expect(mockBloquearActivo).not.toHaveBeenCalled();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST D — bloqueo falla pero guardarPreoperacionalCompleto no lanza
+  // Requiere que el fix esté aplicado (fallará antes del fix por razón diferente:
+  // bloquearActivo ni siquiera se llama). Tras el fix, verifica resiliencia.
+  // ──────────────────────────────────────────────────────────────────────────
+  it('[D] debería completar sin lanzar aunque alertasData.bloquearActivo rechace', async function() {
+    var novedades = [
+      { grupo: 'g1', item: 'frenos', severidad: 'bloqueo', critico: true }
+    ];
+    var sesion = crearSesionMinima(novedades);
+
+    // bloquearActivo lanza un error simulado
+    alertasDataMock.bloquearActivo.mockRejectedValue(new Error('fallo conexion alertas'));
+
+    // guardarPreoperacionalCompleto NO debe propagar el error
+    var resultado = await cierre.guardarPreoperacionalCompleto(sesion, '+573001234567', GRUPOS_VACIOS);
+
+    // El preoperacional sí se guardó
+    expect(mockCrearPreoperacional).toHaveBeenCalledTimes(1);
+
+    // La función retornó sin error
+    expect(resultado.error).toBeNull();
+    expect(resultado.preop).toBeDefined();
+    expect(resultado.preop.id).toBe('preop-uuid');
   });
 
 });

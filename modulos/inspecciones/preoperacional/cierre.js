@@ -6,6 +6,7 @@ var activosData = require('../../../data/activos');
 var autorizacionesData = require('../../../data/autorizaciones');
 var alertasReglas = require('../../alertas/reglas');
 var alertasNotificador = require('../../alertas/notificador');
+var alertasData = require('../../../data/alertas');
 
 /**
  * Inyecta nombre_grupo en cada entrada de respuestas (clave = UUID del grupo en plantilla).
@@ -200,6 +201,17 @@ async function guardarPreoperacionalCompleto(sesion, telefono, grupos) {
     var novedadesBloqueo = (datosPreoperacional.novedades || [])
       .filter(function(n) { return n.severidad === 'bloqueo'; });
     if (novedadesBloqueo.length > 0) {
+      var motivoBloqueo = 'Novedades críticas en preoperacional — pendiente autorización supervisor';
+      try {
+        await alertasData.bloquearActivo(sesion.vehiculo.id, motivoBloqueo);
+      } catch (errBloqueo) {
+        console.error('Error bloqueando activo en preoperacional:', errBloqueo.message || errBloqueo);
+      }
+      if (sesion.conductor && sesion.conductor.telefono) {
+        var placa = sesion.placa || (sesion.vehiculo && sesion.vehiculo.placa) || '';
+        var mensajeBloqueo = '🚨 Vehículo ' + placa + ' bloqueado por novedades críticas. El supervisor fue notificado y debe autorizar antes de continuar.';
+        alertasNotificador.enviarWhatsApp(sesion.conductor.telefono, mensajeBloqueo);
+      }
       try {
         await autorizacionesData.crearAutorizacionDesdeBloqueo(
           preop.id,
