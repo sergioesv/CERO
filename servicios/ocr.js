@@ -425,11 +425,6 @@ function limpiarItemsInterpretados(parsed, items) {
 }
 
 async function interpretarNovedad(texto, items) {
-  var porReglas = interpretarNovedadPorReglas(texto, items);
-  if (porReglas.items.length > 0) {
-    return porReglas;
-  }
-
   var prompt = [
     'Eres un clasificador de novedades de inspeccion vehicular.',
     'Texto reportado por el conductor: "' + String(texto || '').trim() + '".',
@@ -441,16 +436,25 @@ async function interpretarNovedad(texto, items) {
     'La observacion debe conservar el texto original del conductor.'
   ].join(' ');
 
-  var parsed = await llamarGeminiJson({
-    prompt: prompt,
-    schema: construirSchemaNovedades(items),
-    modelo: MODELO_NOVEDADES
-  });
+  try {
+    var parsed = await llamarGeminiJson({
+      prompt: prompt,
+      schema: construirSchemaNovedades(items),
+      modelo: MODELO_NOVEDADES
+    });
 
-  var limpio = limpiarItemsInterpretados(parsed, items);
-  limpio.observacion = limpio.observacion || String(texto || '').trim();
-  limpio.fuente = 'gemini';
-  return limpio;
+    var limpio = limpiarItemsInterpretados(parsed, items);
+    limpio.observacion = limpio.observacion || String(texto || '').trim();
+
+    if (limpio.items.length > 0) {
+      limpio.fuente = 'gemini';
+      return limpio;
+    }
+  } catch (errorGemini) {
+    console.warn('[ocr] Gemini fallo en interpretarNovedad, usando reglas como fallback:', errorGemini.message);
+  }
+
+  return interpretarNovedadPorReglas(texto, items);
 }
 
 async function extraerPlacaFoto(urlFoto) {
