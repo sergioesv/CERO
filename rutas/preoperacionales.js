@@ -46,7 +46,13 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
     }
 
     if (estado && estado !== 'todos') {
-      query = query.eq('clasificacion', estado);
+      if (estado === 'con_novedades') {
+        query = query.in('clasificacion', ['ALERTA', 'BLOQUEO']);
+      } else if (estado === 'critico') {
+        query = query.eq('clasificacion', 'BLOQUEO');
+      } else {
+        query = query.eq('clasificacion', estado);
+      }
     }
 
     if (!estado || estado === 'todos') {
