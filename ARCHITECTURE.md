@@ -314,11 +314,12 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   ├── adr
 │   │   ├── 0001-twiml-compartido-y-data-conductores.md
 │   │   └── 0002-rename-permiso-vehiculos-a-activos.md
-│   └── canon
-│       ├── CERO_ARCHITECTURE_RULES.md
-│       ├── CERO_CANON.md
-│       ├── CERO_DATABASE_CONTRACT.md
-│       └── CERO_RELEASE_CHECKLIST.md
+│   ├── canon
+│   │   ├── CERO_ARCHITECTURE_RULES.md
+│   │   ├── CERO_CANON.md
+│   │   ├── CERO_DATABASE_CONTRACT.md
+│   │   └── CERO_RELEASE_CHECKLIST.md
+│   └── DECISION_LOG.md
 ├── instrucciones
 │   ├── cambio-3-tabla-sticky-v1.txt
 │   ├── fix-badge-rol-header.txt
