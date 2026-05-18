@@ -44,7 +44,7 @@ const CANONICAL_ROLE_PERMISSIONS = {
     tanqueos: ['ver', 'autorizar', 'editar'],
     alertas: ['ver', 'autorizar'],
     dashboard: ['ver'],
-    autorizaciones: ['ver']
+    autorizaciones: ['ver', 'editar']
   },
   operador: {
     activos: ['ver'],
