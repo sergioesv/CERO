@@ -7,7 +7,6 @@
 var config = require('../config/config');
 
 var TABLA_POSOPERACIONALES = config.TABLES.posoperacionales;
-var TABLA_FOTOS = process.env.DB_TABLE_FOTOS_POSOPERACIONAL || 'fotos_posoperacional';
 var TABLA_PREOPERACIONALES = config.TABLES.preoperacionales;
 
 function fechaHoyCO() {
@@ -171,16 +170,17 @@ async function guardarFotosPosoperacional(posoperacionalId, fotos) {
 
   var filas = fotos.map(function(foto) {
     return {
-      posoperacional_id: posoperacionalId,
-      novedad_id: foto.novedadId || null,
+      entidad_tipo: 'posoperacional',
+      entidad_id: posoperacionalId,
       tipo: foto.tipo,
       descripcion: foto.descripcion || null,
-      foto_url: foto.url
+      foto_url: foto.url,
+      metadata: foto.novedadId ? { novedad_id: foto.novedadId } : null
     };
   });
 
   return await config.supabase
-    .from(TABLA_FOTOS)
+    .from('evidencia')
     .insert(filas)
     .select();
 }
@@ -194,7 +194,6 @@ async function actualizarPdfPosoperacional(posoperacionalId, pdfUrl) {
 
 module.exports = {
   TABLA_POSOPERACIONALES,
-  TABLA_FOTOS,
   fechaHoyCO,
   obtenerReferenciaKilometraje,
   crearPosoperacional,
