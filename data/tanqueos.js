@@ -9,7 +9,7 @@ var referenciaKm = require('./posoperacionales');
 var activosData = require('./activos');
 
 var TABLA_TANQUEOS = config.TABLES.tanqueos;
-var TABLA_FOTOS = process.env.DB_TABLE_FOTOS_TANQUEO || 'fotos_tanqueo';
+var TABLA_FOTOS = process.env.DB_TABLE_FOTOS_TANQUEO || 'evidencia';
 
 async function obtenerReferenciaKilometraje(activoId) {
   return referenciaKm.obtenerReferenciaKilometraje(activoId);
@@ -23,14 +23,15 @@ async function crearTanqueo(datosTanqueo) {
     .single();
 }
 
-async function guardarFotosTanqueo(tanqueoId, fotos) {
+async function guardarEvidencias(tanqueoId, fotos) {
   if (!Array.isArray(fotos) || !fotos.length) {
     return { error: null, data: [] };
   }
 
   var filas = fotos.map(function(foto) {
     return {
-      tanqueo_id: tanqueoId,
+      entidad_tipo: 'tanqueo',
+      entidad_id: tanqueoId,
       tipo: foto.tipo,
       descripcion: foto.descripcion || null,
       foto_url: foto.url
@@ -295,7 +296,8 @@ async function obtenerTanqueo(id) {
   var resFotos = await config.supabase
     .from(TABLA_FOTOS)
     .select('id, tipo, descripcion, foto_url, created_at')
-    .eq('tanqueo_id', id)
+    .eq('entidad_tipo', 'tanqueo')
+    .eq('entidad_id', id)
     .order('created_at');
 
   var fotos = resFotos.data || [];
@@ -503,12 +505,55 @@ async function obtenerConsolidado(mes, sedeId) {
   return { resumen: resumen, porVehiculo: listaVehiculos, detalle: data };
 }
 
+/**
+ * Guarda datos OCR en la tabla tanqueos_ocr.
+ * Solo inserta si al menos un campo OCR tiene valor.
+ *
+ * @param {string} tanqueoId - UUID del tanqueo
+ * @param {Object} datosOcr - Objeto con campos OCR extraídos
+ * @returns {Object|null} - Registro insertado o null si no había datos
+ */
+async function guardarDatosOcr(tanqueoId, datosOcr) {
+  var camposOcr = {
+    factura_numero_ocr: datosOcr.factura_numero_ocr,
+    placa_ocr_factura: datosOcr.placa_ocr_factura,
+    placa_ocr_foto: datosOcr.placa_ocr_foto,
+    km_ocr_factura: datosOcr.km_ocr_factura,
+    km_ocr_odometro: datosOcr.km_ocr_odometro,
+    cantidad_ocr: datosOcr.cantidad_ocr,
+    datos_brutos: datosOcr.datos_ocr_factura,
+    score_ocr_global: datosOcr.score_ocr_global,
+    tier_ocr: datosOcr.tier_ocr,
+    discrepancias: datosOcr.discrepancias,
+    estado_validacion: datosOcr.estado_validacion,
+    validado_por: datosOcr.validado_por,
+    fecha_validacion: datosOcr.fecha_validacion,
+    motivo_rechazo: datosOcr.motivo_rechazo,
+    revisado_por: datosOcr.revisado_por,
+    fecha_revision: datosOcr.fecha_revision,
+    notas_admin: datosOcr.notas_admin,
+  };
+  var hayDatosOcr = Object.values(camposOcr).some(function(v) {
+    return v !== undefined && v !== null;
+  });
+  if (!hayDatosOcr) return null;
+  var payload = Object.assign({ tanqueo_id: tanqueoId }, camposOcr);
+  var resultado = await config.supabase
+    .from('tanqueos_ocr')
+    .insert(payload)
+    .select()
+    .single();
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
 module.exports = {
   TABLA_TANQUEOS: TABLA_TANQUEOS,
   TABLA_FOTOS: TABLA_FOTOS,
   obtenerReferenciaKilometraje: obtenerReferenciaKilometraje,
   crearTanqueo: crearTanqueo,
-  guardarFotosTanqueo: guardarFotosTanqueo,
+  guardarEvidencias: guardarEvidencias,
+  guardarDatosOcr: guardarDatosOcr,
   actualizarKilometrajeActivo: actualizarKilometrajeActivo,
   obtenerRendimientoHistorico: obtenerRendimientoHistorico,
   listarTanqueos: listarTanqueos,

@@ -7,6 +7,7 @@
 
 var tanqueosData = require('../../data/tanqueos');
 var validaciones = require('./validaciones');
+var logger = console;
 
 /**
  * Determina el estado de validación del tanqueo según el tier OCR
@@ -145,6 +146,31 @@ async function guardarTanqueo(sesion, telefono) {
 
   var facturaNumeroFinal = sesion.facturaNumeroManual || sesion.facturaNumeroOcr || null;
 
+  // Campos OCR separados para tanqueos_ocr
+  var datosOcrPayload = {
+    factura_numero_ocr:    sesion.facturaNumeroOcr   || null,
+    placa_ocr_factura:     sesion.placaOcrFactura     || null,
+    placa_ocr_foto:        sesion.placaOcrFoto        || null,
+    km_ocr_factura:        sesion.kmOcrFactura
+      ? parseInt(String(sesion.kmOcrFactura).replace(/\D/g, ''), 10)
+      : null,
+    km_ocr_odometro:       sesion.kmOcrOdometro != null
+      ? sesion.kmOcrOdometro
+      : (sesion.kilometraje != null ? sesion.kilometraje : null),
+    cantidad_ocr:          sesion.cantidadOcr    != null ? sesion.cantidadOcr    : null,
+    datos_ocr_factura:     sesion.datosOcrFactura || null,
+    score_ocr_global:      sesion.scoreOcrGlobal || 0,
+    tier_ocr:              sesion.tierOcr         || 3,
+    discrepancias:         [],   // v3: no se calculan en runtime, se ven en drawer
+    estado_validacion:     estadoValidacionFinal,
+    validado_por:          null,
+    fecha_validacion:      null,
+    motivo_rechazo:        null,
+    revisado_por:          null,
+    fecha_revision:        null,
+    notas_admin:           null
+  };
+
   var datosTanqueo = {
     // Campos base
     activo_id:         sesion.vehiculo ? sesion.vehiculo.id : null,
@@ -169,25 +195,11 @@ async function guardarTanqueo(sesion, telefono) {
     observaciones:     null,
     pdf_url:           null,
 
-    // Campos OCR factura
+    // Campos OCR conservados en tanqueos por compat
     factura_numero:        facturaNumeroFinal,
-    factura_numero_ocr:    sesion.facturaNumeroOcr   || null,
     factura_numero_manual: sesion.facturaNumeroManual || null,
-    placa_ocr_factura:     sesion.placaOcrFactura     || null,
-    placa_ocr_foto:        sesion.placaOcrFoto        || null,
-    km_ocr_factura:        sesion.kmOcrFactura
-      ? parseInt(String(sesion.kmOcrFactura).replace(/\D/g, ''), 10)
-      : null,
-    km_ocr_odometro:       sesion.kmOcrOdometro != null
-      ? sesion.kmOcrOdometro
-      : (sesion.kilometraje != null ? sesion.kilometraje : null),
-    cantidad_ocr:          sesion.cantidadOcr    != null ? sesion.cantidadOcr    : null,
-    cantidad_manual:       sesion.cantidadManual  != null ? sesion.cantidadManual  : null,
-    datos_ocr_factura:     sesion.datosOcrFactura || null,
 
-    // Nuevos campos v3
-    score_ocr_global:      sesion.scoreOcrGlobal || 0,
-    tier_ocr:              sesion.tierOcr         || 3,
+    // Nuevos campos v3 conservados en tanqueos
     serial_ibutton:        (datosOcr.serial_ibutton  && datosOcr.serial_ibutton.leido)
       ? String(datosOcr.serial_ibutton.valor).trim() : null,
     autorizacion_terpel:   (datosOcr.autorizacion    && datosOcr.autorizacion.leido)
@@ -199,7 +211,6 @@ async function guardarTanqueo(sesion, telefono) {
 
     // Validación y rendimiento
     estado_validacion:      estadoValidacionFinal,
-    discrepancias:          [],   // v3: no se calculan en runtime, se ven en drawer
     rendimiento_calculado:  rendimiento.rendimientoCalculado,
     rendimiento_alerta:     rendimiento.rendimientoAlerta,
     es_primer_tanqueo:      rendimiento.esPrimerTanqueo === true
@@ -216,12 +227,19 @@ async function guardarTanqueo(sesion, telefono) {
     return { error: resTanqueo.error, tanqueo: null, estadoValidacion: estadoValidacionFinal };
   }
 
+  var tanqueoId = resTanqueo.data.id;
+
+  // Guardar datos OCR si existen
+  await tanqueosData.guardarDatosOcr(tanqueoId, datosOcrPayload).catch(function(err) {
+    logger.error('[Cierre] Error guardando datos OCR:', err);
+  });
+
   var fotos = (sesion.fotos || []).filter(function(f) {
     return f.tipo === 'factura' || f.tipo === 'odometro' || f.tipo === 'tablero';
   });
 
   if (fotos.length > 0) {
-    var resFotos = await tanqueosData.guardarFotosTanqueo(resTanqueo.data.id, fotos);
+    var resFotos = await tanqueosData.guardarEvidencias(tanqueoId, fotos);
     if (resFotos && resFotos.error) {
       console.error('[Cierre] Error guardando fotos:', resFotos.error.message || resFotos.error);
     }

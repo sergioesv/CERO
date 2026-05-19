@@ -58,8 +58,9 @@ router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verifica
     }
 
     var resFoto = await supabase
-      .from('fotos_tanqueo')
-      .select('foto_url, tanqueo_id')
+      .from('evidencia')
+      .select('foto_url, entidad_id')
+      .eq('entidad_tipo', 'tanqueo')
       .eq('id', fotoId)
       .maybeSingle();
 
