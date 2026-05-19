@@ -15,5 +15,6 @@ node_modules/
 # Dumps tecnicos locales (generar: .\cero_powersell.ps1 -Modo whatsapp)
 CERO_dump_*.txt
 
-# Claude Code — archivos locales por desarrollador
+# Claude Code ï¿½ archivos locales por desarrollador
 .claude/settings.local.json
+.claude/worktrees/
