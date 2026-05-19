@@ -144,9 +144,10 @@ router.get('/:id', verificarToken, verificarPermiso('preoperacionales', 'ver'), 
     }
 
     var fotos = await supabase
-      .from('fotos_evidencia')
+      .from('evidencia')
       .select('*')
-      .eq('preoperacional_id', id);
+      .eq('entidad_tipo', 'preoperacional')
+      .eq('entidad_id', id);
 
     var registro = resultado.data;
     registro.fotos = fotos.data || [];

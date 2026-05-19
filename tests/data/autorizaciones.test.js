@@ -58,7 +58,7 @@ jest.mock('../../config/config', function() {
       posoperacionales: 'posoperacionales',
       tanqueos: 'tanqueos',
       sesionesActivas: 'sesiones_activas',
-      fotosEvidencia: 'fotos_evidencia'
+      evidencia: 'evidencia'
     },
     MAX_KM_SALTO: 500
   };

@@ -77,7 +77,8 @@ const TABLES = {
   activos: clean(process.env.DB_TABLE_ACTIVOS || 'activos'),
   conductores: clean(process.env.DB_TABLE_CONDUCTORES || 'conductores'),
   preoperacionales: clean(process.env.DB_TABLE_PREOPERACIONALES || 'preoperacionales'),
-  fotosEvidencia: clean(process.env.DB_TABLE_FOTOS_EVIDENCIA || 'fotos_evidencia'),
+  // fotosEvidencia: 'fotos_evidencia', // DEPRECADO v2 — ver tabla evidencia
+  evidencia: clean(process.env.DB_TABLE_EVIDENCIA || 'evidencia'),
   alertas: clean(process.env.DB_TABLE_ALERTAS || 'alertas'),
   tanqueos: clean(process.env.DB_TABLE_TANQUEOS || 'tanqueos'),
   ats: clean(process.env.DB_TABLE_ATS || 'ats'),

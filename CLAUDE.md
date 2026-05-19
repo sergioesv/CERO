@@ -24,6 +24,7 @@ Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en pus
 
 ## Schema de BD
 - Fuente de verdad: supabase/schema.sql (extraer de Supabase si no existe)
+- Schema canónico: supabase/migrations/20260518000001_schema_canonico_v2.sql
 - Tablas clave: activos, conductores, preoperacionales, posoperacionales, tanqueos,
   autorizaciones_novedad, historial_estado_activo, empresas, sedes, usuarios_panel,
   plantillas_inspeccion, plantilla_grupos, plantilla_items
