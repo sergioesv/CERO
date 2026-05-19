@@ -464,7 +464,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 ├── supabase
 │   └── migrations
 │       ├── 20260514120000_rename_permiso_vehiculos_a_activos.sql
-│       └── 20260514130000_backfill_autorizacion_mso120.sql
+│       ├── 20260514130000_backfill_autorizacion_mso120.sql
+│       └── 20260518000001_schema_canonico_v2.sql
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
