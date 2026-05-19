@@ -463,8 +463,6 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
 ├── supabase
 │   └── migrations
-│       ├── 20260514120000_rename_permiso_vehiculos_a_activos.sql
-│       ├── 20260514130000_backfill_autorizacion_mso120.sql
 │       └── 20260518000001_schema_canonico_v2.sql
 ├── tests
 │   ├── __mocks__
@@ -480,6 +478,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   │   ├── flujo.test.js
 │   │   │   └── validaciones.test.js
 │   │   └── inspecciones
+│   │       ├── compartido
+│   │       │   └── baseFlujo.test.js
 │   │       └── preoperacional
 │   │           └── cierre.test.js
 │   ├── rutas
