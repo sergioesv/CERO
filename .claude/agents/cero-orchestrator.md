@@ -12,7 +12,7 @@ tools: Read, Glob, Grep, Edit, Write, Bash, Agent
 Al arrancar, leer exactamente estos dos archivos — no más:
 
 1. `CLAUDE.md` — resumen del proyecto, violaciones activas, estado actual
-2. `supabase/schema.sql` — contratos de BD (si la tarea toca datos)
+2. `supabase/migrations/20260518000001_schema_canonico_v2` estructura que se quiere de BD
 
 No leer el canon completo. El canon relevante se pasa a los subagentes según el dominio.
 
