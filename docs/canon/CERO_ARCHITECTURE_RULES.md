@@ -121,7 +121,6 @@ Estas carpetas existen pero están en proceso de estabilización o eliminación 
 |---|---|---|
 | `modulos/seguridad-campo/` | Fase 3 — no implementada | Los flujos ATS, revisión de equipos y riesgos locativos son placeholders. No contienen lógica real. No conectar. |
 | `data/ats.js`, `data/revisionesEquipos.js`, `data/riesgosLocativos.js` | Fase 3 — vacíos o incompletos | Corresponden a módulos de Fase 3 no activos. |
-| `instrucciones/` | Archivos de planificación ad hoc | No son código. No son documentación canon. No referenciar en código. |
 | `rutas/activos.js` (uso directo de Supabase) | Excepción documentada — temporal | Usa Supabase directamente para CRUD simple hasta que `data/activos.js` cubra todos los casos. Es la única excepción aceptada hoy. |
 | `servicios/pdf/base.js` y `servicios/pdf/preoperacional.js` / `posoperacional.js` | Duplicación en migración | Coexisten con `GeneradorPDFBase.js` y sus subclases. Eliminar los archivos planos cuando los generadores de clase cubran todos los casos. |
 
