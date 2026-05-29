@@ -1,6 +1,6 @@
 const axios = require('axios');
 const config = require('../config/config');
-const utils = require('../modulos/inspecciones/preoperacional/validaciones');
+const validacionVisual = require('../modulos/inspecciones/compartido/validacionVisual');
 
 const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
 const GEMINI_TIMEOUT_MS = 9000;
@@ -474,7 +474,7 @@ async function extraerPlacaFoto(urlFoto) {
       modelo: MODELO_VISION
     });
 
-    var placa = utils.normalizarPlaca(parsed.placa || '');
+    var placa = validacionVisual.normalizarPlaca(parsed.placa || '');
     return {
       valida: !!parsed.valida && !!placa,
       placa: placa || null,
