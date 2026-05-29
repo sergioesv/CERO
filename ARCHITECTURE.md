@@ -286,7 +286,7 @@ El orquestador pasa las reglas de dominio a los subagentes según el área tocad
 Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-19 -->
+<!-- Última actualización: 2026-05-29 -->
 
 ## Folder structure
 
@@ -320,15 +320,6 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   ├── CERO_DATABASE_CONTRACT.md
 │   │   └── CERO_RELEASE_CHECKLIST.md
 │   └── DECISION_LOG.md
-├── instrucciones
-│   ├── cambio-3-tabla-sticky-v1.txt
-│   ├── fix-badge-rol-header.txt
-│   ├── fix-ci-frontend-eslint.txt
-│   ├── fix-drawer-labels-spacing.txt
-│   ├── fix-trust-proxy-security.txt
-│   ├── setup-local-dotenv-v1.txt
-│   ├── update-architecture-usuarios.txt
-│   └── usuarios-panel-v1.txt
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
 ├── modulos
