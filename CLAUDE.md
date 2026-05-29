@@ -4,7 +4,7 @@
 ## Proyecto
 SaaS de gestión de operaciones de campo vía WhatsApp. Colombia, PESV (Res. 40595/2022).
 Stack: Node.js 20 CommonJS · Supabase PostgreSQL (São Paulo) · Railway · Twilio · Gemini 2.0 Flash
-Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en push a desarrollo
+Repo: sergioesv/CERO · Rama activa: desarrollo · Deploy: auto en push a desarrollo
 
 ## Estado actual
 - Fase 1 completa: preop, posop, tanqueo, alertas, inscripción, autorización v12
