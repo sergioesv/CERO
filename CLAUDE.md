@@ -36,12 +36,11 @@ Repo: sergioesv/CERO (privado) · Rama activa: desarrollo · Deploy: auto en pus
 |-----|--------------------------------------------------|-----------|-------------|
 | V-01 | servicios/ocr.js línea 3                        | ALTA | Importa de modulos/ — dirección prohibida |
 | V-02 | servicios/ocr.js líneas 228-404                 | ALTA | Lógica de dominio de inspecciones en capa servicios |
-| V-04 | interpretacion.js vs seed-templates.js          | MEDIA | Alias hardcodeados desincronizados con BD real |
+| V-04 | servicios/ocr.js aliasPorItem (líneas 237-256) vs scripts/seed-templates.js / plantilla_items | MEDIA | Alias de ítems hardcodeados en ocr.js, sin sincronizar con el vocabulario real sembrado en BD |
 | V-05 | ocr.js línea 354                                | MEDIA | Fallback implícito clasifica cualquier texto no reconocido como BLOQUEO |
-| V-06 | ocr.js vs interpretacion.js                     | MEDIA | 5 funciones duplicadas con reglas divergentes |
-| V-07 | modulos/inspecciones/estado.js líneas 104-122   | BAJA  | Tercera implementación del mismo matching de nombres |
+| V-07 | servicios/ocr.js vs modulos/inspecciones/preoperacional/estado.js | BAJA  | Matching de nombres duplicado entre ocr.js y el estado del preoperacional |
 
-Orden de corrección: V-01/V-02 → V-04/V-06 → V-05 → V-07
+Orden de corrección: V-01/V-02 → V-04 → V-05 → V-07
 
 ## Pendientes críticos antes del segundo cliente
 - [ ] supabase/schema.sql — extraer y versionar
