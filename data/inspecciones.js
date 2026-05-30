@@ -149,9 +149,79 @@ async function obtenerReferenciaKilometraje(activoId, tipoFlujo) {
   };
 }
 
+
+/**
+ * Lista preoperacionales con filtros opcionales.
+ * @param {Object} filtros - { desde, hasta, activoId, conductorId, estado }
+ */
+async function listarPreoperacionales(filtros) {
+  var supabase = require('../config/config').supabase;
+  var query = supabase
+    .from('preoperacionales')
+    .select('*, activos:activo_id(id, placa, nombre, datos), conductores:conductor_id(id, nombre, cedula)')
+    .order('fecha', { ascending: false })
+    .order('hora', { ascending: false });
+
+  if (filtros.desde)      query = query.gte('fecha', filtros.desde);
+  if (filtros.hasta)      query = query.lte('fecha', filtros.hasta);
+  if (filtros.activoId)   query = query.eq('activo_id', filtros.activoId);
+  if (filtros.conductorId) query = query.eq('conductor_id', filtros.conductorId);
+
+  if (filtros.estado && filtros.estado !== 'todos') {
+    if (filtros.estado === 'con_novedades') {
+      query = query.in('clasificacion', ['ALERTA', 'BLOQUEO']);
+    } else if (filtros.estado === 'bloqueado') {
+      query = query.eq('clasificacion', 'BLOQUEO');
+    } else {
+      query = query.eq('clasificacion', filtros.estado.toUpperCase());
+    }
+  }
+
+  var resultado = await query;
+  if (resultado.error) throw resultado.error;
+  return resultado.data || [];
+}
+
+/**
+ * Obtiene un preoperacional por ID con activo, conductor, fotos y autorizacion.
+ */
+async function obtenerPreoperacionalDetalle(id) {
+  var supabase = require('../config/config').supabase;
+
+  var resultado = await supabase
+    .from('preoperacionales')
+    .select('*, activos:activo_id(id, placa, nombre, datos, documentos), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
+    .eq('id', id)
+    .single();
+
+  if (resultado.error) return null;
+
+  var registro = resultado.data;
+
+  var resEvidencia = await supabase
+    .from('evidencia')
+    .select('*')
+    .eq('entidad_tipo', 'preoperacional')
+    .eq('entidad_id', id);
+  registro.fotos = resEvidencia.data || [];
+
+  var resAut = await supabase
+    .from('autorizaciones_novedad')
+    .select('id, decision, justificacion, novedades_bloqueo, timestamp_alerta, timestamp_decision, supervisor_id')
+    .eq('preoperacional_id', id)
+    .limit(1);
+  registro.autorizacion = (!resAut.error && resAut.data && resAut.data.length > 0)
+    ? resAut.data[0]
+    : null;
+
+  return registro;
+}
+
 module.exports = {
   crearPreoperacional,
   guardarFotosEvidencia,
   actualizarKilometrajeActivo,
-  obtenerReferenciaKilometraje
+  obtenerReferenciaKilometraje,
+  listarPreoperacionales,
+  obtenerPreoperacionalDetalle
 };

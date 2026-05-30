@@ -547,6 +547,23 @@ async function guardarDatosOcr(tanqueoId, datosOcr) {
   return resultado.data;
 }
 
+
+/**
+ * Obtiene la URL de una foto de evidencia de tanqueo por ID.
+ * Usado por el endpoint de proxy de fotos Twilio.
+ */
+async function obtenerFotoEvidencia(fotoId) {
+  var resultado = await config.supabase
+    .from('evidencia')
+    .select('foto_url, entidad_id')
+    .eq('entidad_tipo', 'tanqueo')
+    .eq('id', fotoId)
+    .maybeSingle();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
 module.exports = {
   TABLA_TANQUEOS: TABLA_TANQUEOS,
   TABLA_FOTOS: TABLA_FOTOS,

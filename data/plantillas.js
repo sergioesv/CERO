@@ -76,8 +76,127 @@ async function obtenerGruposEItems(plantillaId) {
   return grupos;
 }
 
+
+async function listarPlantillas() {
+  var resultado = await config.supabase
+    .from('plantillas_inspeccion')
+    .select('*, tipos_activo (nombre, codigo)')
+    .order('created_at', { ascending: false });
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data || [];
+}
+
+async function buscarTipoActivoPorNombreOCodigo(valor) {
+  var resultado = await config.supabase
+    .from('tipos_activo')
+    .select('id')
+    .or(`nombre.eq."${valor}",codigo.eq."${valor}"`)
+    .single();
+
+  if (resultado.error) return null;
+  return resultado.data;
+}
+
+async function crearPlantilla(campos) {
+  var resultado = await config.supabase
+    .from('plantillas_inspeccion')
+    .insert([campos])
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function actualizarPlantilla(id, campos) {
+  var resultado = await config.supabase
+    .from('plantillas_inspeccion')
+    .update(campos)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function crearGrupo(campos) {
+  var resultado = await config.supabase
+    .from('plantilla_grupos')
+    .insert([campos])
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function actualizarGrupo(id, campos) {
+  var resultado = await config.supabase
+    .from('plantilla_grupos')
+    .update(campos)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function eliminarGrupo(id) {
+  var resultado = await config.supabase
+    .from('plantilla_grupos')
+    .delete()
+    .eq('id', id);
+
+  if (resultado.error) throw resultado.error;
+}
+
+async function crearItem(campos) {
+  var resultado = await config.supabase
+    .from('plantilla_items')
+    .insert([campos])
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function actualizarItem(id, campos) {
+  var resultado = await config.supabase
+    .from('plantilla_items')
+    .update(campos)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+async function eliminarItem(id) {
+  var resultado = await config.supabase
+    .from('plantilla_items')
+    .delete()
+    .eq('id', id);
+
+  if (resultado.error) throw resultado.error;
+}
+
 module.exports = {
   obtenerPlantillaActiva,
   obtenerPlantillaPorId,
-  obtenerGruposEItems
+  obtenerGruposEItems,
+  listarPlantillas,
+  buscarTipoActivoPorNombreOCodigo,
+  crearPlantilla,
+  actualizarPlantilla,
+  crearGrupo,
+  actualizarGrupo,
+  eliminarGrupo,
+  crearItem,
+  actualizarItem,
+  eliminarItem
 };

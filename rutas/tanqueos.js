@@ -6,7 +6,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, supabase } = require('../config/config');
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
 
 function sanitizarCeldaCsv(valor) {
@@ -57,18 +57,13 @@ router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verifica
       return res.status(400).json({ ok: false, error: 'ID inválido' });
     }
 
-    var resFoto = await supabase
-      .from('evidencia')
-      .select('foto_url, entidad_id')
-      .eq('entidad_tipo', 'tanqueo')
-      .eq('id', fotoId)
-      .maybeSingle();
+    var fotoData = await tanqueosData.obtenerFotoEvidencia(fotoId);
 
-    if (resFoto.error || !resFoto.data) {
+    if (!fotoData) {
       return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
     }
 
-    var url = resFoto.data.foto_url;
+    var url = fotoData.foto_url;
 
     if (!url || !url.startsWith('https://api.twilio.com/')) {
       return res.status(400).json({ ok: false, error: 'Tipo de URL no soportado' });

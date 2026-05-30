@@ -8,6 +8,10 @@ Formato: | Fecha | Decisión | Razón | Violación cerrada |
 
 | Fecha | Decisión | Razón | Violación cerrada |
 |---|---|---|---|
+| 2026-05-29 | Mover SQL de rutas/plantillas.js a data/plantillas.js (CRUD completo de plantillas/grupos/items) | rutas/ no debe contener queries Supabase | — |
+| 2026-05-29 | Mover SQL de rutas/preoperacionales.js a data/inspecciones.js (listarPreoperacionales, obtenerPreoperacionalDetalle) | rutas/ no debe contener queries Supabase | — |
+| 2026-05-29 | Mover query evidencia de rutas/tanqueos.js a data/tanqueos.obtenerFotoEvidencia | rutas/ no debe contener queries Supabase | — |
+| 2026-05-29 | rutas/ completamente limpia de SQL directo — unica excepcion documentada: rutas/activos.js | Arquitectura SRP completada en capa rutas/ | — |
 | 2026-05-29 | Crear data/usuarios.js con todas las queries de usuarios/auth — rutas/auth.js y rutas/usuarios.js ya sin SQL directo | rutas/ no debe contener queries Supabase | — |
 | 2026-05-29 | Eliminar SQL directo de rutas/alertas.js — delega a data/alertas.js (obtenerVencimientosActivos/Licencias) | rutas/ no debe contener queries Supabase | — |
 | 2026-05-29 | Agregar listarRoles() a data/permisos.js — rutas/roles.js ya no tiene SQL directo | rutas/ no debe contener queries Supabase | — |
