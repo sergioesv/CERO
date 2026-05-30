@@ -1,3 +1,11 @@
+// ============================================================
+// DEPRECADO — no agregar nueva logica aqui.
+// El motor activo es servicios/pdf/GeneradorPDFBase.js (clase).
+// Este archivo existe solo para compatibilidad con wrappers legacy.
+// Eliminar cuando preoperacional.js y posoperacional.js
+// importen GeneradorPDF* directamente desde cierre.js.
+// ============================================================
+
 /**
  * Motor compartido de generación de PDF para CERO.
  * Expone helpers reutilizables por preoperacional y posoperacional.

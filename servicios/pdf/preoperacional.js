@@ -6,7 +6,6 @@
 
 'use strict';
 
-var base        = require('./base');
 var config      = require('../../config/config');
 const GeneradorPDFPreoperacional = require('./GeneradorPDFPreoperacional');
 
