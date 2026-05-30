@@ -286,7 +286,7 @@ El orquestador pasa las reglas de dominio a los subagentes según el área tocad
 Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-29 -->
+<!-- Última actualización: 2026-05-30 -->
 
 ## Folder structure
 
