@@ -319,7 +319,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   ├── CERO_CANON.md
 │   │   ├── CERO_DATABASE_CONTRACT.md
 │   │   └── CERO_RELEASE_CHECKLIST.md
-│   └── DECISION_LOG.md
+│   ├── DECISION_LOG.md
+│   └── HANDOFF_SOLID.md
 ├── middlewares
 │   └── auth.js  # JWT verificarToken + verificarPermiso con roles canonicos
 ├── modulos
@@ -337,6 +338,7 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   ├── compartido
 │   │   │   ├── baseFlujo.js  # Base compartida para maquinas de estado de flujos WhatsApp
 │   │   │   ├── iniciadorFlujo.js  # Iniciador de flujo — OCR placa y odometro
+│   │   │   ├── interpretadorNovedades.js
 │   │   │   ├── kilometraje.js  # Validacion y logica de kilometraje entre turnos
 │   │   │   ├── navegacion.js  # Textos de navegacion — menu principal, 0=atras, 9=menu
 │   │   │   ├── twiml.js  # TwiML utilidades — respuestas WhatsApp
