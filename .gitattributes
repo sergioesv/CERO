@@ -1,0 +1,20 @@
+# Normalizar line endings: LF en repo, conversión automática en Windows
+* text=auto eol=lf
+
+# Forzar LF en archivos de texto críticos
+*.js     text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.css    text eol=lf
+*.html   text eol=lf
+*.sql    text eol=lf
+*.cjs    text eol=lf
+
+# Binarios — no tocar
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.ico    binary
