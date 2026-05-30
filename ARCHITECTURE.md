@@ -299,7 +299,6 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 ├── data
 │   ├── activos.js  # Activos — tabla activos + registrarCambioEstado + historial
 │   ├── alertas.js  # Alertas — vencimientos de documentos y licencias
-│   ├── ats.js  # ATS — Analisis de Trabajo Seguro (Fase 3)
 │   ├── autorizaciones.js  # Autorizaciones de novedades — pendientes, resueltas, decidir
 │   ├── conductores.js
 │   ├── dashboard.js  # Dashboard — consultas agregadas para el panel ejecutivo
@@ -307,9 +306,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   ├── permisos.js  # Permisos — roles canonicos, seed de permisos base, classifyRoleName
 │   ├── plantillas.js
 │   ├── posoperacionales.js  # Posoperacionales — registro de cierre de turno
-│   ├── revisionesEquipos.js  # Revision de equipos — arneses, escaleras, EPP (Fase 3)
-│   ├── riesgosLocativos.js  # Riesgos locativos (Fase 3)
-│   └── tanqueos.js  # Tanqueos — registro de combustible
+│   ├── tanqueos.js  # Tanqueos — registro de combustible
+│   └── usuarios.js
 ├── docs
 │   ├── adr
 │   │   ├── 0001-twiml-compartido-y-data-conductores.md
