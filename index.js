@@ -87,8 +87,6 @@ registrarCronAlertas();
 // API — ENDPOINTS PARA EL PANEL DE ADMINISTRACIÓN
 // ═══════════════════════════════════════════════════════════
 
-const { supabase } = require('./config/config');
-
 const rutasActivos = require('./rutas/activos');
 app.use('/api/activos', rutasActivos);
 app.use('/api/vehiculos', rutasActivos);  // Alias temporal para frontend legacy
@@ -105,43 +103,6 @@ app.use('/api/alertas', rutasAlertas);
 const rutasPlantillas = require('./rutas/plantillas');
 app.use('/api/plantillas', rutasPlantillas);
 
-// ───────────────────────────────────────────────────────────
-// DASHBOARD
-// ───────────────────────────────────────────────────────────
-
-// GET /api/dashboard/resumen — resumen general (consultas en paralelo)
-app.get('/api/dashboard/resumen', verificarToken, verificarPermiso('dashboard', 'ver'), async function (req, res) {
-  try {
-    // Fecha de hoy en zona horaria Colombia (UTC-5)
-    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
-
-    // Ejecutar las 4 consultas independientes en paralelo
-    const [
-      { count: totalVehiculos, error: e1 },
-      { count: bloqueados,     error: e2 },
-      { count: conductoresActivos, error: e3 },
-      { count: inspeccionesHoy,    error: e4 }
-    ] = await Promise.all([
-      supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null),
-      supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null).eq('bloqueado', true),
-      supabase.from('conductores').select('*', { count: 'exact', head: true }).eq('activo', true),
-      supabase.from('preoperacionales').select('*', { count: 'exact', head: true }).gte('created_at', hoy)
-    ]);
-
-    // Si alguna consulta falló, lanzar error
-    const errorDb = e1 || e2 || e3 || e4;
-    if (errorDb) throw errorDb;
-
-    res.json({
-      ok: true,
-      vehiculos: {
-        total: totalVehiculos || 0,
-        activos: (totalVehiculos || 0) - (bloqueados || 0),
-        bloqueados: bloqueados || 0
-      },
-      conductores: conductoresActivos || 0,
-      inspeccionesHoy: inspeccionesHoy || 0
-    });
   } catch (error) {
     console.error('Error obteniendo resumen dashboard:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });

@@ -68,4 +68,20 @@ router.get('/api/dashboard/indice', verificarToken, async function (req, res) {
   }
 });
 
+
+/**
+ * GET /api/dashboard/resumen
+ * 4 KPIs en paralelo: vehiculos, bloqueados, conductores, inspecciones hoy.
+ * Movido desde index.js para respetar separacion de responsabilidades.
+ */
+router.get('/api/dashboard/resumen', verificarToken, async function (req, res) {
+  try {
+    var resumen = await dashboardData.obtenerResumenGeneral();
+    res.json({ ok: true, ...resumen });
+  } catch (error) {
+    console.error('Error obteniendo resumen dashboard:', error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+});
+
 module.exports = router;

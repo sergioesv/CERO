@@ -1,21 +1,20 @@
-// ═══════════════════════════════════════════════════════════
-// API — CONDUCTORES
-// ═══════════════════════════════════════════════════════════
+// ============================================================
+// rutas/conductores.js
+// HTTP — recibe, valida, delega a data/, responde.
+// Sin queries directas a Supabase.
+// ============================================================
+
+'use strict';
 
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/config');
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
+const conductoresData = require('../data/conductores');
 
 // GET / — lista todos los conductores
 router.get('/', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
-    const { data, error } = await supabase
-      .from('conductores')
-      .select('*')
-      .order('nombre');
-
-    if (error) throw error;
+    const data = await conductoresData.listarConductores();
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error listando conductores:', error);
@@ -23,16 +22,10 @@ router.get('/', verificarToken, verificarPermiso('conductores', 'ver'), async fu
   }
 });
 
-// GET /:id — obtiene un conductor
+// GET /:id — obtiene un conductor por ID
 router.get('/:id', verificarToken, verificarPermiso('conductores', 'ver'), async function (req, res) {
   try {
-    const { data, error } = await supabase
-      .from('conductores')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-
-    if (error) throw error;
+    const data = await conductoresData.obtenerConductorPorId(req.params.id);
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error obteniendo conductor:', error);
@@ -46,25 +39,7 @@ router.post('/', verificarToken, verificarPermiso('conductores', 'crear'), async
     if (!req.body.nombre || !req.body.cedula) {
       return res.status(400).json({ ok: false, error: 'Los campos nombre y cedula son obligatorios' });
     }
-
-    const conductor = {
-      nombre: req.body.nombre,
-      cedula: req.body.cedula,
-      telefono: req.body.telefono || null,
-      licencia_categoria: req.body.licencia_categoria || null,
-      licencia_vencimiento: req.body.licencia_vencimiento || null,
-      cargo: req.body.cargo || 'Conductor',
-      activo: true
-    };
-    if (req.body.sede_id !== undefined) conductor.sede_id = req.body.sede_id || null;
-
-    const { data, error } = await supabase
-      .from('conductores')
-      .insert([conductor])
-      .select()
-      .single();
-
-    if (error) throw error;
+    const data = await conductoresData.crearConductor(req.body);
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error creando conductor:', error);
@@ -75,24 +50,16 @@ router.post('/', verificarToken, verificarPermiso('conductores', 'crear'), async
 // PUT /:id — actualiza un conductor
 router.put('/:id', verificarToken, verificarPermiso('conductores', 'editar'), async function (req, res) {
   try {
+    const CAMPOS_PERMITIDOS = [
+      'nombre', 'cedula', 'telefono', 'licencia_categoria',
+      'licencia_vencimiento', 'cargo', 'activo', 'sede_id'
+    ];
     const campos = {};
-    if (req.body.nombre !== undefined) campos.nombre = req.body.nombre;
-    if (req.body.cedula !== undefined) campos.cedula = req.body.cedula;
-    if (req.body.telefono !== undefined) campos.telefono = req.body.telefono;
-    if (req.body.licencia_categoria !== undefined) campos.licencia_categoria = req.body.licencia_categoria;
-    if (req.body.licencia_vencimiento !== undefined) campos.licencia_vencimiento = req.body.licencia_vencimiento;
-    if (req.body.cargo !== undefined) campos.cargo = req.body.cargo;
-    if (req.body.activo !== undefined) campos.activo = req.body.activo;
-    if (req.body.sede_id !== undefined) campos.sede_id = req.body.sede_id;
+    CAMPOS_PERMITIDOS.forEach(function(campo) {
+      if (req.body[campo] !== undefined) campos[campo] = req.body[campo];
+    });
 
-    const { data, error } = await supabase
-      .from('conductores')
-      .update(campos)
-      .eq('id', req.params.id)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const data = await conductoresData.actualizarConductor(req.params.id, campos);
     res.json({ ok: true, data: data });
   } catch (error) {
     console.error('Error actualizando conductor:', error);

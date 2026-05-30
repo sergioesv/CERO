@@ -1313,6 +1313,44 @@ async function obtenerDatosActivos(sedeIds, periodo, tipoFiltro) {
   };
 }
 
+
+/**
+ * Resumen general del dashboard — 4 KPIs en paralelo.
+ * Usado por el widget de resumen en la cabecera del panel.
+ */
+async function obtenerResumenGeneral() {
+  var supabase = require('../config/config').supabase;
+  var hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
+
+  var [
+    resActivos,
+    resBloqueados,
+    resConductores,
+    resInspecciones
+  ] = await Promise.all([
+    supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null),
+    supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null).eq('bloqueado', true),
+    supabase.from('conductores').select('*', { count: 'exact', head: true }).eq('activo', true),
+    supabase.from('preoperacionales').select('*', { count: 'exact', head: true }).gte('created_at', hoy)
+  ]);
+
+  var errorDb = resActivos.error || resBloqueados.error || resConductores.error || resInspecciones.error;
+  if (errorDb) throw errorDb;
+
+  var total = resActivos.count || 0;
+  var bloqueados = resBloqueados.count || 0;
+
+  return {
+    vehiculos: {
+      total:     total,
+      activos:   total - bloqueados,
+      bloqueados: bloqueados
+    },
+    conductores:    resConductores.count || 0,
+    inspeccionesHoy: resInspecciones.count || 0
+  };
+}
+
 module.exports = {
   resolverSedeIds,
   obtenerConfiguracionSede,
@@ -1325,5 +1363,6 @@ module.exports = {
   obtenerItemsMasNovedades,
   obtenerActivosAtencion,
   obtenerReincidencia,
-  rangoPeriodo
+  rangoPeriodo,
+  obtenerResumenGeneral
 };

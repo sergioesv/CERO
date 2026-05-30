@@ -34,8 +34,8 @@ Repo: sergioesv/CERO · Rama activa: desarrollo · Deploy: auto en push a desarr
 ## Violaciones SOLID activas (pendientes de corrección)
 | ID  | Archivo                                          | Prioridad | Descripción |
 |-----|--------------------------------------------------|-----------|-------------|
-| V-01 | servicios/ocr.js línea 3                        | ALTA | Importa de modulos/ — dirección prohibida |
-| V-02 | servicios/ocr.js líneas 228-404                 | ALTA | Lógica de dominio de inspecciones en capa servicios |
+| ~~V-01~~ | ~~servicios/ocr.js línea 3~~                | ~~ALTA~~ | ✅ CERRADA 2026-05-29 — extraído a interpretadorNovedades.js |
+| ~~V-02~~ | ~~servicios/ocr.js líneas 228-404~~          | ~~ALTA~~ | ✅ CERRADA 2026-05-29 — extraído a interpretadorNovedades.js |
 | V-04 | servicios/ocr.js aliasPorItem (líneas 237-256) vs scripts/seed-templates.js / plantilla_items | MEDIA | Alias de ítems hardcodeados en ocr.js, sin sincronizar con el vocabulario real sembrado en BD |
 | V-05 | ocr.js línea 354                                | MEDIA | Fallback implícito clasifica cualquier texto no reconocido como BLOQUEO |
 | V-07 | servicios/ocr.js vs modulos/inspecciones/preoperacional/estado.js | BAJA  | Matching de nombres duplicado entre ocr.js y el estado del preoperacional |

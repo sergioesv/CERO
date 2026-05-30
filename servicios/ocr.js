@@ -1,23 +1,38 @@
+'use strict';
+
+// ============================================================================
+// servicios/ocr.js
+//
+// Servicio de vision artificial (Gemini API).
+// Responsabilidad: integracion con Gemini para OCR de placas, odometros y facturas.
+//
+// V-01 corregido: ya no importa de modulos/. La logica de dominio de inspecciones
+// fue extraida a modulos/inspecciones/compartido/interpretadorNovedades.js.
+// ============================================================================
+
 const axios = require('axios');
 const config = require('../config/config');
-const validacionVisual = require('../modulos/inspecciones/compartido/validacionVisual');
+const interpretador = require('../modulos/inspecciones/compartido/interpretadorNovedades');
 
 const DOMINIOS_PERMITIDOS = ['twilio.com', 'twiliocdn.com', 'api.twilio.com'];
 const GEMINI_TIMEOUT_MS = 9000;
-const MODELO_VISION = config.clean(process.env.GOOGLE_MODEL_VISION || 'gemini-2.5-flash');
+const MODELO_VISION    = config.clean(process.env.GOOGLE_MODEL_VISION    || 'gemini-2.5-flash');
 const MODELO_NOVEDADES = config.clean(process.env.GOOGLE_MODEL_NOVEDADES || MODELO_VISION || 'gemini-2.5-flash');
-const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'o', 'con', 'sin', 'estado', 'visible', 'visibles']);
 
 /**
- * Campos críticos para calcular el score OCR de factura.
- * El score global es el promedio de confianza de estos campos (solo los leídos).
+ * Campos criticos para calcular el score OCR de factura.
+ * Score global = promedio de confianza de estos campos (solo los leidos).
  */
 var CAMPOS_CRITICOS_FACTURA = ['factura_numero', 'cantidad', 'valor_total', 'placa'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilidades de texto (privadas - solo para normalizacion de placas y facturas)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function sinAcentos(texto) {
   return String(texto == null ? '' : texto)
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[̀-ͯ]/g, '');
 }
 
 function normalizarTexto(texto) {
@@ -28,20 +43,23 @@ function normalizarTexto(texto) {
     .trim();
 }
 
-function tokenizar(texto) {
-  var normalizado = normalizarTexto(texto);
-  if (!normalizado) return [];
-  return normalizado.split(' ').map(function(token) {
-    return token.replace(/(es|s)$/g, '');
-  }).filter(Boolean);
-}
-
 function textoIncluye(normalizado, terminos) {
   for (var i = 0; i < terminos.length; i++) {
     if (normalizado.indexOf(normalizarTexto(terminos[i])) >= 0) return true;
   }
   return false;
 }
+
+// normalizarPlaca: inlineada para evitar dependencia circular con validacionVisual
+function normalizarPlaca(texto) {
+  return sinAcentos(String(texto == null ? '' : texto))
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Descarga de imagenes desde CDN de Twilio
+// ─────────────────────────────────────────────────────────────────────────────
 
 function descargarImagen(url) {
   return (async function() {
@@ -75,6 +93,10 @@ function descargarImagen(url) {
     }
   })();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cliente Gemini (privado)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function obtenerUrlGemini(modelo) {
   return 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(modelo) + ':generateContent';
@@ -121,10 +143,10 @@ function parsearJsonSeguro(texto) {
 }
 
 async function llamarGeminiJson(opciones) {
-  var prompt = opciones.prompt;
+  var prompt    = opciones.prompt;
   var imageData = opciones.imageData;
-  var schema = opciones.schema;
-  var modelo = opciones.modelo;
+  var schema    = opciones.schema;
+  var modelo    = opciones.modelo;
 
   if (!config.GOOGLE_API_KEY) {
     throw new Error('GOOGLE_API_KEY no configurada');
@@ -180,6 +202,10 @@ async function llamarGeminiJson(opciones) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Schemas Gemini
+// ─────────────────────────────────────────────────────────────────────────────
+
 function construirSchemaNovedades(items) {
   return {
     type: 'OBJECT',
@@ -207,8 +233,8 @@ function construirSchemaPlaca() {
     required: ['valida', 'placa', 'razon'],
     properties: {
       valida: { type: 'BOOLEAN' },
-      placa: { type: 'STRING' },
-      razon: { type: 'STRING' }
+      placa:  { type: 'STRING' },
+      razon:  { type: 'STRING' }
     }
   };
 }
@@ -218,210 +244,19 @@ function construirSchemaOdometro() {
     type: 'OBJECT',
     required: ['valida', 'kilometraje', 'razon'],
     properties: {
-      valida: { type: 'BOOLEAN' },
+      valida:      { type: 'BOOLEAN' },
       kilometraje: { type: 'STRING' },
-      razon: { type: 'STRING' }
+      razon:       { type: 'STRING' }
     }
   };
 }
 
-function aliasPorItem(nombre) {
-  var clave = normalizarTexto(nombre);
-  var alias = new Set();
-  alias.add(clave);
+// ─────────────────────────────────────────────────────────────────────────────
+// API publica - interpretacion de novedades (delega al modulo de dominio)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  tokenizar(nombre).forEach(function(token) {
-    if (!STOPWORDS.has(token)) alias.add(token);
-  });
-
-  if (/aceite/.test(clave) && /motor/.test(clave)) ['aceite', 'motor'].forEach(function(v) { alias.add(v); });
-  if (/refrigerante/.test(clave)) ['refrigerante', 'agua'].forEach(function(v) { alias.add(v); });
-  if (/liquido/.test(clave) && /freno/.test(clave)) ['liquido frenos', 'liquido', 'freno', 'frenos'].forEach(function(v) { alias.add(v); });
-  if (/fugas?/.test(clave)) ['fuga', 'fugas', 'goteo', 'goteando'].forEach(function(v) { alias.add(v); });
-  if (/luces?|faros?/.test(clave)) ['luz', 'luces', 'faro', 'faros'].forEach(function(v) { alias.add(v); });
-  if (/stops?|direccionales?/.test(clave)) ['stop', 'stops', 'direccional', 'direccionales'].forEach(function(v) { alias.add(v); });
-  if (/pito|bocina/.test(clave) || (/alarma/.test(clave) && /reversa/.test(clave))) ['pito', 'alarma', 'reversa', 'corneta', 'bocina'].forEach(function(v) { alias.add(v); });
-  if (/tablero/.test(clave)) ['tablero', 'instrumento', 'instrumentos', 'indicador', 'indicadores'].forEach(function(v) { alias.add(v); });
-  if (/bater/.test(clave)) ['bateria', 'baterias'].forEach(function(v) { alias.add(v); });
-  if (/parqueo/.test(clave) || (/freno/.test(clave) && /mano/.test(clave))) ['freno', 'frenos', 'parqueo', 'mano'].forEach(function(v) { alias.add(v); });
-  if (/llanta/.test(clave) && !/repuesto/.test(clave)) ['llanta', 'llantas', 'neumatico', 'neumaticos'].forEach(function(v) { alias.add(v); });
-  if (/perno/.test(clave)) ['perno', 'pernos', 'rueda', 'ruedas', 'tuerca', 'tuercas'].forEach(function(v) { alias.add(v); });
-  if (/repuesto/.test(clave)) ['repuesto', 'respuesto', 'llanta repuesto', 'rueda repuesto'].forEach(function(v) { alias.add(v); });
-  if (/cinturon/.test(clave)) ['cinturon', 'cinturones', 'seguridad'].forEach(function(v) { alias.add(v); });
-  if (/retrovisor|espejo/.test(clave)) ['retrovisor', 'retrovisores', 'espejo', 'espejos'].forEach(function(v) { alias.add(v); });
-  if (/pedal/.test(clave)) ['pedal', 'pedales'].forEach(function(v) { alias.add(v); });
-  if (/vidrio|limpiabrisas|plumilla/.test(clave)) ['vidrio', 'vidrios', 'limpiabrisas', 'plumilla', 'plumillas'].forEach(function(v) { alias.add(v); });
-  if (/aseo|limpieza/.test(clave)) ['aseo', 'limpieza', 'suelto', 'sueltos', 'elemento', 'elementos'].forEach(function(v) { alias.add(v); });
-  if (/aire/.test(clave) && /acondicionado|acond/.test(clave)) ['aire', 'acondicionado', 'ac'].forEach(function(v) { alias.add(v); });
-  if (/equipo/.test(clave) && /carretera/.test(clave)) ['equipo', 'carretera', 'botiquin', 'extintor', 'cono', 'conos'].forEach(function(v) { alias.add(v); });
-
-  return Array.from(alias);
-}
-
-function puntuarItem(segmentoNormalizado, tokensSegmento, itemNombre) {
-  var alias = aliasPorItem(itemNombre);
-  var score = 0;
-
-  for (var i = 0; i < alias.length; i++) {
-    var termino = alias[i];
-    var terminoNormalizado = normalizarTexto(termino);
-    if (!terminoNormalizado) continue;
-
-    if (terminoNormalizado.indexOf(' ') >= 0) {
-      if (segmentoNormalizado.indexOf(terminoNormalizado) >= 0) score += 4;
-      continue;
-    }
-
-    var terminoToken = terminoNormalizado.replace(/(es|s)$/g, '');
-    if (tokensSegmento.indexOf(terminoToken) >= 0) score += 2;
-  }
-
-  var nombreNormalizado = normalizarTexto(itemNombre);
-  if (segmentoNormalizado === nombreNormalizado) score += 5;
-  if (segmentoNormalizado.indexOf(nombreNormalizado) >= 0) score += 3;
-
-  return score;
-}
-
-function encontrarMejorItem(segmento, items) {
-  var segmentoNormalizado = normalizarTexto(segmento);
-  if (!segmentoNormalizado) return null;
-
-  var tokensSegmento = tokenizar(segmento);
-  var mejor = null;
-  var mejorScore = 0;
-
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var score = puntuarItem(segmentoNormalizado, tokensSegmento, item);
-    if (score > mejorScore) {
-      mejor = item;
-      mejorScore = score;
-    }
-  }
-
-  return mejorScore > 0 ? mejor : null;
-}
-
-function detectarEstado(segmento, itemNombre) {
-  var texto = normalizarTexto(segmento);
-  var item = normalizarTexto(itemNombre);
-
-  if (!texto) return null;
-  if (textoIncluye(texto, ['no aplica', 'n a', 'na'])) return 'N/A';
-  if (textoIncluye(texto, ['ok', 'bien', 'bueno', 'buena', 'normal'])) return 'OK';
-
-  var esNivel = /aceite|refrigerante|liquido frenos/.test(item);
-  var esFugas = /fugas/.test(item);
-  var esLlantas = /llanta/.test(item);
-  var esElectrico = /luces|stop|direccionales|pito|alarma|tablero|baterias/.test(item);
-
-  if (esNivel) {
-    if (textoIncluye(texto, ['vacio', 'vacia', 'sin liquido', 'sin aceite'])) return 'Vacio';
-    if (textoIncluye(texto, ['bajo', 'baja', 'poquito', 'poco', 'faltante'])) return 'Bajo';
-  }
-
-  if (esFugas && textoIncluye(texto, ['fuga', 'fugas', 'goteo', 'goteando', 'derrame', 'botando'])) {
-    return 'Con fugas';
-  }
-
-  if (esLlantas) {
-    if (textoIncluye(texto, ['sin presion', 'sin aire', 'baja presion', 'desinflada', 'desinflado', 'pinchada', 'pinchado'])) {
-      return 'Sin presion';
-    }
-    if (textoIncluye(texto, ['desgastada', 'desgastado', 'lisa', 'lisas'])) return 'Desgastada';
-    if (textoIncluye(texto, ['danada', 'dañada', 'danado', 'dañado', 'rota', 'roto', 'rajada', 'rajado', 'cuarteada', 'cuarteado'])) {
-      return 'Danada';
-    }
-  }
-
-  if (esElectrico) {
-    if (textoIncluye(texto, ['intermitente'])) return 'Intermitente';
-    if (textoIncluye(texto, ['no funciona', 'no sirve', 'no prende', 'apagada', 'apagado', 'fundida', 'fundido', 'quemada', 'quemado'])) {
-      return 'No funciona';
-    }
-  }
-
-  if (textoIncluye(texto, ['falta', 'faltante', 'ausente', 'no tiene'])) return 'Falta';
-  if (textoIncluye(texto, ['flojo', 'floja', 'flojos', 'flojas'])) return 'Flojo';
-  if (textoIncluye(texto, ['danado', 'dañado', 'danada', 'dañada', 'roto', 'rota', 'quebrado', 'quebrada', 'averiado', 'averiada'])) {
-    return 'Danado';
-  }
-  if (textoIncluye(texto, ['malo', 'mala', 'malos', 'malas', 'mal estado', 'falla', 'fallando', 'deficiente'])) {
-    return 'Mal estado';
-  }
-
-  return 'Mal estado';
-}
-
-function separarSegmentos(texto) {
-  var bruto = String(texto || '').replace(/[\n\r]+/g, ', ');
-  return bruto
-    .split(/,|;|\.|\s+y\s+|\s+e\s+|\//i)
-    .map(function(parte) { return parte.trim(); })
-    .filter(Boolean);
-}
-
-function interpretarNovedadPorReglas(texto, items) {
-  var observacion = String(texto || '').trim();
-  var resultado = [];
-  var vistos = {};
-  var segmentos = separarSegmentos(observacion);
-
-  if (!segmentos.length && observacion) segmentos = [observacion];
-
-  for (var i = 0; i < segmentos.length; i++) {
-    var segmento = segmentos[i];
-    var item = encontrarMejorItem(segmento, items);
-    if (!item) {
-      console.warn('[ocr] segmento sin match:', JSON.stringify(segmento), '| items bloque:', items.join(', '));
-      continue;
-    }
-    if (vistos[item]) continue;
-
-    vistos[item] = true;
-    resultado.push({
-      nombre: item,
-      estado: detectarEstado(segmento, item)
-    });
-  }
-
-  if (!resultado.length && observacion) {
-    var itemGeneral = encontrarMejorItem(observacion, items);
-    if (itemGeneral) {
-      resultado.push({
-        nombre: itemGeneral,
-        estado: detectarEstado(observacion, itemGeneral)
-      });
-    }
-  }
-
-  return {
-    items: resultado,
-    observacion: observacion,
-    fuente: 'reglas'
-  };
-}
-
-function limpiarItemsInterpretados(parsed, items) {
-  var itemsPermitidos = new Set(items);
-  var vistos = {};
-  var salida = [];
-
-  (parsed && Array.isArray(parsed.items) ? parsed.items : []).forEach(function(item) {
-    if (!item || !item.nombre || !itemsPermitidos.has(item.nombre)) return;
-    if (vistos[item.nombre]) return;
-    vistos[item.nombre] = true;
-    salida.push({
-      nombre: item.nombre,
-      estado: item.estado || 'Mal estado'
-    });
-  });
-
-  return {
-    items: salida,
-    observacion: parsed && parsed.observacion ? parsed.observacion : ''
-  };
+function marcarTodoOK() {
+  return { estado: 'OK', items: [], observacion: null };
 }
 
 async function interpretarNovedad(texto, items) {
@@ -438,12 +273,12 @@ async function interpretarNovedad(texto, items) {
 
   try {
     var parsed = await llamarGeminiJson({
-      prompt: prompt,
-      schema: construirSchemaNovedades(items),
-      modelo: MODELO_NOVEDADES
+      prompt:  prompt,
+      schema:  construirSchemaNovedades(items),
+      modelo:  MODELO_NOVEDADES
     });
 
-    var limpio = limpiarItemsInterpretados(parsed, items);
+    var limpio = interpretador.limpiarItemsInterpretados(parsed, items);
     limpio.observacion = limpio.observacion || String(texto || '').trim();
 
     if (limpio.items.length > 0) {
@@ -454,8 +289,13 @@ async function interpretarNovedad(texto, items) {
     console.warn('[ocr] Gemini fallo en interpretarNovedad, usando reglas como fallback:', errorGemini.message);
   }
 
-  return interpretarNovedadPorReglas(texto, items);
+  // Fallback a interpretacion por reglas (logica de dominio en modulos/)
+  return interpretador.interpretarNovedadPorReglas(texto, items);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API publica - extraccion OCR de fotos
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function extraerPlacaFoto(urlFoto) {
   try {
@@ -468,17 +308,17 @@ async function extraerPlacaFoto(urlFoto) {
     ].join(' ');
 
     var parsed = await llamarGeminiJson({
-      prompt: prompt,
+      prompt:    prompt,
       imageData: imagen,
-      schema: construirSchemaPlaca(),
-      modelo: MODELO_VISION
+      schema:    construirSchemaPlaca(),
+      modelo:    MODELO_VISION
     });
 
-    var placa = validacionVisual.normalizarPlaca(parsed.placa || '');
+    var placa = normalizarPlaca(parsed.placa || '');
     return {
       valida: !!parsed.valida && !!placa,
-      placa: placa || null,
-      razon: parsed.razon || ''
+      placa:  placa || null,
+      razon:  parsed.razon || ''
     };
   } catch (error) {
     return { valida: false, placa: null, razon: error.message };
@@ -495,35 +335,31 @@ async function extraerKilometrajeFoto(urlFoto) {
     ].join(' ');
 
     var parsed = await llamarGeminiJson({
-      prompt: prompt,
+      prompt:    prompt,
       imageData: imagen,
-      schema: construirSchemaOdometro(),
-      modelo: MODELO_VISION
+      schema:    construirSchemaOdometro(),
+      modelo:    MODELO_VISION
     });
 
     var bruto = String(parsed.kilometraje == null ? '' : parsed.kilometraje).replace(/[^0-9]/g, '');
     var km = bruto ? Math.trunc(Number(bruto)) : null;
     return {
-      valida: !!parsed.valida && km !== null,
+      valida:      !!parsed.valida && km !== null,
       kilometraje: km,
-      razon: parsed.razon || ''
+      razon:       parsed.razon || ''
     };
   } catch (error) {
     return { valida: false, kilometraje: null, razon: error.message };
   }
 }
 
-function marcarTodoOK() {
-  return { estado: 'OK', items: [], observacion: null };
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// API publica - OCR de facturas de combustible
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Calcula el score global OCR y el tier de confianza para una factura.
  * Score = promedio de confianza de CAMPOS_CRITICOS que tienen leido=true.
- * Si ningún campo crítico fue leído → score = 0.
- *
- * @param {Object} resultado — resultado normalizado de OCR con todos los campos
- * @returns {{ scoreGlobal: number, tierOcr: number }}
  */
 function calcularScoreOcr(resultado) {
   var sumaConfianza = 0;
@@ -548,21 +384,12 @@ function calcularScoreOcr(resultado) {
   else if (scoreGlobal >= 0.50) tierOcr = 2;
   else                          tierOcr = 3;
 
-  console.log('[OCR Factura] Score global: ' + scoreGlobal + ' — Tier ' + tierOcr +
-    ' (' + campoCriticosLeidos + '/4 campos críticos leídos)');
+  console.log('[OCR Factura] Score global: ' + scoreGlobal + ' - Tier ' + tierOcr +
+    ' (' + campoCriticosLeidos + '/4 campos criticos leidos)');
 
   return { scoreGlobal: scoreGlobal, tierOcr: tierOcr };
 }
 
-/**
- * Normaliza y valida el resultado del OCR de factura.
- * Garantiza que todos los campos tengan la estructura correcta.
- * Si un campo viene mal formado, lo marca como no leido.
- *
- * @param {Object} datos — respuesta cruda de Gemini
- * @param {Object} resultadoVacio — objeto por defecto con campos vacios
- * @returns {Object} — resultado validado con 14 campos (valor, leido, confianza)
- */
 function normalizarResultadoOCR(datos, resultadoVacio) {
   var camposRequeridos = [
     'factura_numero', 'placa', 'kilometraje', 'producto',
@@ -592,20 +419,11 @@ function normalizarResultadoOCR(datos, resultadoVacio) {
   }
 
   var leidos = camposRequeridos.filter(function(c) { return resultado[c].leido; }).length;
-  console.log('[OCR Factura] ' + leidos + '/14 campos leídos exitosamente');
+  console.log('[OCR Factura] ' + leidos + '/14 campos leidos exitosamente');
 
   return resultado;
 }
 
-/**
- * Extrae datos de una factura/recibo de estación de combustible usando Gemini OCR.
- * Analiza la foto y retorna 14 campos con indicador de lectura exitosa y confianza.
- * Si un campo no es legible o no aparece, marca leido como false.
- * Nunca inventa datos — si no puede leer, no lo intenta.
- *
- * @param {string} urlFoto — URL de la imagen (Supabase Storage o Twilio media)
- * @returns {Object} — 14 campos con {valor, leido, confianza}, score_global, tier_ocr
- */
 async function extraerDatosFacturaCombustible(urlFoto) {
   var resultadoVacio = {
     factura_numero:  { valor: '', leido: false, confianza: 0 },
@@ -649,16 +467,16 @@ async function extraerDatosFacturaCombustible(urlFoto) {
     type: 'OBJECT',
     required: camposRequeridos.slice(),
     properties: {
-      factura_numero: campoFacturaSchema(),
-      placa: campoFacturaSchema(),
-      kilometraje: campoFacturaSchema(),
-      producto: campoFacturaSchema(),
-      cantidad: campoFacturaSchema(),
-      unidad_medida: campoFacturaSchema(),
+      factura_numero:  campoFacturaSchema(),
+      placa:           campoFacturaSchema(),
+      kilometraje:     campoFacturaSchema(),
+      producto:        campoFacturaSchema(),
+      cantidad:        campoFacturaSchema(),
+      unidad_medida:   campoFacturaSchema(),
       precio_unitario: campoFacturaSchema(),
-      valor_total: campoFacturaSchema(),
-      estacion: campoFacturaSchema(),
-      fecha: campoFacturaSchema(),
+      valor_total:     campoFacturaSchema(),
+      estacion:        campoFacturaSchema(),
+      fecha:           campoFacturaSchema(),
       serial_ibutton:  campoFacturaSchema(),
       autorizacion:    campoFacturaSchema(),
       medio:           campoFacturaSchema(),
@@ -670,43 +488,44 @@ async function extraerDatosFacturaCombustible(urlFoto) {
     var imagen = await descargarImagen(urlFoto);
 
     var prompt = [
-      'Analiza esta foto de un recibo o factura de estación de combustible colombiana.',
+      'Analiza esta foto de un recibo o factura de estacion de combustible colombiana.',
       'Extrae los siguientes campos si son legibles en la imagen.',
-      'Si un campo no es legible, no aparece en la imagen, o no estás seguro, marca leido como false y valor como cadena vacía.',
+      'Si un campo no es legible, no aparece en la imagen, o no estas seguro, marca leido como false y valor como cadena vacia.',
       'NO inventes datos. Solo extrae lo que puedes leer claramente.',
       '',
       'Campos a extraer:',
-      '- factura_numero: número de remisión, factura o recibo (ej: 01817613)',
-      '- placa: placa del vehículo (ej: SHT057, ABC123)',
-      '- kilometraje: lectura del odómetro/kilometraje (solo números, ej: 266063)',
+      '- factura_numero: numero de remision, factura o recibo (ej: 01817613)',
+      '- placa: placa del vehiculo (ej: SHT057, ABC123)',
+      '- kilometraje: lectura del odometro/kilometraje (solo numeros, ej: 266063)',
       '- producto: tipo de combustible (ej: Gasolina corriente, ACPM, Diesel)',
-      '- cantidad: cantidad despachada (solo números con decimales, ej: 9.759)',
+      '- cantidad: cantidad despachada (solo numeros con decimales, ej: 9.759)',
       '- unidad_medida: unidad de la cantidad (galones o litros)',
-      '- precio_unitario: precio por unidad (solo números, ej: 15500)',
-      '- valor_total: total pagado (solo números, ej: 151264)',
-      '- estacion: nombre de la estación de servicio (ej: EDS Centro Carros)',
+      '- precio_unitario: precio por unidad (solo numeros, ej: 15500)',
+      '- valor_total: total pagado (solo numeros, ej: 151264)',
+      '- estacion: nombre de la estacion de servicio (ej: EDS Centro Carros)',
       '- fecha: fecha del tanqueo en formato YYYY-MM-DD (ej: 2026-03-05)',
-      '- serial_ibutton: número serial del dispositivo iButton (ej: F0000001009F6C01) — solo en facturas Terpel convenio',
-      '- autorizacion: número de autorización de la transacción (ej: 684-1772718144369)',
+      '- serial_ibutton: numero serial del dispositivo iButton (ej: F0000001009F6C01) - solo en facturas Terpel convenio',
+      '- autorizacion: numero de autorizacion de la transaccion (ej: 684-1772718144369)',
       '- medio: medio de pago usado (ej: IBUTTON, EFECTIVO, TARJETA)',
-      '- nit_estacion: NIT de la estación de servicio (ej: 900021407-9)',
+      '- nit_estacion: NIT de la estacion de servicio (ej: 900021407-9)',
       '',
       'IMPORTANTE:',
       '- En Colombia la etiqueta puede decir REMISION NRO en vez de factura.',
       '- La placa puede aparecer como PLACA, N. INTERNO, o similar.',
       '- El kilometraje puede aparecer como KILOMETRAJE, KM, ODOMETRO.',
       '- Si dice GALONES, la unidad_medida es "galones". Si dice LITROS, es "litros".',
-      '- Valores monetarios sin signos de peso ($) ni puntos de miles — solo dígitos.',
+      '- Valores monetarios sin signos de peso ($) ni puntos de miles - solo digitos.',
       '- Fechas convertir siempre a YYYY-MM-DD.',
       '- Si el campo no aparece en la factura, marcarlo leido=false con confianza=0.',
-      '- El campo confianza debe reflejar qué tan claramente legible es el valor (1.0 = perfectamente legible).'
+      '- El campo confianza: valor entre 0.0 y 1.0. Solo extrae lo que ves con claridad.',
+      '- Si confianza es menor a 0.6, marcar leido=false.'
     ].join('\n');
 
     var datos = await llamarGeminiJson({
-      prompt: prompt,
+      prompt:    prompt,
       imageData: imagen,
-      schema: schemaFactura,
-      modelo: MODELO_VISION
+      schema:    schemaFactura,
+      modelo:    MODELO_VISION
     });
 
     var resultado = normalizarResultadoOCR(datos, resultadoVacio);
@@ -722,6 +541,10 @@ async function extraerDatosFacturaCombustible(urlFoto) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────────────────────────────────────
+
 module.exports = {
   marcarTodoOK,
   interpretarNovedad,
@@ -730,11 +553,3 @@ module.exports = {
   extraerDatosFacturaCombustible,
   descargarImagen
 };
-
-if (process.env.NODE_ENV === 'test') {
-  module.exports._test = {
-    aliasPorItem: aliasPorItem,
-    interpretarNovedadPorReglas: interpretarNovedadPorReglas,
-    separarSegmentos: separarSegmentos
-  };
-}

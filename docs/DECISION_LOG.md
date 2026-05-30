@@ -8,6 +8,10 @@ Formato: | Fecha | Decisión | Razón | Violación cerrada |
 
 | Fecha | Decisión | Razón | Violación cerrada |
 |---|---|---|---|
+| 2026-05-29 | Mover queries de rutas/conductores.js a data/conductores.js | rutas/ no debe contener SQL — viola SRP. data/conductores.js existia vacio. | — |
+| 2026-05-29 | Mover /api/dashboard/resumen de index.js a rutas/dashboard.js + data/dashboard.js | index.js es punto de entrada, no debe contener logica ni SQL | — |
+| 2026-05-29 | Marcar data/ats.js, riesgosLocativos.js, revisionesEquipos.js como DEPRECADOS | Archivos de 3 lineas sin funciones — las constantes ya existen en config.TABLES. Eliminar con git rm | — |
+| 2026-05-29 | Extraer interpretadorNovedades.js de servicios/ocr.js — romper ciclo circular ocr <-> validacionVisual | servicios/ no puede importar de modulos/ (V-01). Logica de dominio de inspecciones no pertenece en capa de servicios (V-02). Nuevo modulo: modulos/inspecciones/compartido/interpretadorNovedades.js | V-01, V-02 |
 | 18/05/2026 | Decision Log separado de ARCHITECTURE.md | ARCHITECTURE.md tiene sección auto-generada por GitHub Actions — mezclarla con edición manual causaba conflictos git predecibles | — |
 | 16/05/2026 | Zona 2 del dashboard consume /api/dashboard/general + /api/dashboard/activos en paralelo. Card "Documentación" muestra documentos_por_vencer como proxy de "vencidos" | Endpoint no expone inspecciones.total, novedades.criticas, documentacion.vencidos. Revisar cuando data/dashboard.js exponga esos campos | — |
 | 19/04/2026 | Recuperación de sesión expirada — timeout 30 min + ventana recuperable 5 min, tanqueo 10 min | UX: sesiones se borraban silenciosamente. Ahora se ofrece continuar/reiniciar. Inscripción no recuperable (pocos pasos). | — |

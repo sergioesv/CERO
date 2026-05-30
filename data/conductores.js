@@ -1,24 +1,87 @@
-// ═══════════════════════════════════════════════════════════
+// ============================================================
 // data/conductores.js
-// Capa de datos para conductores
-// CERO — v26
-// ═══════════════════════════════════════════════════════════
+// Capa de datos — queries a Supabase para conductores.
+// Unica capa autorizada para hablar con la tabla conductores.
+// ============================================================
 
 'use strict';
 
 var config = require('../config/config');
 
 /**
- * Inserta un conductor nuevo en la tabla conductores.
- * Encapsula la query Supabase fuera de los modulos de negocio.
+ * Lista todos los conductores ordenados por nombre.
+ */
+async function listarConductores() {
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .select('*')
+    .order('nombre');
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+/**
+ * Obtiene un conductor por ID.
+ */
+async function obtenerConductorPorId(id) {
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+/**
+ * Crea un conductor desde el panel admin.
+ * @param {Object} campos - { nombre, cedula, telefono, licencia_categoria, licencia_vencimiento, cargo, sede_id }
+ */
+async function crearConductor(campos) {
+  var registro = {
+    nombre:               campos.nombre,
+    cedula:               campos.cedula,
+    telefono:             campos.telefono || null,
+    licencia_categoria:   campos.licencia_categoria || null,
+    licencia_vencimiento: campos.licencia_vencimiento || null,
+    cargo:                campos.cargo || 'Conductor',
+    activo:               true
+  };
+  if (campos.sede_id !== undefined) registro.sede_id = campos.sede_id || null;
+
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .insert([registro])
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+/**
+ * Actualiza campos de un conductor existente.
+ * Solo actualiza los campos presentes en el objeto recibido.
+ */
+async function actualizarConductor(id, campos) {
+  var resultado = await config.supabase
+    .from(config.TABLES.conductores)
+    .update(campos)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+/**
+ * Inserta un conductor nuevo desde flujo WhatsApp.
  * Normaliza el telefono antes de guardar (elimina prefijo whatsapp:).
- *
- * @param {string} telefono - Telefono WhatsApp completo (ej: whatsapp:+573001234567).
- * @param {Object} datos    - { nombre, cedula, licencia, cargo }
- * @returns {Promise<{ error: Object|null, data: Object|null }>}
  */
 async function insertarConductor(telefono, datos) {
-  // Quitar prefijo whatsapp: y espacios para guardar solo el numero
   var telefonoLimpio = String(telefono || '')
     .replace(/^whatsapp:/i, '')
     .trim();
@@ -46,5 +109,9 @@ async function insertarConductor(telefono, datos) {
 }
 
 module.exports = {
-  insertarConductor: insertarConductor
+  listarConductores,
+  obtenerConductorPorId,
+  crearConductor,
+  actualizarConductor,
+  insertarConductor
 };
