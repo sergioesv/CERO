@@ -8,6 +8,8 @@ Formato: | Fecha | Decisión | Razón | Violación cerrada |
 
 | Fecha | Decisión | Razón | Violación cerrada |
 |---|---|---|---|
+| 2026-05-29 | Eliminar SQL directo de rutas/alertas.js — delega a data/alertas.js (obtenerVencimientosActivos/Licencias) | rutas/ no debe contener queries Supabase | — |
+| 2026-05-29 | Agregar listarRoles() a data/permisos.js — rutas/roles.js ya no tiene SQL directo | rutas/ no debe contener queries Supabase | — |
 | 2026-05-29 | Mover queries de rutas/conductores.js a data/conductores.js | rutas/ no debe contener SQL — viola SRP. data/conductores.js existia vacio. | — |
 | 2026-05-29 | Mover /api/dashboard/resumen de index.js a rutas/dashboard.js + data/dashboard.js | index.js es punto de entrada, no debe contener logica ni SQL | — |
 | 2026-05-29 | Marcar data/ats.js, riesgosLocativos.js, revisionesEquipos.js como DEPRECADOS | Archivos de 3 lineas sin funciones — las constantes ya existen en config.TABLES. Eliminar con git rm | — |

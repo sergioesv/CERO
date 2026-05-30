@@ -185,11 +185,59 @@ async function seedPermisosBase() {
   console.log(`Seed permisos_rol aplicado (${rows.length} permisos base)`);
 }
 
+
+/**
+ * Lista el catalogo de roles disponibles.
+ * Excluye superadmin_plataforma — no se puede asignar desde la UI.
+ */
+async function listarRoles() {
+  var resultado = await config.supabase
+    .from('roles')
+    .select('id, nombre, empresa_id')
+    .order('nombre');
+
+  if (resultado.error) throw resultado.error;
+
+  return (resultado.data || []).filter(function(r) {
+    return r.nombre !== 'superadmin_plataforma';
+  });
+}
+
+
+/**
+ * Obtiene una asignacion de rol por ID, incluyendo empresa del usuario.
+ */
+async function obtenerAsignacionRol(id) {
+  var resultado = await config.supabase
+    .from('usuarios_roles')
+    .select('id, usuario_id, usuarios_panel(empresa_id)')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data;
+}
+
+/**
+ * Elimina una asignacion de rol por ID.
+ */
+async function eliminarAsignacionRol(id) {
+  var resultado = await config.supabase
+    .from('usuarios_roles')
+    .delete()
+    .eq('id', id);
+
+  if (resultado.error) throw resultado.error;
+}
+
 module.exports = {
   CANONICAL_ROLE_PERMISSIONS,
   classifyRoleName,
   getAllowedCanonicalRolesForItem,
   getCanonicalRolesForUser,
   normalizeRoleName,
-  seedPermisosBase
+  seedPermisosBase,
+  listarRoles,
+  obtenerAsignacionRol,
+  eliminarAsignacionRol
 };
