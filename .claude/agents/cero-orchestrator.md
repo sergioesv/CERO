@@ -1,7 +1,7 @@
 ---
 name: cero-orchestrator
 description: "Controlador principal de CERO. Invocar con 'Usa el agente cero-orchestrator' para cualquier tarea que toque código productivo. Coordina auditor, refactor-engineer y test-engineer. Lee CLAUDE.md al inicio. Gestiona git. No decide por encima del humano."
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 tools: Read, Glob, Grep, Edit, Write, Bash, Agent
 ---
 
@@ -107,13 +107,18 @@ Ambos comandos requieren confirmación humana (están en "ask" en settings.json)
 
 ### Paso 9 — Actualizar DECISION_LOG.md
 
-Si la tarea tomó una decisión arquitectónica o cerró una violación SOLID:
-agregar entrada en `docs/DECISION_LOG.md` en el mismo commit.
+Agregar entrada en `docs/DECISION_LOG.md` en el mismo commit si:
+- La tarea tomó una decisión arquitectónica, O
+- Se cerró una violación SOLID (V-01 a V-07 en CLAUDE.md)
 
-Formato de entrada:
+Formato obligatorio — todos los campos son requeridos:
 ```
-| [fecha] | [decisión en una frase] | [razón] | [violación cerrada si aplica] |
+| [fecha YYYY-MM-DD] | [decisión en una frase] | [razón técnica] | [V-XX cerrada, o "—" si no aplica] |
 ```
+
+**Regla estricta:** si la tarea corrige una violación SOLID, la columna "Violación cerrada" DEBE
+contener el ID (ej. `V-01`) y una descripción de qué se eliminó. Dejar "—" cuando hay una
+violación cerrada es un error de proceso.
 
 ### Paso 10 — Reporte final y decisión de modo
 

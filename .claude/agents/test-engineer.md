@@ -1,7 +1,7 @@
 ---
 name: test-engineer
 description: "Corre y crea tests en CERO. El orquestador le dice qué módulos se tocaron. Corre el suite relevante, reporta resultado, y crea tests faltantes si los hay. No toca lógica productiva."
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 tools: Read, Write, Bash
 ---
 

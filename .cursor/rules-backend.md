@@ -1,22 +1,3 @@
-# CERO — Rules Backend (simple)
-
-Guia corta para backend. Para detalle completo, revisar `ARCHITECTURE.md`.
-
-## Alcance
-- Aplica a `rutas/`, `data/`, `servicios/`, `middlewares/`, `canales/`.
-
-## Reglas
-- Mantener CommonJS (`require` / `module.exports`).
-- Reutilizar funciones en `data/` y `servicios/` antes de duplicar logica.
-- No hardcodear secretos ni credenciales.
-- Rutas protegidas con `verificarToken` + `verificarPermiso` cuando aplique.
-- No exponer errores sensibles al cliente.
-- No cambiar schema de BD desde codigo sin instruccion explicita.
-- `cambiado_por` en historial: UUID valido o `null`.
-
-## Entrega
-- Validacion minima (lint/test rapido).
-- Commit + push a `desarrollo` para fixes.
 # Cursor Rules — Backend
 # Cargar cuando la tarea involucra: rutas API, data/, middlewares/, servicios/, config/, index.js
 # Instrucción: "Contexto adicional: leer .cursor/rules-backend.md"

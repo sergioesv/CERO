@@ -1,7 +1,7 @@
 ---
 name: auditor
 description: "Audita archivos específicos de CERO buscando violaciones de capas y SOLID. Solo lectura. El orquestador le pasa las reglas del dominio — no lee el canon por su cuenta. Devuelve máximo 3 hallazgos concretos con línea exacta."
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 tools: Read, Glob, Grep
 ---
 

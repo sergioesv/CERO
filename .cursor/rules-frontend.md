@@ -1,22 +1,3 @@
-# CERO — Rules Frontend (simple)
-
-Guia corta para frontend. Para detalle completo, revisar `ARCHITECTURE.md`.
-
-## Alcance
-- Aplica a `public/` (`modules/`, `components/`, `js/`, `css/`).
-
-## Reglas
-- Frontend vanilla (HTML/CSS/JS), sin frameworks.
-- Mantener separacion API/Logic/Render/Module.
-- Escapar contenido dinamico y evitar inyecciones HTML.
-- Reutilizar componentes existentes (`badge`, `table`, `modal`, `toast`).
-- En activos, usar campos planos (`marca`, `soat_vencimiento`, `tecnomecanica_vencimiento`).
-- Comparaciones de estado robustas a mayusculas/minusculas.
-- No romper tema claro/oscuro ni variables CSS.
-
-## Entrega
-- Validacion minima visual/funcional.
-- Commit + push a `desarrollo` para fixes.
 # Cursor Rules — Frontend Panel
 # Cargar cuando la tarea involucra: public/, módulos del panel, componentes, CSS, login.html, index.html
 # Instrucción: "Contexto adicional: leer .cursor/rules-frontend.md"

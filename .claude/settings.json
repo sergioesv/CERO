@@ -13,7 +13,11 @@
       "Bash(npm test -- *)",
       "Bash(npm run test)",
       "Bash(npm run test:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(git checkout *)",
+      "Bash(npx jest *)",
+      "Bash(tr -d '\\r')",
+      "Bash(mv ARCHITECTURE.md.tmp ARCHITECTURE.md)"
     ],
     "ask": [
       "Edit(*)",

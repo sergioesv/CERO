@@ -2,10 +2,11 @@
 
 ## Estado real
 
-CERO funciona funcionalmente, pero aún no está en producción.
+**Fase 1 completa.** Fase 2 completa. Cliente activo: Enerlight (en negociación — requiere estabilización antes de cierre).
+Bloqueadores actuales y violaciones SOLID activas: ver `CLAUDE.md`.
 
 Objetivo actual:
-Preparar CERO para piloto y producción con control, trazabilidad, pruebas y arquitectura evolutiva.
+Estabilizar para piloto con Enerlight. Cerrar violaciones V-01/V-02, completar audit multi-tenant, habilitar RLS.
 
 ## Stack oficial
 
@@ -52,12 +53,12 @@ CERO se estabiliza, se prueba y se refactoriza por capas.
 9. El código legacy puede existir, pero debe quedar aislado y documentado.
 10. Claude puede ayudar, pero no decide la arquitectura por encima del canon.
 
-## Orden de trabajo
+## Orden de trabajo (estado 2026-05-29)
 
-1. Canon y reglas
-2. Ambientes
-3. Migrations
-4. Tests mínimos
-5. Refactor por capas
-6. Piloto
-7. Producción
+✅ Canon y reglas
+✅ Ambientes
+✅ Migrations (schema v2 aplicado)
+⏳ Tests mínimos — cobertura parcial, faltan tanqueos/ocr/conductores
+⏳ Refactor por capas — V-01/V-02 pendientes (ver CLAUDE.md)
+⏳ Piloto — bloqueado hasta estabilización
+⬜ Producción — bloqueado por RLS y audit multi-tenant

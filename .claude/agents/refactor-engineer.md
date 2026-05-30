@@ -1,7 +1,7 @@
 ---
 name: refactor-engineer
 description: "Ejecuta cambios quirúrgicos aprobados en CERO. Recibe instrucción exacta del orquestador — qué línea, qué archivo, qué cambiar. No reescribe módulos completos. Un archivo por invocación. Reporta diff al terminar."
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 tools: Read, Edit, Write, Bash
 ---
 

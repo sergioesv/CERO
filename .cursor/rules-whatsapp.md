@@ -1,21 +1,3 @@
-# CERO — Rules WhatsApp (simple)
-
-Guia corta para flujos WhatsApp. Para detalle completo, revisar `ARCHITECTURE.md`.
-
-## Alcance
-- Aplica a `modulos/inspecciones/`, `modulos/tanqueo/`, `modulos/inscripcion/`, `servicios/sesiones.js`.
-
-## Reglas
-- Respetar patron de `FlujoBase` + estados por modulo.
-- Mantener `0` = atras y `9` = menu principal.
-- Reutilizar helpers compartidos (`twiml`, `navegacion`, `kilometraje`, `iniciadorFlujo`).
-- Si hay manejo custom de `ODOMETRO_CONFIRMACION`, interceptar antes de `procesarEstadoCompartido`.
-- En `onExitoPlaca`, preservar datos necesarios de sesion al reiniciar (ej. `vehiculo`, `conductor`).
-- No duplicar logica de cierre/mensajes/validaciones entre modulos.
-
-## Entrega
-- Probar flujo minimo impactado.
-- Commit + push a `desarrollo` para fixes.
 # Cursor Rules — WhatsApp Flows
 # Cargar cuando la tarea involucra: modulos/, canales/whatsapp.js, servicios/sesiones.js
 # Instrucción: "Contexto adicional: leer .cursor/rules-whatsapp.md"

@@ -6,8 +6,44 @@ on:
       - 'claude/**'
 
 jobs:
-  merge:
+  validate:
+    name: Validar antes de merge
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+      - name: Buscar secrets en el diff
+        run: |
+          PATRONES='password\s*[:=]\s*["\x27][^"\x27]{6,}|secret\s*[:=]\s*["\x27][^"\x27]{6,}|api.?key\s*[:=]\s*["\x27][^"\x27]{6,}|eyJhbGciOi[A-Za-z0-9_-]+|service_role[A-Za-z0-9_-]+|AC[a-z0-9]{32}|SK[a-z0-9]{32}'
+          if git diff origin/desarrollo...HEAD -- . ':(exclude)package-lock.json' ':(exclude)*.md' | grep -E "$PATRONES" 2>/dev/null; then
+            echo "❌ Posibles secrets detectados — merge bloqueado"
+            exit 1
+          fi
+          echo "✅ Sin secrets en el diff"
+
+  merge:
+    name: Merge a desarrollo
+    runs-on: ubuntu-latest
+    needs: validate
     steps:
       - uses: actions/checkout@v4
         with:
