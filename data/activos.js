@@ -110,6 +110,27 @@ function aplanarActivo(activo) {
 }
 
 // ───────────────────────────────────────────────────────────
+// LISTAR ACTIVOS (panel flota) — solo del tenant
+// Reemplaza la query global que vivía en rutas/activos.js
+// ───────────────────────────────────────────────────────────
+
+async function listarActivos(scope) {
+  // require tardío para evitar ciclos de dependencia
+  var tenantScope = require('../servicios/tenantScope');
+  tenantScope.assert(scope);
+  var query = supabase
+    .from(config.TABLES.activos)
+    .select('id, placa, nombre, estado, datos, documentos, bloqueado, motivo_bloqueo, kilometraje, activo, sede_id')
+    .not('placa', 'is', null)
+    .order('placa');
+  query = tenantScope.porSede(query, scope);
+  var resultado = await query;
+
+  if (resultado.error) throw resultado.error;
+  return resultado.data || [];
+}
+
+// ───────────────────────────────────────────────────────────
 // BUSCAR CONDUCTOR POR TELÉFONO (migrado de vehiculos.js)
 // ───────────────────────────────────────────────────────────
 
@@ -327,6 +348,7 @@ async function registrarCambioEstado(activoIdOrPlaca, estadoNuevo, motivo, categ
 }
 
 module.exports = {
+  listarActivos,
   // Funciones principales
   cargarActivoYConductor,
   buscarPlacaSugerida,

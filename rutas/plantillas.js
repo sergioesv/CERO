@@ -10,11 +10,22 @@ const router  = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const plantillasService = require('../servicios/plantillas');
 const plantillasData    = require('../data/plantillas');
+const tenantScope       = require('../servicios/tenantScope');
+
+const conScope = tenantScope.middleware();
+
+function responderErrorTenant(res, error) {
+  if (error && (error.status === 403 || error.status === 404)) {
+    res.status(error.status).json({ ok: false, error: error.message });
+    return true;
+  }
+  return false;
+}
 
 // GET / — listar plantillas
-router.get('/', verificarToken, verificarPermiso('plantillas', 'ver'), async function(req, res) {
+router.get('/', verificarToken, conScope, verificarPermiso('plantillas', 'ver'), async function(req, res) {
   try {
-    const data = await plantillasData.listarPlantillas();
+    const data = await plantillasData.listarPlantillas(req.scope);
     const resultado = data.map(function(p) {
       return {
         id:              p.id,
@@ -47,7 +58,7 @@ router.get('/:id', verificarToken, verificarPermiso('plantillas', 'ver'), async 
 });
 
 // POST / — crear plantilla
-router.post('/', verificarToken, verificarPermiso('plantillas', 'crear'), async function(req, res) {
+router.post('/', verificarToken, conScope, verificarPermiso('plantillas', 'crear'), async function(req, res) {
   try {
     const { nombre, tipo_activo, estado, tipo_inspeccion = 'preoperacional' } = req.body;
 
@@ -57,7 +68,7 @@ router.post('/', verificarToken, verificarPermiso('plantillas', 'crear'), async 
       tipoActivoId = tipo ? tipo.id : null;
     }
 
-    const data = await plantillasData.crearPlantilla({
+    const data = await plantillasData.crearPlantilla(req.scope, {
       nombre,
       tipo_activo_id:  tipoActivoId,
       tipo_inspeccion,
@@ -73,7 +84,7 @@ router.post('/', verificarToken, verificarPermiso('plantillas', 'crear'), async 
 });
 
 // PUT /:id — actualizar cabecera
-router.put('/:id', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.put('/:id', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
     const { nombre, estado, config } = req.body;
     const campos = {};
@@ -81,19 +92,20 @@ router.put('/:id', verificarToken, verificarPermiso('plantillas', 'editar'), asy
     if (estado !== undefined) campos.activa = (estado === 'activa');
     if (config)            campos.config = config;
 
-    const data = await plantillasData.actualizarPlantilla(req.params.id, campos);
+    const data = await plantillasData.actualizarPlantilla(req.scope, req.params.id, campos);
     res.json({ ok: true, data });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error actualizando plantilla:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // POST /:id/grupos
-router.post('/:id/grupos', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.post('/:id/grupos', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
     const { nombre, orden, solo_panel = false } = req.body;
-    const data = await plantillasData.crearGrupo({
+    const data = await plantillasData.crearGrupo(req.scope, {
       plantilla_id: req.params.id,
       nombre,
       orden:        orden || 0,
@@ -101,13 +113,14 @@ router.post('/:id/grupos', verificarToken, verificarPermiso('plantillas', 'edita
     });
     res.json({ ok: true, data });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error creando grupo:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // PUT /grupos/:id
-router.put('/grupos/:id', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.put('/grupos/:id', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
     const { nombre, orden, solo_panel } = req.body;
     const campos = {};
@@ -115,30 +128,32 @@ router.put('/grupos/:id', verificarToken, verificarPermiso('plantillas', 'editar
     if (orden !== undefined)      campos.orden      = orden;
     if (solo_panel !== undefined) campos.solo_panel = solo_panel;
 
-    const data = await plantillasData.actualizarGrupo(req.params.id, campos);
+    const data = await plantillasData.actualizarGrupo(req.scope, req.params.id, campos);
     res.json({ ok: true, data });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error actualizando grupo:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // DELETE /grupos/:id
-router.delete('/grupos/:id', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.delete('/grupos/:id', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
-    await plantillasData.eliminarGrupo(req.params.id);
+    await plantillasData.eliminarGrupo(req.scope, req.params.id);
     res.json({ ok: true, message: 'Grupo eliminado' });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error eliminando grupo:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // POST /grupos/:id/items
-router.post('/grupos/:id/items', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.post('/grupos/:id/items', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
     const { nombre, orden, critico = false, sin_foto = false } = req.body;
-    const data = await plantillasData.crearItem({
+    const data = await plantillasData.crearItem(req.scope, {
       grupo_id: req.params.id,
       nombre,
       orden:    orden || 0,
@@ -147,13 +162,14 @@ router.post('/grupos/:id/items', verificarToken, verificarPermiso('plantillas', 
     });
     res.json({ ok: true, data });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error creando item:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // PUT /items/:id
-router.put('/items/:id', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.put('/items/:id', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
     const { nombre, orden, critico, sin_foto } = req.body;
     const campos = {};
@@ -162,20 +178,22 @@ router.put('/items/:id', verificarToken, verificarPermiso('plantillas', 'editar'
     if (critico !== undefined)  campos.critico  = critico;
     if (sin_foto !== undefined) campos.sin_foto = sin_foto;
 
-    const data = await plantillasData.actualizarItem(req.params.id, campos);
+    const data = await plantillasData.actualizarItem(req.scope, req.params.id, campos);
     res.json({ ok: true, data });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error actualizando item:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // DELETE /items/:id
-router.delete('/items/:id', verificarToken, verificarPermiso('plantillas', 'editar'), async function(req, res) {
+router.delete('/items/:id', verificarToken, conScope, verificarPermiso('plantillas', 'editar'), async function(req, res) {
   try {
-    await plantillasData.eliminarItem(req.params.id);
+    await plantillasData.eliminarItem(req.scope, req.params.id);
     res.json({ ok: true, message: 'Item eliminado' });
   } catch (error) {
+    if (responderErrorTenant(res, error)) return;
     console.error('Error eliminando item:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }

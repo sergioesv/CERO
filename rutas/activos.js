@@ -14,15 +14,9 @@ const tenantScope = require('../servicios/tenantScope');
 const conScope = tenantScope.middleware();
 
 // GET / — lista todos los activos con placa (vehículos)
-router.get('/', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
+router.get('/', verificarToken, conScope, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
-    const { data, error } = await supabase
-      .from('activos')
-      .select('id, placa, nombre, estado, datos, documentos, bloqueado, motivo_bloqueo, kilometraje, activo, sede_id')
-      .not('placa', 'is', null)
-      .order('placa');
-
-    if (error) throw error;
+    const data = await activosData.listarActivos(req.scope);
 
     // Aplanar datos para compat con frontend
     var resultado = (data || []).map(function(a) {
@@ -54,7 +48,7 @@ router.get('/', verificarToken, verificarPermiso('activos', 'ver'), async functi
 });
 
 // POST / — crea un activo (vehículo)
-router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async function (req, res) {
+router.post('/', verificarToken, conScope, verificarPermiso('activos', 'crear'), async function (req, res) {
   try {
     if (!req.body.placa) {
       return res.status(400).json({ ok: false, error: 'El campo placa es obligatorio' });
@@ -98,8 +92,7 @@ router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async fun
     var sedeSolicitada = req.body.sede_id || null;
     if (sedeSolicitada) {
       try {
-        var scope = await tenantScope.desdeUsuario(req.usuario);
-        tenantScope.validarSedeSolicitada(scope, sedeSolicitada);
+        tenantScope.validarSedeSolicitada(req.scope, sedeSolicitada);
       } catch (e) {
         return res.status(e.status || 403).json({ ok: false, error: e.message });
       }
@@ -151,12 +144,15 @@ router.get('/:placa/historial', verificarToken, conScope, verificarPermiso('acti
 });
 
 // GET /:placa — obtiene un activo por placa
-router.get('/:placa', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
+router.get('/:placa', verificarToken, conScope, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
+    var activoId = await tenantScope.resolverActivoPorPlaca(req.scope, req.params.placa);
+    if (!activoId) return res.status(404).json({ ok: false, error: 'Activo no encontrado' });
+
     const { data, error } = await supabase
       .from('activos')
       .select('*')
-      .eq('placa', req.params.placa.toUpperCase())
+      .eq('id', activoId)
       .single();
 
     if (error) throw error;
@@ -168,17 +164,23 @@ router.get('/:placa', verificarToken, verificarPermiso('activos', 'ver'), async 
 });
 
 // PUT /:placa — actualiza un activo
-router.put('/:placa', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
+router.put('/:placa', verificarToken, conScope, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     const param = req.params.placa; // puede ser UUID o placa
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const esUuid = UUID_RE.test(param);
 
+    // Verificar pertenencia al tenant (UUID) o resolver placa en scope
+    var activoIdVerificado = esUuid
+      ? ((await tenantScope.perteneceActivo(req.scope, param)) ? param : null)
+      : await tenantScope.resolverActivoPorPlaca(req.scope, param);
+    if (!activoIdVerificado) return res.status(404).json({ ok: false, error: 'Activo no encontrado' });
+
     // Obtener activo actual para merge de JSONB
     var resCurrent = await supabase
       .from('activos')
       .select('id, placa, datos, documentos')
-      .eq(esUuid ? 'id' : 'placa', esUuid ? param : param.toUpperCase())
+      .eq('id', activoIdVerificado)
       .single();
 
     if (resCurrent.error) throw resCurrent.error;
@@ -243,10 +245,10 @@ router.put('/:placa', verificarToken, verificarPermiso('activos', 'editar'), asy
 });
 
 // POST /:placa/bloquear — bloquea un activo
-router.post('/:placa/bloquear', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
+router.post('/:placa/bloquear', verificarToken, conScope, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     var placa = req.params.placa.toUpperCase();
-    var activoId = await activosData.obtenerActivoIdPorPlaca(placa);
+    var activoId = await tenantScope.resolverActivoPorPlaca(req.scope, placa);
     if (!activoId) return res.status(404).json({ ok: false, error: 'Activo no encontrado' });
 
     const { data, error } = await supabase
@@ -276,10 +278,10 @@ router.post('/:placa/bloquear', verificarToken, verificarPermiso('activos', 'edi
 });
 
 // POST /:placa/desbloquear — desbloquea un activo
-router.post('/:placa/desbloquear', verificarToken, verificarPermiso('activos', 'editar'), async function (req, res) {
+router.post('/:placa/desbloquear', verificarToken, conScope, verificarPermiso('activos', 'editar'), async function (req, res) {
   try {
     var placa = req.params.placa.toUpperCase();
-    var activoId = await activosData.obtenerActivoIdPorPlaca(placa);
+    var activoId = await tenantScope.resolverActivoPorPlaca(req.scope, placa);
     if (!activoId) return res.status(404).json({ ok: false, error: 'Activo no encontrado' });
 
     const { data, error } = await supabase
@@ -309,10 +311,10 @@ router.post('/:placa/desbloquear', verificarToken, verificarPermiso('activos', '
 });
 
 // DELETE /:placa — elimina un activo (solo si no tiene historial)
-router.delete('/:placa', verificarToken, verificarPermiso('activos', 'eliminar'), async function (req, res) {
+router.delete('/:placa', verificarToken, conScope, verificarPermiso('activos', 'eliminar'), async function (req, res) {
   try {
     const placa = req.params.placa.toUpperCase();
-    var activoId = await activosData.obtenerActivoIdPorPlaca(placa);
+    var activoId = await tenantScope.resolverActivoPorPlaca(req.scope, placa);
     if (!activoId) return res.status(404).json({ ok: false, error: 'Activo no encontrado' });
 
     const { count: preop } = await supabase
@@ -353,3 +355,4 @@ router.delete('/:placa', verificarToken, verificarPermiso('activos', 'eliminar')
 });
 
 module.exports = router;
+
