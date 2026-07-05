@@ -104,8 +104,29 @@ select 'POST conductores_sin_empresa', count(*) from conductores where empresa_i
 
 commit;
 
--- ─── PENDIENTE POST-BACKFILL (migración futura, NO en esta) ───
--- Cuando los POST den 0:
+-- ─── PASO 3: FIX PUNTUAL (aplicado 2026-07-05) ───
+-- Conductor inscrito por WhatsApp sin sede (insertarConductor no la
+-- asigna — data/conductores.js:84). Sede derivada de su último preop.
+update conductores c
+set sede_id = sub.sede_id,
+    empresa_id = sub.empresa_id
+from (
+  select a.sede_id, a.empresa_id
+  from preoperacionales p
+  join activos a on a.id = p.activo_id
+  where p.conductor_id = 'ed41f465-92a2-4fc3-9b4c-744f30dd00fd'
+  order by p.fecha desc, p.hora desc
+  limit 1
+) sub
+where c.id = 'ed41f465-92a2-4fc3-9b4c-744f30dd00fd'
+  and c.sede_id is null;
+
+-- ─── PENDIENTE POST-BACKFILL — BLOQUEADO por fase 1.5 ───
+-- NO aplicar NOT NULL todavía: insertarConductor (flujo de inscripción
+-- WhatsApp, data/conductores.js:84) inserta sin sede_id/empresa_id y
+-- rompería en producción. Orden: fase 1.5 (tenant en inscripción
+-- WhatsApp) primero, luego:
 --   alter table conductores alter column empresa_id set not null;
---   alter table activos alter column sede_id set not null;  -- evaluar
+--   alter table conductores alter column sede_id set not null;
+--   alter table activos alter column sede_id set not null;
 -- y el UNIQUE (cedula, empresa_id) de la migración v2.
