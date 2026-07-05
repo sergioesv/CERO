@@ -1,5 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // API — TANQUEOS
+// Multi-tenant: tenantScope.middleware() adjunta req.scope tras
+// verificarToken; la capa data/ lo exige en toda lectura/escritura.
 // ═══════════════════════════════════════════════════════════
 
 const express = require('express');
@@ -9,6 +11,8 @@ const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
 const tenantScope = require('../servicios/tenantScope');
+
+const conScope = tenantScope.middleware();
 
 function sanitizarCeldaCsv(valor) {
   var s = String(valor == null ? '' : valor);
@@ -25,19 +29,8 @@ function bearerDesdeQueryParaMedia(req, res, next) {
   next();
 }
 
-// Sede efectiva del consolidado: el query param se valida contra el scope
-// del JWT — un query param NUNCA elige tenant. Usuario de una sola sede
-// sin filtro explícito → su sede.
-// TODO(multi-tenant PR2): obtenerConsolidado(scope, ...) filtrará por join a activos.
-async function resolverSedeConsolidado(req) {
-  var scope = await tenantScope.desdeUsuario(req.usuario);
-  var sedeId = tenantScope.validarSedeSolicitada(scope, req.query.sede_id || null);
-  if (!sedeId && !scope.esSistema && scope.sedeIds.length === 1) sedeId = scope.sedeIds[0];
-  return sedeId;
-}
-
 // GET / — lista con filtros y stats
-router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+router.get('/', verificarToken, conScope, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
     var filtros = {
       fecha_inicio:      req.query.fecha_inicio      || null,
@@ -50,7 +43,7 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
     if (filtros.estado_validacion === 'todos') {
       filtros.estado_validacion = null;
     }
-    var resultado = await tanqueosData.listarTanqueos(filtros);
+    var resultado = await tanqueosData.listarTanqueos(req.scope, filtros);
     if (resultado.error) throw resultado.error;
     res.json({ ok: true, data: resultado.data, stats: resultado.stats });
   } catch (error) {
@@ -61,7 +54,8 @@ router.get('/', verificarToken, verificarPermiso('tanqueos', 'ver'), async funct
 
 // GET /media/:fotoId — proxy seguro para imágenes Twilio Media
 // El backend resuelve la URL desde BD — el cliente nunca controla qué URL se fetcha
-router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+// La pertenencia de la foto al tenant se verifica en data/ (tanqueo → activo → sede)
+router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, conScope, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
     var fotoId = req.params.fotoId;
 
@@ -69,7 +63,7 @@ router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verifica
       return res.status(400).json({ ok: false, error: 'ID inválido' });
     }
 
-    var fotoData = await tanqueosData.obtenerFotoEvidencia(fotoId);
+    var fotoData = await tanqueosData.obtenerFotoEvidencia(req.scope, fotoId);
 
     if (!fotoData) {
       return res.status(404).json({ ok: false, error: 'Foto no encontrada' });
@@ -100,35 +94,24 @@ router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verifica
 });
 
 // GET /consolidado — resumen mensual agrupado por vehículo (antes de /:id)
-router.get('/consolidado', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+router.get('/consolidado', verificarToken, conScope, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
     var mes = req.query.mes || new Date().toISOString().substring(0, 7);
-    var sedeId;
-    try {
-      sedeId = await resolverSedeConsolidado(req);
-    } catch (e) {
-      return res.status(e.status || 403).json({ ok: false, error: e.message });
-    }
-    var resultado = await tanqueosData.obtenerConsolidado(mes, sedeId);
+    var resultado = await tanqueosData.obtenerConsolidado(req.scope, mes, req.query.sede_id || null);
     if (resultado.error) return res.status(400).json({ ok: false, error: resultado.error });
     res.json({ ok: true, resumen: resultado.resumen, porVehiculo: resultado.porVehiculo });
   } catch (error) {
+    if (error.status === 403) return res.status(403).json({ ok: false, error: error.message });
     console.error('Error en GET /api/tanqueos/consolidado:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // GET /consolidado/exportar — CSV descargable del mes
-router.get('/consolidado/exportar', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+router.get('/consolidado/exportar', verificarToken, conScope, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
     var mes = req.query.mes || new Date().toISOString().substring(0, 7);
-    var sedeId;
-    try {
-      sedeId = await resolverSedeConsolidado(req);
-    } catch (e) {
-      return res.status(e.status || 403).json({ ok: false, error: e.message });
-    }
-    var resultado = await tanqueosData.obtenerConsolidado(mes, sedeId);
+    var resultado = await tanqueosData.obtenerConsolidado(req.scope, mes, req.query.sede_id || null);
     if (resultado.error) return res.status(400).json({ ok: false, error: resultado.error });
 
     var detalle = resultado.detalle || [];
@@ -159,15 +142,16 @@ router.get('/consolidado/exportar', verificarToken, verificarPermiso('tanqueos',
     var csv = [cabecera].concat(filas).join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="tanqueos-' + mes + '.csv"');
-    res.send('\uFEFF' + csv);
+    res.send('﻿' + csv);
   } catch (error) {
+    if (error.status === 403) return res.status(403).json({ ok: false, error: error.message });
     console.error('Error en GET /api/tanqueos/consolidado/exportar:', error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
 // PUT /validar-lote — antes de /:id para no capturar "validar-lote" como id
-router.put('/validar-lote', verificarToken, verificarPermiso('tanqueos', 'editar'), async function (req, res) {
+router.put('/validar-lote', verificarToken, conScope, verificarPermiso('tanqueos', 'editar'), async function (req, res) {
   try {
     var ids       = req.body.ids;
     var usuarioId = req.usuario ? (req.usuario.email || req.usuario.id || 'panel') : 'panel';
@@ -176,7 +160,7 @@ router.put('/validar-lote', verificarToken, verificarPermiso('tanqueos', 'editar
       return res.status(400).json({ ok: false, error: 'ids debe ser un array no vacío' });
     }
 
-    var resultado = await tanqueosData.validarLote(ids, usuarioId);
+    var resultado = await tanqueosData.validarLote(req.scope, ids, usuarioId);
     if (!resultado.ok) return res.status(400).json({ ok: false, error: resultado.error });
     res.json({ ok: true, procesados: resultado.procesados });
   } catch (error) {
@@ -186,9 +170,9 @@ router.put('/validar-lote', verificarToken, verificarPermiso('tanqueos', 'editar
 });
 
 // GET /:id — detalle completo con fotos y signed URLs
-router.get('/:id', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
+router.get('/:id', verificarToken, conScope, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
-    var resultado = await tanqueosData.obtenerTanqueo(req.params.id);
+    var resultado = await tanqueosData.obtenerTanqueo(req.scope, req.params.id);
     if (resultado.error) return res.status(404).json({ ok: false, error: 'Tanqueo no encontrado' });
     res.json({ ok: true, data: resultado.data });
   } catch (error) {
@@ -198,7 +182,7 @@ router.get('/:id', verificarToken, verificarPermiso('tanqueos', 'ver'), async fu
 });
 
 // PUT /:id/validar — marcar revisado individualmente
-router.put('/:id/validar', verificarToken, verificarPermiso('tanqueos', 'editar'), async function (req, res) {
+router.put('/:id/validar', verificarToken, conScope, verificarPermiso('tanqueos', 'editar'), async function (req, res) {
   try {
     var decision       = req.body.decision;
     var notasAdmin     = req.body.notas_admin || '';
@@ -208,7 +192,7 @@ router.put('/:id/validar', verificarToken, verificarPermiso('tanqueos', 'editar'
       return res.status(400).json({ ok: false, error: 'decision debe ser "validar"' });
     }
 
-    var resultado = await tanqueosData.validarTanqueo(req.params.id, decision, notasAdmin, usuarioId);
+    var resultado = await tanqueosData.validarTanqueo(req.scope, req.params.id, decision, notasAdmin, usuarioId);
     if (!resultado.ok) return res.status(400).json({ ok: false, error: resultado.error });
     res.json({ ok: true, mensaje: 'Tanqueo revisado' });
   } catch (error) {

@@ -2,18 +2,36 @@
 // data/tanqueos.js
 // Capa de datos para tanqueos
 // CERO — v26 — vehiculo_placa → activo_id
+// Multi-tenant: funciones expuestas a rutas/ exigen tenantScope
+// (primer parámetro). El filtro va por join !inner a activos.sede_id
+// — las columnas sede_id denormalizadas NO se usan para seguridad.
 // ═══════════════════════════════════════════════════════════
 
 var config = require('../config/config');
 var referenciaKm = require('./posoperacionales');
-var activosData = require('./activos');
+var tenantScope = require('../servicios/tenantScope');
 
 var TABLA_TANQUEOS = config.TABLES.tanqueos;
 var TABLA_FOTOS = process.env.DB_TABLE_FOTOS_TANQUEO || 'evidencia';
 
+// Embed estándar del activo para queries con filtro de tenant
+var EMBED_ACTIVO = 'activos:activo_id!inner(id, placa, nombre, datos, sede_id)';
+var EMBED_ACTIVO_MIN = 'activos:activo_id!inner(sede_id)';
+
+var STATS_VACIAS = {
+  total: 0,
+  pendientes: 0,
+  anomalias: 0,
+  combustible_total: { galones: 0, litros: 0 },
+  galones_total: 0,
+  litros_total: 0
+};
+
 async function obtenerReferenciaKilometraje(activoId) {
   return referenciaKm.obtenerReferenciaKilometraje(activoId);
 }
+
+// ─── Canal WhatsApp (activo_id ya resuelto por el flujo) — sin scope ───
 
 async function crearTanqueo(datosTanqueo) {
   return await config.supabase
@@ -78,29 +96,23 @@ async function obtenerRendimientoHistorico(activoId) {
   return { promedio: parseFloat((suma / resultado.data.length).toFixed(2)) };
 }
 
-/**
- * Resuelve placa a activo_id para filtros del panel.
- * @param {string} placa
- * @returns {string|null}
- */
-async function resolverActivoIdPorPlaca(placa) {
-  if (!placa) return null;
-  return await activosData.obtenerActivoIdPorPlaca(placa);
-}
+// ─── Panel (rutas/) — scope obligatorio ───
 
 /**
  * Lista tanqueos con filtros opcionales y stats para el panel.
- * Join a activos y conductores.
+ * Join !inner a activos (filtro de tenant) y a conductores.
+ * @param {Object} scope - tenantScope obligatorio
  */
-async function listarTanqueos(filtros) {
+async function listarTanqueos(scope, filtros) {
+  tenantScope.assert(scope);
   filtros = filtros || {};
 
-  // Si hay filtro por placa, resolver a activo_id
+  // Si hay filtro por placa, resolver a activo_id DENTRO del scope
   var activoIdFiltro = null;
   if (filtros.placa) {
-    activoIdFiltro = await resolverActivoIdPorPlaca(filtros.placa);
+    activoIdFiltro = await tenantScope.resolverActivoPorPlaca(scope, filtros.placa);
     if (!activoIdFiltro) {
-      return { data: [], stats: { total: 0, pendientes: 0, anomalias: 0, combustible_total: { galones: 0, litros: 0 }, galones_total: 0, litros_total: 0 } };
+      return { data: [], stats: Object.assign({}, STATS_VACIAS) };
     }
   }
 
@@ -113,10 +125,12 @@ async function listarTanqueos(filtros) {
       'diferencia_km', 'estacion_servicio', 'factura_numero',
       'estado_validacion', 'rendimiento_calculado', 'rendimiento_alerta',
       'discrepancias', 'validado_por', 'fecha_validacion', 'motivo_rechazo',
-      'activos:activo_id(id, placa, nombre, datos)',
+      EMBED_ACTIVO,
       'conductores:conductor_id(id, nombre, cedula)'
     ].join(', '))
     .order('created_at', { ascending: false });
+
+  query = tenantScope.porActivoJoin(query, scope);
 
   if (filtros.fecha_inicio) query = query.gte('created_at', filtros.fecha_inicio);
   if (filtros.fecha_fin) query = query.lte('created_at', filtros.fecha_fin + 'T23:59:59Z');
@@ -150,12 +164,13 @@ async function listarTanqueos(filtros) {
     return t;
   });
 
-  var stats = await obtenerStatsPeriodo(filtros, activoIdFiltro);
+  var stats = await obtenerStatsPeriodo(scope, filtros, activoIdFiltro);
 
   return { data: data, stats: stats };
 }
 
-function aplicarFiltrosBase(query, filtros, activoIdFiltro) {
+function aplicarFiltrosBase(query, scope, filtros, activoIdFiltro) {
+  query = tenantScope.porActivoJoin(query, scope);
   if (filtros.fecha_inicio) query = query.gte('created_at', filtros.fecha_inicio);
   if (filtros.fecha_fin) query = query.lte('created_at', filtros.fecha_fin + 'T23:59:59Z');
   if (activoIdFiltro) query = query.eq('activo_id', activoIdFiltro);
@@ -164,12 +179,13 @@ function aplicarFiltrosBase(query, filtros, activoIdFiltro) {
   return query;
 }
 
-async function obtenerStatsPeriodo(filtros, activoIdFiltro) {
+async function obtenerStatsPeriodo(scope, filtros, activoIdFiltro) {
+  tenantScope.assert(scope);
   filtros = filtros || {};
 
   var qTotal = aplicarFiltrosBase(
-    config.supabase.from(TABLA_TANQUEOS).select('id', { count: 'exact', head: true }),
-    filtros, activoIdFiltro
+    config.supabase.from(TABLA_TANQUEOS).select('id, ' + EMBED_ACTIVO_MIN, { count: 'exact', head: true }),
+    scope, filtros, activoIdFiltro
   );
   if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
     if (filtros.estado_validacion === 'revisados') {
@@ -183,27 +199,27 @@ async function obtenerStatsPeriodo(filtros, activoIdFiltro) {
   var qPendientes = aplicarFiltrosBase(
     config.supabase
       .from(TABLA_TANQUEOS)
-      .select('id', { count: 'exact', head: true })
+      .select('id, ' + EMBED_ACTIVO_MIN, { count: 'exact', head: true })
       .eq('estado_validacion', 'pendiente_revision'),
-    filtros, activoIdFiltro
+    scope, filtros, activoIdFiltro
   );
   var resPendientes = await qPendientes;
 
   var qAnomalias = aplicarFiltrosBase(
     config.supabase
       .from(TABLA_TANQUEOS)
-      .select('id', { count: 'exact', head: true })
+      .select('id, ' + EMBED_ACTIVO_MIN, { count: 'exact', head: true })
       .eq('rendimiento_alerta', true),
-    filtros, activoIdFiltro
+    scope, filtros, activoIdFiltro
   );
   var resAnomalias = await qAnomalias;
 
   var qGalones = aplicarFiltrosBase(
     config.supabase
       .from(TABLA_TANQUEOS)
-      .select('cantidad')
+      .select('cantidad, ' + EMBED_ACTIVO_MIN)
       .eq('unidad_medida', 'galones'),
-    filtros, activoIdFiltro
+    scope, filtros, activoIdFiltro
   );
   if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
     if (filtros.estado_validacion === 'revisados') {
@@ -217,9 +233,9 @@ async function obtenerStatsPeriodo(filtros, activoIdFiltro) {
   var qLitros = aplicarFiltrosBase(
     config.supabase
       .from(TABLA_TANQUEOS)
-      .select('cantidad')
+      .select('cantidad, ' + EMBED_ACTIVO_MIN)
       .eq('unidad_medida', 'litros'),
-    filtros, activoIdFiltro
+    scope, filtros, activoIdFiltro
   );
   if (filtros.estado_validacion && filtros.estado_validacion !== 'todos') {
     if (filtros.estado_validacion === 'revisados') {
@@ -231,14 +247,7 @@ async function obtenerStatsPeriodo(filtros, activoIdFiltro) {
   var resLitros = await qLitros;
 
   if (resTotal.error || resPendientes.error || resAnomalias.error || resGalones.error || resLitros.error) {
-    return {
-      total: 0,
-      pendientes: 0,
-      anomalias: 0,
-      combustible_total: { galones: 0, litros: 0 },
-      galones_total: 0,
-      litros_total: 0
-    };
+    return Object.assign({}, STATS_VACIAS);
   }
 
   var galonesTotal = (resGalones.data || []).reduce(function(acc, row) {
@@ -262,19 +271,20 @@ async function obtenerStatsPeriodo(filtros, activoIdFiltro) {
 }
 
 /**
- * Obtiene el detalle completo de un tanqueo por ID.
+ * Obtiene el detalle completo de un tanqueo por ID — solo del tenant.
  * Incluye fotos con signed URLs de Supabase Storage.
  */
-async function obtenerTanqueo(id) {
-  var resultado = await config.supabase
+async function obtenerTanqueo(scope, id) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from(TABLA_TANQUEOS)
     .select([
       '*',
-      'activos:activo_id(id, placa, nombre, datos)',
+      EMBED_ACTIVO,
       'conductores:conductor_id(id, nombre, cedula, licencia_categoria)'
-    ].join(', '))
-    .eq('id', id)
-    .single();
+    ].join(', '));
+  query = tenantScope.porActivoJoin(query, scope);
+  var resultado = await query.eq('id', id).single();
 
   if (resultado.error) return { error: resultado.error, data: null };
 
@@ -328,16 +338,19 @@ async function obtenerTanqueo(id) {
 }
 
 /**
- * Valida o rechaza un tanqueo individualmente.
+ * Valida o rechaza un tanqueo individualmente — solo del tenant.
+ * El check previo lleva el join de tenant: un tanqueo ajeno responde
+ * "no encontrado" y el UPDATE nunca se ejecuta.
  */
-async function validarTanqueo(id, decision, notasAdmin, usuarioId) {
+async function validarTanqueo(scope, id, decision, notasAdmin, usuarioId) {
+  tenantScope.assert(scope);
   var estadosPermitidos = ['pendiente_revision', 'auto_validado'];
 
-  var resActual = await config.supabase
+  var qCheck = config.supabase
     .from(TABLA_TANQUEOS)
-    .select('id, estado_validacion')
-    .eq('id', id)
-    .single();
+    .select('id, estado_validacion, ' + EMBED_ACTIVO_MIN);
+  qCheck = tenantScope.porActivoJoin(qCheck, scope);
+  var resActual = await qCheck.eq('id', id).single();
 
   if (resActual.error || !resActual.data) {
     return { ok: false, error: 'Tanqueo no encontrado' };
@@ -369,22 +382,27 @@ async function validarTanqueo(id, decision, notasAdmin, usuarioId) {
 }
 
 /**
- * Valida en lote tanqueos con estado auto_validado.
+ * Valida en lote tanqueos con estado auto_validado — solo del tenant.
+ * Los ids ajenos se descartan en silencio (no revelan existencia).
  */
-async function validarLote(ids, usuarioId) {
+async function validarLote(scope, ids, usuarioId) {
+  tenantScope.assert(scope);
   if (!Array.isArray(ids) || ids.length === 0) {
     return { ok: false, error: 'IDs requeridos' };
   }
 
-  var resConteo = await config.supabase
+  var qPropios = config.supabase
     .from(TABLA_TANQUEOS)
-    .select('id', { count: 'exact', head: true })
+    .select('id, ' + EMBED_ACTIVO_MIN)
     .in('id', ids)
     .eq('estado_validacion', 'auto_validado');
+  qPropios = tenantScope.porActivoJoin(qPropios, scope);
+  var resPropios = await qPropios;
 
-  var procesados = resConteo.count || 0;
+  if (resPropios.error) return { ok: false, error: resPropios.error.message, procesados: 0 };
 
-  if (procesados === 0) {
+  var idsPropios = (resPropios.data || []).map(function(r) { return r.id; });
+  if (idsPropios.length === 0) {
     return { ok: true, procesados: 0 };
   }
 
@@ -395,18 +413,22 @@ async function validarLote(ids, usuarioId) {
       validado_por: usuarioId || 'panel',
       fecha_validacion: new Date().toISOString()
     })
-    .in('id', ids)
+    .in('id', idsPropios)
     .eq('estado_validacion', 'auto_validado');
 
   if (res.error) return { ok: false, error: res.error.message, procesados: 0 };
-  return { ok: true, procesados: procesados };
+  return { ok: true, procesados: idsPropios.length };
 }
 
 /**
- * Obtiene el consolidado mensual de tanqueos validados.
- * Agrupa por activo.
+ * Consolidado mensual de tanqueos validados — solo del tenant.
+ * sedeId opcional para acotar; se valida contra el scope (403 si ajena).
+ * El filtro va por la sede del ACTIVO, no por tanqueos.sede_id.
  */
-async function obtenerConsolidado(mes, sedeId) {
+async function obtenerConsolidado(scope, mes, sedeId) {
+  tenantScope.assert(scope);
+  sedeId = tenantScope.validarSedeSolicitada(scope, sedeId || null);
+
   if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
     return { error: 'Formato de mes inválido. Use YYYY-MM' };
   }
@@ -427,7 +449,7 @@ async function obtenerConsolidado(mes, sedeId) {
       'rendimiento_calculado', 'estado_validacion', 'created_at',
       'factura_numero', 'estacion_servicio', 'conductor_id',
       'conductores:conductor_id(nombre)',
-      'activos:activo_id(id, placa, nombre, datos)'
+      EMBED_ACTIVO
     ].join(', '))
     .gte('created_at', inicio)
     .lt('created_at', siguienteMes)
@@ -435,7 +457,11 @@ async function obtenerConsolidado(mes, sedeId) {
     .order('activo_id')
     .order('created_at');
 
-  if (sedeId) query = query.eq('sede_id', sedeId);
+  if (sedeId) {
+    query = query.eq('activos.sede_id', sedeId);
+  } else {
+    query = tenantScope.porActivoJoin(query, scope);
+  }
 
   var resultado = await query;
   if (resultado.error) return { error: resultado.error.message };
@@ -508,6 +534,7 @@ async function obtenerConsolidado(mes, sedeId) {
 /**
  * Guarda datos OCR en la tabla tanqueos_ocr.
  * Solo inserta si al menos un campo OCR tiene valor.
+ * Canal WhatsApp — sin scope (tanqueo recién creado por el flujo).
  *
  * @param {string} tanqueoId - UUID del tanqueo
  * @param {Object} datosOcr - Objeto con campos OCR extraídos
@@ -549,10 +576,12 @@ async function guardarDatosOcr(tanqueoId, datosOcr) {
 
 
 /**
- * Obtiene la URL de una foto de evidencia de tanqueo por ID.
- * Usado por el endpoint de proxy de fotos Twilio.
+ * Obtiene la URL de una foto de evidencia de tanqueo por ID — solo del tenant.
+ * Usado por el endpoint de proxy de fotos Twilio. La pertenencia se
+ * verifica vía el tanqueo dueño de la foto (cierra IDOR del proxy).
  */
-async function obtenerFotoEvidencia(fotoId) {
+async function obtenerFotoEvidencia(scope, fotoId) {
+  tenantScope.assert(scope);
   var resultado = await config.supabase
     .from('evidencia')
     .select('foto_url, entidad_id')
@@ -561,6 +590,16 @@ async function obtenerFotoEvidencia(fotoId) {
     .maybeSingle();
 
   if (resultado.error) throw resultado.error;
+  if (!resultado.data) return null;
+
+  var qDueno = config.supabase
+    .from(TABLA_TANQUEOS)
+    .select('id, ' + EMBED_ACTIVO_MIN)
+    .eq('id', resultado.data.entidad_id);
+  qDueno = tenantScope.porActivoJoin(qDueno, scope);
+  var resDueno = await qDueno.maybeSingle();
+
+  if (resDueno.error || !resDueno.data) return null;
   return resultado.data;
 }
 
@@ -574,8 +613,10 @@ module.exports = {
   actualizarKilometrajeActivo: actualizarKilometrajeActivo,
   obtenerRendimientoHistorico: obtenerRendimientoHistorico,
   listarTanqueos: listarTanqueos,
+  obtenerStatsPeriodo: obtenerStatsPeriodo,
   obtenerTanqueo: obtenerTanqueo,
   validarTanqueo: validarTanqueo,
   validarLote: validarLote,
-  obtenerConsolidado: obtenerConsolidado
+  obtenerConsolidado: obtenerConsolidado,
+  obtenerFotoEvidencia: obtenerFotoEvidencia
 };
