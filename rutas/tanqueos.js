@@ -8,6 +8,7 @@ const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = require('../config/config');
 const tanqueosData = require('../data/tanqueos');
+const tenantScope = require('../servicios/tenantScope');
 
 function sanitizarCeldaCsv(valor) {
   var s = String(valor == null ? '' : valor);
@@ -22,6 +23,17 @@ function bearerDesdeQueryParaMedia(req, res, next) {
     req.headers.authorization = 'Bearer ' + String(req.query.token);
   }
   next();
+}
+
+// Sede efectiva del consolidado: el query param se valida contra el scope
+// del JWT — un query param NUNCA elige tenant. Usuario de una sola sede
+// sin filtro explícito → su sede.
+// TODO(multi-tenant PR2): obtenerConsolidado(scope, ...) filtrará por join a activos.
+async function resolverSedeConsolidado(req) {
+  var scope = await tenantScope.desdeUsuario(req.usuario);
+  var sedeId = tenantScope.validarSedeSolicitada(scope, req.query.sede_id || null);
+  if (!sedeId && !scope.esSistema && scope.sedeIds.length === 1) sedeId = scope.sedeIds[0];
+  return sedeId;
 }
 
 // GET / — lista con filtros y stats
@@ -90,8 +102,13 @@ router.get('/media/:fotoId', bearerDesdeQueryParaMedia, verificarToken, verifica
 // GET /consolidado — resumen mensual agrupado por vehículo (antes de /:id)
 router.get('/consolidado', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
-    var mes    = req.query.mes    || new Date().toISOString().substring(0, 7);
-    var sedeId = req.query.sede_id || null;
+    var mes = req.query.mes || new Date().toISOString().substring(0, 7);
+    var sedeId;
+    try {
+      sedeId = await resolverSedeConsolidado(req);
+    } catch (e) {
+      return res.status(e.status || 403).json({ ok: false, error: e.message });
+    }
     var resultado = await tanqueosData.obtenerConsolidado(mes, sedeId);
     if (resultado.error) return res.status(400).json({ ok: false, error: resultado.error });
     res.json({ ok: true, resumen: resultado.resumen, porVehiculo: resultado.porVehiculo });
@@ -104,8 +121,13 @@ router.get('/consolidado', verificarToken, verificarPermiso('tanqueos', 'ver'), 
 // GET /consolidado/exportar — CSV descargable del mes
 router.get('/consolidado/exportar', verificarToken, verificarPermiso('tanqueos', 'ver'), async function (req, res) {
   try {
-    var mes    = req.query.mes    || new Date().toISOString().substring(0, 7);
-    var sedeId = req.query.sede_id || null;
+    var mes = req.query.mes || new Date().toISOString().substring(0, 7);
+    var sedeId;
+    try {
+      sedeId = await resolverSedeConsolidado(req);
+    } catch (e) {
+      return res.status(e.status || 403).json({ ok: false, error: e.message });
+    }
     var resultado = await tanqueosData.obtenerConsolidado(mes, sedeId);
     if (resultado.error) return res.status(400).json({ ok: false, error: resultado.error });
 

@@ -9,6 +9,7 @@ const { supabase } = require('../config/config');
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const activosData = require('../data/activos');
 const autorizacionesData = require('../data/autorizaciones');
+const tenantScope = require('../servicios/tenantScope');
 
 // GET / — lista todos los activos con placa (vehículos)
 router.get('/', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
@@ -83,16 +84,27 @@ router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async fun
       .single();
     var tipoActivoId = (resTipo.data && resTipo.data.id) || null;
 
-    // empresa_id: usar la primera empresa disponible o del usuario
-    var resEmpresa = await supabase
-      .from('empresas')
-      .select('id')
-      .limit(1)
-      .single();
-    var empresaId = (resEmpresa.data && resEmpresa.data.id) || null;
+    // empresa_id: SIEMPRE del JWT — nunca de la BD ni del body (multi-tenant).
+    // Antes: .from('empresas').limit(1) asignaba el activo a la primera
+    // empresa de la tabla — catastrófico con más de un cliente.
+    var empresaId = (req.usuario && req.usuario.empresa_id) || null;
+    if (!empresaId) {
+      return res.status(400).json({ ok: false, error: 'Usuario sin empresa asignada — no se puede crear el activo' });
+    }
 
-    if (!tipoActivoId || !empresaId) {
-      return res.status(500).json({ ok: false, error: 'No se pudo resolver tipo_activo o empresa' });
+    // sede_id del body: debe pertenecer al alcance del usuario
+    var sedeSolicitada = req.body.sede_id || null;
+    if (sedeSolicitada) {
+      try {
+        var scope = await tenantScope.desdeUsuario(req.usuario);
+        tenantScope.validarSedeSolicitada(scope, sedeSolicitada);
+      } catch (e) {
+        return res.status(e.status || 403).json({ ok: false, error: e.message });
+      }
+    }
+
+    if (!tipoActivoId) {
+      return res.status(500).json({ ok: false, error: 'No se pudo resolver tipo_activo' });
     }
 
     var activo = {
@@ -101,7 +113,7 @@ router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async fun
       nombre: (datos.marca || '') + ' ' + (datos.tipo_vehiculo || '') + ' ' + placa,
       tipo_activo_id: tipoActivoId,
       empresa_id: empresaId,
-      sede_id: req.body.sede_id || null,
+      sede_id: sedeSolicitada,
       datos: datos,
       documentos: documentos,
       kilometraje: req.body.kilometraje || 0,
