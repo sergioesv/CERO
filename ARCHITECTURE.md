@@ -286,7 +286,7 @@ El orquestador pasa las reglas de dominio a los subagentes según el área tocad
 Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-30 -->
+<!-- Última actualización: 2026-07-05 -->
 
 ## Folder structure
 
@@ -440,7 +440,7 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
 ├── servicios
 │   ├── pdf
-│   │   ├── base.js  # Motor PDF compartido — nunca duplicar logica aqui
+│   │   ├── entrega.js  # Entrega de PDFs — subida a Storage + envio WhatsApp
 │   │   ├── GeneradorPDFBase.js
 │   │   ├── GeneradorPDFPosoperacional.js
 │   │   ├── GeneradorPDFPreoperacional.js
@@ -451,16 +451,26 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   ├── passwords.js
 │   ├── plantillas.js
 │   ├── sesiones.js  # Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition
-│   └── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+│   ├── storage.js  # Supabase Storage — subida de fotos y PDFs, signed URLs
+│   └── tenantScope.js
 ├── supabase
-│   └── migrations
-│       └── 20260518000001_schema_canonico_v2.sql
+│   ├── migrations
+│   │   ├── 20260518000001_schema_canonico_v2.sql
+│   │   └── 20260705000002_backfill_tenant.sql
+│   └── schema.sql
 ├── tests
 │   ├── __mocks__
 │   │   └── supabase.js
 │   ├── data
+│   │   ├── activos.scope.test.js
+│   │   ├── alertas.scope.test.js
+│   │   ├── autorizaciones.scope.test.js
 │   │   ├── autorizaciones.test.js
-│   │   └── permisos.test.js
+│   │   ├── conductores.scope.test.js
+│   │   ├── inspecciones.scope.test.js
+│   │   ├── permisos.test.js
+│   │   ├── plantillas.scope.test.js
+│   │   └── tanqueos.test.js
 │   ├── helpers
 │   │   └── twilio.js
 │   ├── modulos
@@ -472,11 +482,13 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │       ├── compartido
 │   │       │   └── baseFlujo.test.js
 │   │       └── preoperacional
+│   │           ├── cierre.pdf.test.js
 │   │           └── cierre.test.js
 │   ├── rutas
 │   │   └── activos.test.js
 │   └── servicios
-│       └── ocr.novedades.test.js
+│       ├── ocr.novedades.test.js
+│       └── tenantScope.test.js
 ├── ARCHITECTURE.md  # Fuente de verdad del proyecto — leer antes de cada sesion
 ├── cero_powersell.ps1
 ├── CLAUDE.md
