@@ -103,12 +103,6 @@ app.use('/api/alertas', rutasAlertas);
 const rutasPlantillas = require('./rutas/plantillas');
 app.use('/api/plantillas', rutasPlantillas);
 
-  } catch (error) {
-    console.error('Error obteniendo resumen dashboard:', error);
-    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
-  }
-});
-
 const rutasAutorizaciones = require('./rutas/autorizaciones');
 app.use('/api/autorizaciones', rutasAutorizaciones);
 

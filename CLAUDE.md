@@ -3,7 +3,7 @@
 
 ## Proyecto
 SaaS de gestión de operaciones de campo vía WhatsApp. Colombia, PESV (Res. 40595/2022).
-Stack: Node.js 20 CommonJS · Supabase PostgreSQL (São Paulo) · Railway · Twilio · Gemini 2.0 Flash
+Stack: Node.js 20 CommonJS · Supabase PostgreSQL (São Paulo) · Railway · Twilio · Gemini 2.5 Flash (GOOGLE_MODEL_VISION, default en servicios/ocr.js)
 Repo: sergioesv/CERO · Rama activa: desarrollo · Deploy: auto en push a desarrollo
 
 ## Estado actual
@@ -36,18 +36,18 @@ Repo: sergioesv/CERO · Rama activa: desarrollo · Deploy: auto en push a desarr
 |-----|--------------------------------------------------|-----------|-------------|
 | ~~V-01~~ | ~~servicios/ocr.js línea 3~~                | ~~ALTA~~ | ✅ CERRADA 2026-05-29 — extraído a interpretadorNovedades.js |
 | ~~V-02~~ | ~~servicios/ocr.js líneas 228-404~~          | ~~ALTA~~ | ✅ CERRADA 2026-05-29 — extraído a interpretadorNovedades.js |
-| V-04 | servicios/ocr.js aliasPorItem (líneas 237-256) vs scripts/seed-templates.js / plantilla_items | MEDIA | Alias de ítems hardcodeados en ocr.js, sin sincronizar con el vocabulario real sembrado en BD |
-| V-05 | ocr.js línea 354                                | MEDIA | Fallback implícito clasifica cualquier texto no reconocido como BLOQUEO |
-| V-07 | servicios/ocr.js vs modulos/inspecciones/preoperacional/estado.js | BAJA  | Matching de nombres duplicado entre ocr.js y el estado del preoperacional |
+| V-04 | modulos/inspecciones/compartido/interpretadorNovedades.js:56-87 vs plantilla_items | MEDIA | aliasPorItem hardcodeado (migró desde ocr.js), sin sincronizar con el vocabulario sembrado en BD |
+| V-05 | interpretadorNovedades.js:190-193               | MEDIA | Fallback clasifica todo texto no reconocido como "Mal estado" (documentado como intencional) |
+| ~~V-07~~ | ~~ocr.js vs preoperacional/estado.js~~      | ~~BAJA~~ | ✅ CERRADA — estado.js ya no contiene matching; ocr.js delega en interpretadorNovedades |
 
-Orden de corrección: V-01/V-02 → V-04 → V-05 → V-07
+Orden de corrección: V-04 → V-05 (únicas abiertas)
 
 ## Pendientes críticos antes del segundo cliente
 - [ ] supabase/schema.sql — extraer y versionar
-- [ ] docs/DECISION_LOG.md — separar del ARCHITECTURE.md
+- [x] docs/DECISION_LOG.md — separado (131 líneas, docs/DECISION_LOG.md)
 - [ ] Multi-tenant audit — todos los endpoints filtran por empresa_id
 - [ ] RLS Supabase
-- [ ] Sesiones WhatsApp en memoria → migrar a supabase.sesiones_activas (Fix 10)
+- [x] Fix 10 hecho: sesiones persisten en supabase.sesiones_activas (servicios/sesiones.js). PENDIENTE real: lock "procesando" sigue en memoria → máximo 1 réplica en Railway
 
 ## Patrones críticos (no olvidar)
 - onExitoPlaca: guardar vehiculo/conductor antes de reiniciarDatosOperativos, restaurar después
@@ -57,6 +57,7 @@ Orden de corrección: V-01/V-02 → V-04 → V-05 → V-07
 - RLS se activa automáticamente en tablas nuevas — hacer DISABLE ROW LEVEL SECURITY después de crear
 - PostgREST: NOTIFY pgrst, 'reload schema' después de cambios de schema
 - Twilio media: proxy server-side obligatorio — browser no autentica con Twilio
+- PDF: generación en GeneradorPDF*, entrega (Storage+WhatsApp) en servicios/pdf/entrega.js — base.js eliminado 2026-07-04
 
 ## Git
 - Conventional commits obligatorios: feat/fix/docs/chore/refactor/test(scope): mensaje en español

@@ -1,5 +1,8 @@
 /**
  * Generador de PDF para inspecciones posoperacionales.
+ * Generación: GeneradorPDFPosoperacional (clase).
+ * Entrega (subida a Storage + envío WhatsApp): servicios/pdf/entrega.js.
+ *
  * Documento compacto (1 página en la mayoría de casos) que registra:
  * - Datos del conductor (nombre + cédula)
  * - Kilometraje final y referencia
@@ -12,7 +15,8 @@
 'use strict';
 
 const GeneradorPDFPosoperacional = require('./GeneradorPDFPosoperacional');
-const config = require('../../config/config');
+const config  = require('../../config/config');
+const entrega = require('./entrega');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Genera el buffer PDF del posoperacional
@@ -39,7 +43,7 @@ async function subirYEnviarPDF(datosSesion, posoperacionalId, telefono) {
                         config.STORAGE_BUCKET_PREOPERACIONALES ||
                         'preoperacionales';
 
-    var pdfUrl = await base.subirPDF(pdfBuffer, bucket, nombreArchivo);
+    var pdfUrl = await entrega.subirPDF(pdfBuffer, bucket, nombreArchivo);
     if (!pdfUrl) return null;
 
     // Guardar URL en base de datos
@@ -49,10 +53,10 @@ async function subirYEnviarPDF(datosSesion, posoperacionalId, telefono) {
       .eq('id', posoperacionalId);
 
     // Enviar por WhatsApp
-    var ahora = base.obtenerFechaColombia();
-    await base.enviarPDFWhatsApp(pdfUrl, telefono, {
-      titulo:    'PDF Posoperacional',
-      placa:     datosSesion.placa,
+    var ahora = entrega.obtenerFechaColombia();
+    await entrega.enviarPDFWhatsApp(pdfUrl, telefono, {
+      titulo:     'PDF Posoperacional',
+      placa:      datosSesion.placa,
       fechaTexto: ahora.toLocaleDateString('es-CO')
     });
 

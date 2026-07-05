@@ -99,7 +99,7 @@ const DESCRIPCIONES = {
   'servicios/ocr.js':                                          'OCR via Gemini — lectura de placas y odometros',
   'servicios/sesiones.js':                                     'Sesiones WhatsApp — Map en memoria + persistencia Supabase + cola serializada anti race condition',
   'servicios/storage.js':                                      'Supabase Storage — subida de fotos y PDFs, signed URLs',
-  'servicios/pdf/base.js':                                     'Motor PDF compartido — nunca duplicar logica aqui',
+  'servicios/pdf/entrega.js':                                  'Entrega de PDFs — subida a Storage + envio WhatsApp',
   'servicios/pdf/preoperacional.js':                           'Generador PDF preoperacional',
   'servicios/pdf/posoperacional.js':                           'Generador PDF posoperacional',
 

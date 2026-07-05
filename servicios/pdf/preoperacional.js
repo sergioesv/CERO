@@ -1,12 +1,13 @@
 /**
  * Generador de PDF para inspecciones preoperacionales.
- * Usa el motor base (base.js) y agrega el contenido específico del preop:
- * hero del vehículo, sección de novedades críticas y bloques de inspección.
+ * Generación: GeneradorPDFPreoperacional (clase).
+ * Entrega (subida a Storage + envío WhatsApp): servicios/pdf/entrega.js.
  */
 
 'use strict';
 
-var config      = require('../../config/config');
+var config  = require('../../config/config');
+var entrega = require('./entrega');
 const GeneradorPDFPreoperacional = require('./GeneradorPDFPreoperacional');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,11 +28,11 @@ async function generarPDF(sesion) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
   try {
-    var pdfBuffer    = await generarPDF(sesion);
+    var pdfBuffer     = await generarPDF(sesion);
     var nombreArchivo = 'preop_' + (sesion.placa || 'x') + '_' + Date.now() + '.pdf';
-    var bucket       = config.STORAGE_BUCKET_PREOPERACIONALES;
+    var bucket        = config.STORAGE_BUCKET_PREOPERACIONALES;
 
-    var pdfUrl = await base.subirPDF(pdfBuffer, bucket, nombreArchivo);
+    var pdfUrl = await entrega.subirPDF(pdfBuffer, bucket, nombreArchivo);
     if (!pdfUrl) return null;
 
     // Guardar URL en base de datos
@@ -41,10 +42,10 @@ async function subirYEnviarPDF(sesion, preoperacionalId, telefono) {
       .eq('id', preoperacionalId);
 
     // Enviar por WhatsApp
-    var ahora = base.obtenerFechaColombia();
-    await base.enviarPDFWhatsApp(pdfUrl, telefono, {
-      titulo:    'PDF Preoperacional',
-      placa:     sesion.placa,
+    var ahora = entrega.obtenerFechaColombia();
+    await entrega.enviarPDFWhatsApp(pdfUrl, telefono, {
+      titulo:     'PDF Preoperacional',
+      placa:      sesion.placa,
       fechaTexto: ahora.toLocaleDateString('es-CO')
     });
 
