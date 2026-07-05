@@ -128,6 +128,22 @@ describe('desdeUsuario', function () {
   });
 });
 
+describe('paraSedes', function () {
+  test('exige sedes no vacías', function () {
+    expect(function () { tenantScope.paraSedes([], 'x'); }).toThrow(/sedeIds no vacio/);
+    expect(function () { tenantScope.paraSedes(null, 'x'); }).toThrow(/sedeIds no vacio/);
+  });
+
+  test('crea scope restrictivo que pasa assert y filtra', function () {
+    var scope = tenantScope.paraSedes([SEDE_A], 'cron test');
+    expect(tenantScope.assert(scope)).toBe(scope);
+    expect(scope.esSistema).toBe(false);
+    var q = { in: jest.fn(function () { return q; }) };
+    tenantScope.porSede(q, scope);
+    expect(q.in).toHaveBeenCalledWith('sede_id', [SEDE_A]);
+  });
+});
+
 describe('sistema', function () {
   test('exige motivo auditable', function () {
     expect(function () { tenantScope.sistema(); }).toThrow(/motivo/);

@@ -93,7 +93,7 @@ async function guardarPosoperacionalCompleto(sesion, telefono) {
   // Novedades críticas: notificar supervisor y registrar cambio de estado
   var novedadesCriticas = (sesion.novedades || []).filter(function(n) { return n.critico; });
   if (novedadesCriticas.length > 0) {
-    alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas);
+    alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas, sesion.vehiculo && sesion.vehiculo.sede_id);
 
     // Registrar en historial — novedad crítica implica atención requerida
     var descripcionNovedad = novedadesCriticas.map(function(n) {

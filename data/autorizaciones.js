@@ -9,6 +9,7 @@
 var config = require('../config/config');
 var notificador = require('../modulos/alertas/notificador');
 var activosData = require('./activos');
+var tenantScope = require('../servicios/tenantScope');
 
 // ─────────────────────────────────────────────────────────────────
 // HELPERS DE DOCUMENTOS
@@ -47,13 +48,16 @@ function construirDocumento(fecha) {
 // GET /api/alertas/documentos
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerDocumentosActivos() {
-  var resActivos = await config.supabase
+async function obtenerDocumentosActivos(scope) {
+  tenantScope.assert(scope);
+  var qActivos = config.supabase
     .from(config.TABLES.activos)
     .select('id, placa, nombre, estado, bloqueado, motivo_bloqueo, datos, documentos')
     .eq('activo', true)
     .not('placa', 'is', null)
     .order('placa');
+  qActivos = tenantScope.porSede(qActivos, scope);
+  var resActivos = await qActivos;
 
   if (resActivos.error) throw resActivos.error;
 
@@ -113,12 +117,14 @@ async function obtenerDocumentosActivos() {
 // AUTORIZACIONES PENDIENTES
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerAutorizacionesPendientes() {
-  var res = await config.supabase
+async function obtenerAutorizacionesPendientes(scope) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from('autorizaciones_novedad')
-    .select('*, activos:activo_id(id, placa, nombre), conductores:conductor_id(nombre, telefono)')
+    .select('*, activos:activo_id!inner(id, placa, nombre, sede_id), conductores:conductor_id(nombre, telefono)')
     .is('decision', null)
     .order('timestamp_alerta', { ascending: true });
+  var res = await tenantScope.porActivoJoin(query, scope);
 
   if (res.error) throw res.error;
 
@@ -141,13 +147,15 @@ async function obtenerAutorizacionesPendientes() {
 // AUTORIZACIONES RESUELTAS
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerAutorizacionesResueltas() {
-  var res = await config.supabase
+async function obtenerAutorizacionesResueltas(scope) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from('autorizaciones_novedad')
-    .select('*, activos:activo_id(id, placa, nombre), conductores:conductor_id(nombre), supervisores:supervisor_id(nombre)')
+    .select('*, activos:activo_id!inner(id, placa, nombre, sede_id), conductores:conductor_id(nombre), supervisores:supervisor_id(nombre)')
     .not('decision', 'is', null)
     .order('timestamp_decision', { ascending: false })
     .limit(100);
+  var res = await tenantScope.porActivoJoin(query, scope);
 
   if (res.error) throw res.error;
 
@@ -172,11 +180,14 @@ async function obtenerAutorizacionesResueltas() {
 // REGISTRAR DECISIÓN
 // ─────────────────────────────────────────────────────────────────
 
-async function registrarDecision(autorizacionId, decision, justificacion, supervisorId) {
-  // 1. Verificar que exista y no tenga decisión previa
-  var resCheck = await config.supabase
+async function registrarDecision(scope, autorizacionId, decision, justificacion, supervisorId) {
+  tenantScope.assert(scope);
+  // 1. Verificar que exista, sea del tenant y no tenga decisión previa
+  var qCheck = config.supabase
     .from('autorizaciones_novedad')
-    .select('id, decision, conductor_id, activo_id')
+    .select('id, decision, conductor_id, activo_id, activos:activo_id!inner(sede_id)');
+  qCheck = tenantScope.porActivoJoin(qCheck, scope);
+  var resCheck = await qCheck
     .eq('id', autorizacionId)
     .single();
 
@@ -361,17 +372,22 @@ function construirMensajeDecision(placa, conductorNombre, decision, justificacio
 // GET /api/vehiculos/:placa/historial  (o /api/activos/:placa/historial)
 // ─────────────────────────────────────────────────────────────────
 
-async function obtenerHistorialActivo(placa) {
+async function obtenerHistorialActivo(scope, placa) {
+  tenantScope.assert(scope);
   var placaUpper = placa.toUpperCase();
 
-  // Resolver placa a activo_id
-  var activoId = await activosData.obtenerActivoIdPorPlaca(placaUpper);
+  // Resolver placa a activo_id DENTRO del scope — placa ajena no resuelve
+  var activoId = await tenantScope.resolverActivoPorPlaca(scope, placaUpper);
 
-  // Obtener datos del activo
+  if (!activoId) {
+    return { vehiculo: { placa: placaUpper }, historial: [] };
+  }
+
+  // Obtener datos del activo (ya verificado como propio)
   var resActivo = await config.supabase
     .from(config.TABLES.activos)
     .select('id, placa, nombre, estado, datos')
-    .eq('placa', placaUpper)
+    .eq('id', activoId)
     .single();
 
   var activo = null;
@@ -386,10 +402,6 @@ async function obtenerHistorialActivo(placa) {
     };
   } else {
     activo = { placa: placaUpper };
-  }
-
-  if (!activoId) {
-    return { vehiculo: activo, historial: [] };
   }
 
   var [resPreop, resPosop, resTanqueos, resAutorizaciones] = await Promise.all([

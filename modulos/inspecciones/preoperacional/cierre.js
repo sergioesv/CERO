@@ -226,7 +226,7 @@ async function guardarPreoperacionalCompleto(sesion, telefono, grupos) {
   }
 
   var novedadesCriticas = alertasReglas.obtenerNovedadesCriticas(sesion.novedades);
-  alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas);
+  alertasNotificador.notificarCriticas(sesion.placa, novedadesCriticas, sesion.vehiculo && sesion.vehiculo.sede_id);
 
   var datosSesion = construirDatosSesionPdf(sesion, grupos, telefono, ahora);
   var pdfUrl = await pdf.subirYEnviarPDF(datosSesion, preop.id, telefono);

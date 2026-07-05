@@ -2,21 +2,29 @@
 // data/alertas.js
 // Consultas a Supabase para vencimientos, bloqueos e historial
 // CERO — v26 — Queries sobre activos (vehiculos eliminado)
+// Multi-tenant: lecturas exigen tenantScope. El cron pasa
+// sistema(motivo) para el barrido y paraSedes([sede]) para
+// resolver contactos POR SEDE del activo/conductor afectado.
 // ═══════════════════════════════════════════════════════════
 
 var config = require('../config/config');
 var activosData = require('./activos');
+var tenantScope = require('../servicios/tenantScope');
 
 // ───────────────────────────────────────────────────────────
 // Obtiene activos con documentos próximos a vencer o vencidos
 // Lee soat/tecnomecanica desde activos.documentos JSONB
+// Cada alerta lleva activo_id y sede_id para notificación por tenant
 // ───────────────────────────────────────────────────────────
-async function obtenerVencimientosActivos() {
-  var resultado = await config.supabase
+async function obtenerVencimientosActivos(scope) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from(config.TABLES.activos)
-    .select('id, placa, datos, documentos, bloqueado')
+    .select('id, placa, sede_id, datos, documentos, bloqueado')
     .eq('activo', true)
     .eq('bloqueado', false);
+  query = tenantScope.porSede(query, scope);
+  var resultado = await query;
 
   if (resultado.error || !Array.isArray(resultado.data)) {
     console.error('❌ Error consultando vencimientos de activos:', resultado.error?.message);
@@ -37,6 +45,8 @@ async function obtenerVencimientosActivos() {
       var diasSoat = calcularDiasRestantes(hoy, docs.soat_vencimiento);
       if (diasSoat <= 30) {
         alertas.push({
+          activo_id: a.id,
+          sede_id: a.sede_id || null,
           placa: a.placa,
           descripcion_vehiculo: (datos.marca || '') + ' ' + (datos.modelo || ''),
           tipo_documento: 'SOAT',
@@ -52,6 +62,8 @@ async function obtenerVencimientosActivos() {
       var diasTecno = calcularDiasRestantes(hoy, docs.tecnomecanica_vencimiento);
       if (diasTecno <= 30) {
         alertas.push({
+          activo_id: a.id,
+          sede_id: a.sede_id || null,
           placa: a.placa,
           descripcion_vehiculo: (datos.marca || '') + ' ' + (datos.modelo || ''),
           tipo_documento: 'Tecnomecánica',
@@ -68,13 +80,17 @@ async function obtenerVencimientosActivos() {
 
 // ───────────────────────────────────────────────────────────
 // Obtiene conductores con licencia próxima a vencer o vencida
+// Cada alerta lleva sede_id para notificación por tenant
 // ───────────────────────────────────────────────────────────
-async function obtenerVencimientosLicencias() {
-  var resultado = await config.supabase
+async function obtenerVencimientosLicencias(scope) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from(config.TABLES.conductores)
-    .select('id, nombre, telefono, licencia_categoria, licencia_vencimiento, cargo')
+    .select('id, nombre, telefono, sede_id, licencia_categoria, licencia_vencimiento, cargo')
     .eq('activo', true)
     .not('cargo', 'in', '("Administrador","Supervisor")');
+  query = tenantScope.porSede(query, scope);
+  var resultado = await query;
 
   if (resultado.error || !Array.isArray(resultado.data)) {
     console.error('❌ Error consultando vencimientos de licencias:', resultado.error?.message);
@@ -93,6 +109,7 @@ async function obtenerVencimientosLicencias() {
       if (dias <= 30) {
         alertas.push({
           conductor_id: c.id,
+          sede_id: c.sede_id || null,
           nombre: c.nombre,
           telefono: c.telefono,
           licencia_categoria: c.licencia_categoria,
@@ -111,6 +128,8 @@ async function obtenerVencimientosLicencias() {
 // ───────────────────────────────────────────────────────────
 // Bloquea un activo por documento vencido
 // Acepta activoId (UUID) o placa (string corto)
+// NOTA multi-tenant: preferir SIEMPRE el UUID — la placa no es
+// única global (UNIQUE placa+empresa_id) y este lookup es legacy.
 // ───────────────────────────────────────────────────────────
 async function bloquearActivo(activoIdOrPlaca, motivo) {
   // Resolver a activoId si es placa
@@ -157,13 +176,18 @@ async function bloquearActivo(activoIdOrPlaca, motivo) {
 
 // ───────────────────────────────────────────────────────────
 // Obtiene contactos por cargo (Administrador, Supervisor)
+// SIEMPRE filtrado por sede — aquí vivía el leak de alertas
+// WhatsApp entre clientes.
 // ───────────────────────────────────────────────────────────
-async function obtenerContactosPorCargo(cargo) {
-  var resultado = await config.supabase
+async function obtenerContactosPorCargo(scope, cargo) {
+  tenantScope.assert(scope);
+  var query = config.supabase
     .from(config.TABLES.conductores)
     .select('nombre, telefono, cargo')
     .eq('cargo', cargo)
     .eq('activo', true);
+  query = tenantScope.porSede(query, scope);
+  var resultado = await query;
 
   if (resultado.error || !Array.isArray(resultado.data)) {
     console.error('❌ Error obteniendo contactos con cargo ' + cargo + ':', resultado.error?.message);

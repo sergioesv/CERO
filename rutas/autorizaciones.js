@@ -6,11 +6,14 @@ const express = require('express');
 const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const autorizacionesData = require('../data/autorizaciones');
+const tenantScope = require('../servicios/tenantScope');
+
+const conScope = tenantScope.middleware();
 
 // GET /pendientes — autorizaciones sin decisión
-router.get('/pendientes', verificarToken, verificarPermiso('autorizaciones', 'ver'), async function (req, res) {
+router.get('/pendientes', verificarToken, conScope, verificarPermiso('autorizaciones', 'ver'), async function (req, res) {
   try {
-    var datos = await autorizacionesData.obtenerAutorizacionesPendientes();
+    var datos = await autorizacionesData.obtenerAutorizacionesPendientes(req.scope);
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/autorizaciones/pendientes:', error);
@@ -19,9 +22,9 @@ router.get('/pendientes', verificarToken, verificarPermiso('autorizaciones', 've
 });
 
 // GET /resueltas — autorizaciones con decisión
-router.get('/resueltas', verificarToken, verificarPermiso('autorizaciones', 'ver'), async function (req, res) {
+router.get('/resueltas', verificarToken, conScope, verificarPermiso('autorizaciones', 'ver'), async function (req, res) {
   try {
-    var datos = await autorizacionesData.obtenerAutorizacionesResueltas();
+    var datos = await autorizacionesData.obtenerAutorizacionesResueltas(req.scope);
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/autorizaciones/resueltas:', error);
@@ -30,7 +33,7 @@ router.get('/resueltas', verificarToken, verificarPermiso('autorizaciones', 'ver
 });
 
 // PUT /:id/decidir — registrar decisión del supervisor
-router.put('/:id/decidir', verificarToken, verificarPermiso('autorizaciones', 'editar'), async function (req, res) {
+router.put('/:id/decidir', verificarToken, conScope, verificarPermiso('autorizaciones', 'editar'), async function (req, res) {
   try {
     var id = req.params.id;
     var decision = req.body.decision;
@@ -46,7 +49,7 @@ router.put('/:id/decidir', verificarToken, verificarPermiso('autorizaciones', 'e
       return res.status(400).json({ ok: false, error: 'Justificación obligatoria (mín 10 caracteres) para autorizar' });
     }
 
-    var resultado = await autorizacionesData.registrarDecision(id, decision, justificacion, supervisorId);
+    var resultado = await autorizacionesData.registrarDecision(req.scope, id, decision, justificacion, supervisorId);
     if (!resultado.ok) {
       return res.status(400).json(resultado);
     }

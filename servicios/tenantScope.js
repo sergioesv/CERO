@@ -94,6 +94,19 @@ function sistema(motivo) {
   return crear({ esSistema: true, esSuperadmin: true });
 }
 
+/**
+ * Scope restringido a sedes concretas — para flujos SIN JWT (cron de
+ * alertas por sede del activo, canal WhatsApp). Es MENOS privilegio
+ * que sistema(): solo ve las sedes indicadas. Greppable.
+ */
+function paraSedes(sedeIds, motivo) {
+  var limpias = Array.isArray(sedeIds) ? sedeIds.filter(Boolean) : [];
+  if (!limpias.length) {
+    throw new Error('tenantScope.paraSedes exige sedeIds no vacio (' + (motivo || 'sin motivo') + ')');
+  }
+  return crear({ sedeIds: limpias });
+}
+
 // ─── Verificación ───
 
 function esScope(valor) {
@@ -226,6 +239,7 @@ function middleware() {
 module.exports = {
   desdeUsuario: desdeUsuario,
   sistema: sistema,
+  paraSedes: paraSedes,
   assert: assert,
   esScope: esScope,
   resolverSedeIds: resolverSedeIds,

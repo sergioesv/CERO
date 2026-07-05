@@ -151,16 +151,21 @@ async function obtenerReferenciaKilometraje(activoId, tipoFlujo) {
 
 
 /**
- * Lista preoperacionales con filtros opcionales.
+ * Lista preoperacionales con filtros opcionales — solo del tenant.
+ * @param {Object} scope - tenantScope obligatorio
  * @param {Object} filtros - { desde, hasta, activoId, conductorId, estado }
  */
-async function listarPreoperacionales(filtros) {
+async function listarPreoperacionales(scope, filtros) {
+  var tenantScope = require('../servicios/tenantScope');
+  tenantScope.assert(scope);
+  filtros = filtros || {};
   var supabase = require('../config/config').supabase;
   var query = supabase
     .from('preoperacionales')
-    .select('*, activos:activo_id(id, placa, nombre, datos), conductores:conductor_id(id, nombre, cedula)')
+    .select('*, activos:activo_id!inner(id, placa, nombre, datos, sede_id), conductores:conductor_id(id, nombre, cedula)')
     .order('fecha', { ascending: false })
     .order('hora', { ascending: false });
+  query = tenantScope.porActivoJoin(query, scope);
 
   if (filtros.desde)      query = query.gte('fecha', filtros.desde);
   if (filtros.hasta)      query = query.lte('fecha', filtros.hasta);
@@ -183,14 +188,19 @@ async function listarPreoperacionales(filtros) {
 }
 
 /**
- * Obtiene un preoperacional por ID con activo, conductor, fotos y autorizacion.
+ * Obtiene un preoperacional por ID con activo, conductor, fotos y
+ * autorizacion — solo del tenant (join !inner a la sede del activo).
  */
-async function obtenerPreoperacionalDetalle(id) {
+async function obtenerPreoperacionalDetalle(scope, id) {
+  var tenantScope = require('../servicios/tenantScope');
+  tenantScope.assert(scope);
   var supabase = require('../config/config').supabase;
 
-  var resultado = await supabase
+  var query = supabase
     .from('preoperacionales')
-    .select('*, activos:activo_id(id, placa, nombre, datos, documentos), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)')
+    .select('*, activos:activo_id!inner(id, placa, nombre, datos, documentos, sede_id), conductores:conductor_id(id, nombre, cedula, licencia_categoria, licencia_vencimiento)');
+  query = tenantScope.porActivoJoin(query, scope);
+  var resultado = await query
     .eq('id', id)
     .single();
 

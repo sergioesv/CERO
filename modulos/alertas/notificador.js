@@ -8,6 +8,7 @@
 var cron = require('node-cron');
 var config = require('../../config/config');
 var alertasData = require('../../data/alertas');
+var tenantScope = require('../../servicios/tenantScope');
 var reglas = require('./reglas');
 
 // ───────────────────────────────────────────────────────────
@@ -41,13 +42,13 @@ async function enviarWhatsApp(telefono, mensaje) {
 // ───────────────────────────────────────────────────────────
 // Envía alertas a los destinatarios según la clasificación
 // ───────────────────────────────────────────────────────────
-async function enviarAlertaADestinatarios(mensaje, clasificacion, conductorTelefono) {
+async function enviarAlertaADestinatarios(scopeSede, mensaje, clasificacion, conductorTelefono) {
   var enviados = 0;
 
-  // Enviar a contactos por cargo (Administrador, Supervisor)
+  // Enviar a contactos por cargo (Administrador, Supervisor) DE LA SEDE
   for (var i = 0; i < clasificacion.destinatarios.length; i++) {
     var cargo = clasificacion.destinatarios[i];
-    var contactos = await alertasData.obtenerContactosPorCargo(cargo);
+    var contactos = await alertasData.obtenerContactosPorCargo(scopeSede, cargo);
 
     for (var j = 0; j < contactos.length; j++) {
       var enviado = await enviarWhatsApp(contactos[j].telefono, mensaje);
@@ -68,7 +69,8 @@ async function enviarAlertaADestinatarios(mensaje, clasificacion, conductorTelef
 // Procesa alertas de documentos de vehículos (SOAT, Tecnomecánica)
 // ───────────────────────────────────────────────────────────
 async function procesarAlertasVehiculos() {
-  var alertas = await alertasData.obtenerVencimientosActivos();
+  // Barrido de plataforma; la notificación se acota a la sede de cada activo
+  var alertas = await alertasData.obtenerVencimientosActivos(tenantScope.sistema('cron vencimientos vehiculos'));
   var totalEnviadas = 0;
   var totalBloqueados = 0;
 
@@ -78,15 +80,20 @@ async function procesarAlertasVehiculos() {
     var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes, true);
     if (!clasificacion) continue;
 
-    // Generar y enviar mensaje
-    var mensaje = reglas.generarMensajeVehiculo(alerta, clasificacion);
-    var enviados = await enviarAlertaADestinatarios(mensaje, clasificacion, null);
-    totalEnviadas += enviados;
+    // Generar y enviar mensaje SOLO a contactos de la sede del activo
+    if (alerta.sede_id) {
+      var mensaje = reglas.generarMensajeVehiculo(alerta, clasificacion);
+      var scopeSede = tenantScope.paraSedes([alerta.sede_id], 'alerta vencimiento ' + alerta.placa);
+      var enviados = await enviarAlertaADestinatarios(scopeSede, mensaje, clasificacion, null);
+      totalEnviadas += enviados;
+    } else {
+      console.error('⚠️ Activo ' + alerta.placa + ' sin sede_id — alerta no notificada (multi-tenant fail-closed)');
+    }
 
-    // Bloquear vehículo si el documento venció
+    // Bloquear vehículo si el documento venció — por UUID, nunca por placa
     if (reglas.debeBloquear(alerta.tipo_documento, alerta.dias_restantes)) {
       var motivo = alerta.tipo_documento + ' vencido — ' + reglas.formatearFecha(alerta.fecha_vencimiento);
-      var bloqueado = await alertasData.bloquearActivo(alerta.placa, motivo);
+      var bloqueado = await alertasData.bloquearActivo(alerta.activo_id, motivo);
       if (bloqueado) totalBloqueados++;
     }
   }
@@ -98,7 +105,7 @@ async function procesarAlertasVehiculos() {
 // Procesa alertas de licencias de conducción
 // ───────────────────────────────────────────────────────────
 async function procesarAlertasLicencias() {
-  var alertas = await alertasData.obtenerVencimientosLicencias();
+  var alertas = await alertasData.obtenerVencimientosLicencias(tenantScope.sistema('cron vencimientos licencias'));
   var totalEnviadas = 0;
 
   for (var i = 0; i < alertas.length; i++) {
@@ -107,13 +114,21 @@ async function procesarAlertasLicencias() {
     var clasificacion = reglas.clasificarAlerta(alerta.dias_restantes, false);
     if (!clasificacion) continue;
 
-    // Generar mensaje de licencia
-    var mensaje = reglas.generarMensajeLicencia(alerta, clasificacion);
-
     // Al conductor se le notifica directamente en alertas urgentes y críticas
     var notificarConductor = (alerta.dias_restantes <= 15) ? alerta.telefono : null;
-    var enviados = await enviarAlertaADestinatarios(mensaje, clasificacion, notificarConductor);
-    totalEnviadas += enviados;
+
+    if (alerta.sede_id) {
+      var mensaje = reglas.generarMensajeLicencia(alerta, clasificacion);
+      var scopeSede = tenantScope.paraSedes([alerta.sede_id], 'alerta licencia ' + alerta.nombre);
+      var enviados = await enviarAlertaADestinatarios(scopeSede, mensaje, clasificacion, notificarConductor);
+      totalEnviadas += enviados;
+    } else if (notificarConductor) {
+      // Conductor sin sede: al menos notificarlo a él directamente
+      console.error('⚠️ Conductor ' + alerta.nombre + ' sin sede_id — solo notificación directa');
+      var mensajeDirecto = reglas.generarMensajeLicencia(alerta, clasificacion);
+      var ok = await enviarWhatsApp(notificarConductor, mensajeDirecto);
+      if (ok) totalEnviadas++;
+    }
   }
 
   return { alertas: alertas.length, enviadas: totalEnviadas };
@@ -177,7 +192,7 @@ function registrarCronAlertas() {
 // ítems críticos en estado malo (frenos, llantas, etc.)
 // Ejecución asíncrona sin bloquear el cierre de inspección
 // ───────────────────────────────────────────────────────────
-async function notificarCriticas(placa, novedadesCriticas) {
+async function notificarCriticas(placa, novedadesCriticas, sedeId) {
   if (!Array.isArray(novedadesCriticas) || novedadesCriticas.length === 0) {
     return;
   }
@@ -197,9 +212,14 @@ async function notificarCriticas(placa, novedadesCriticas) {
       + '_Requiere atención inmediata_\n'
       + '_CERO — Sistema de gestión de operaciones_';
 
-    // Enviar al Supervisor y Administrador
-    var supervisores = await alertasData.obtenerContactosPorCargo('Supervisor');
-    var administradores = await alertasData.obtenerContactosPorCargo('Administrador');
+    // Enviar al Supervisor y Administrador DE LA SEDE del activo.
+    // Sin sede: fallback global explícito (mejor sobre-notificar una
+    // alerta de seguridad que silenciarla) — queda logueado.
+    var scopeNotif = sedeId
+      ? tenantScope.paraSedes([sedeId], 'novedad critica ' + placa)
+      : tenantScope.sistema('novedad critica sin sede — fallback global (' + placa + ')');
+    var supervisores = await alertasData.obtenerContactosPorCargo(scopeNotif, 'Supervisor');
+    var administradores = await alertasData.obtenerContactosPorCargo(scopeNotif, 'Administrador');
     var contactos = supervisores.concat(administradores);
 
     for (var i = 0; i < contactos.length; i++) {

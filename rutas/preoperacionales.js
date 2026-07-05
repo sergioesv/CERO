@@ -9,10 +9,12 @@ const express  = require('express');
 const router   = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const inspeccionesData = require('../data/inspecciones');
-const activosData      = require('../data/activos');
+const tenantScope      = require('../servicios/tenantScope');
+
+const conScope = tenantScope.middleware();
 
 // GET / — lista con filtros
-router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function(req, res) {
+router.get('/', verificarToken, conScope, verificarPermiso('preoperacionales', 'ver'), async function(req, res) {
   try {
     var desde     = req.query.desde    || null;
     var hasta     = req.query.hasta    || null;
@@ -22,13 +24,13 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
 
     var activoId = null;
     if (placa) {
-      activoId = await activosData.obtenerActivoIdPorPlaca(placa.toUpperCase());
+      activoId = await tenantScope.resolverActivoPorPlaca(req.scope, placa);
       if (!activoId) {
         return res.json({ data: [], stats: { total: 0, hoy: 0, con_novedades_hoy: 0, criticas_hoy: 0 } });
       }
     }
 
-    var registros = await inspeccionesData.listarPreoperacionales({
+    var registros = await inspeccionesData.listarPreoperacionales(req.scope, {
       desde,
       hasta,
       activoId,
@@ -89,9 +91,9 @@ router.get('/', verificarToken, verificarPermiso('preoperacionales', 'ver'), asy
 });
 
 // GET /:id — detalle completo
-router.get('/:id', verificarToken, verificarPermiso('preoperacionales', 'ver'), async function(req, res) {
+router.get('/:id', verificarToken, conScope, verificarPermiso('preoperacionales', 'ver'), async function(req, res) {
   try {
-    var registro = await inspeccionesData.obtenerPreoperacionalDetalle(req.params.id);
+    var registro = await inspeccionesData.obtenerPreoperacionalDetalle(req.scope, req.params.id);
     if (!registro) return res.status(404).json({ error: 'Preoperacional no encontrado' });
     res.json(registro);
   } catch (error) {

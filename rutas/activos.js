@@ -11,6 +11,8 @@ const activosData = require('../data/activos');
 const autorizacionesData = require('../data/autorizaciones');
 const tenantScope = require('../servicios/tenantScope');
 
+const conScope = tenantScope.middleware();
+
 // GET / — lista todos los activos con placa (vehículos)
 router.get('/', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
@@ -138,9 +140,9 @@ router.post('/', verificarToken, verificarPermiso('activos', 'crear'), async fun
 });
 
 // GET /:placa/historial — timeline completo del activo (antes de /:placa)
-router.get('/:placa/historial', verificarToken, verificarPermiso('activos', 'ver'), async function (req, res) {
+router.get('/:placa/historial', verificarToken, conScope, verificarPermiso('activos', 'ver'), async function (req, res) {
   try {
-    var resultado = await autorizacionesData.obtenerHistorialActivo(req.params.placa);
+    var resultado = await autorizacionesData.obtenerHistorialActivo(req.scope, req.params.placa);
     res.json({ ok: true, vehiculo: resultado.vehiculo, historial: resultado.historial });
   } catch (error) {
     console.error('Error en /api/activos/:placa/historial:', error);

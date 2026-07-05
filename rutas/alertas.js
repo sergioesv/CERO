@@ -11,13 +11,16 @@ const router = express.Router();
 const { verificarToken, verificarPermiso } = require('../middlewares/auth');
 const alertasData = require('../data/alertas');
 const autorizacionesData = require('../data/autorizaciones');
+const tenantScope = require('../servicios/tenantScope');
+
+const conScope = tenantScope.middleware();
 
 // GET /resumen — resumen de alertas activas (criticas/urgentes/informativas)
-router.get('/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async function (req, res) {
+router.get('/resumen', verificarToken, conScope, verificarPermiso('alertas', 'ver'), async function (req, res) {
   try {
     const [alertasActivos, alertasLicencias] = await Promise.all([
-      alertasData.obtenerVencimientosActivos(),
-      alertasData.obtenerVencimientosLicencias()
+      alertasData.obtenerVencimientosActivos(req.scope),
+      alertasData.obtenerVencimientosLicencias(req.scope)
     ]);
 
     let criticas = 0;
@@ -46,9 +49,9 @@ router.get('/resumen', verificarToken, verificarPermiso('alertas', 'ver'), async
 });
 
 // GET /documentos — estado de documentos por vehiculo
-router.get('/documentos', verificarToken, verificarPermiso('alertas', 'ver'), async function (req, res) {
+router.get('/documentos', verificarToken, conScope, verificarPermiso('alertas', 'ver'), async function (req, res) {
   try {
-    var datos = await autorizacionesData.obtenerDocumentosActivos();
+    var datos = await autorizacionesData.obtenerDocumentosActivos(req.scope);
     res.json({ ok: true, datos: datos });
   } catch (error) {
     console.error('Error en /api/alertas/documentos:', error);
