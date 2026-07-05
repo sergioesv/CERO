@@ -286,7 +286,7 @@ El orquestador pasa las reglas de dominio a los subagentes según el área tocad
 Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-05-30 -->
+<!-- Última actualización: 2026-07-05 -->
 
 ## Folder structure
 
@@ -440,7 +440,7 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
 ├── servicios
 │   ├── pdf
-│   │   ├── base.js  # Motor PDF compartido — nunca duplicar logica aqui
+│   │   ├── entrega.js  # Entrega de PDFs — subida a Storage + envio WhatsApp
 │   │   ├── GeneradorPDFBase.js
 │   │   ├── GeneradorPDFPosoperacional.js
 │   │   ├── GeneradorPDFPreoperacional.js
@@ -472,6 +472,7 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │       ├── compartido
 │   │       │   └── baseFlujo.test.js
 │   │       └── preoperacional
+│   │           ├── cierre.pdf.test.js
 │   │           └── cierre.test.js
 │   ├── rutas
 │   │   └── activos.test.js
