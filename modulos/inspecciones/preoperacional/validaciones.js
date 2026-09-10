@@ -232,10 +232,25 @@ function obtenerSubPregunta(itemNombre, grupos) {
 // navegación estándar (0=atrás, 9=menú).
 // ───────────────────────────────────────────────────────────
 
+/**
+ * El titular de la sub-pregunta es solo el enunciado: las opciones las pinta
+ * esta funcion desde subPregunta.opciones, que es donde vive la severidad.
+ * Algunas plantillas traian las opciones tambien escritas dentro de `mensaje`
+ * y al conductor le llegaban dos veces. Se descartan las lineas del titular
+ * que empiecen por un emoji de numero — un enunciado nunca empieza asi.
+ */
+function titularSubPregunta(mensaje) {
+  return String(mensaje || '')
+    .split('\n')
+    .filter(function(linea) { return !/^[0-9]️⃣/.test(linea.trim()); })
+    .join('\n')
+    .trim();
+}
+
 function formatSubPreguntaMsg(subPregunta, prefijo) {
   var numEmoji = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣' };
   var msg = prefijo ? (prefijo + '\n\n') : '';
-  msg += subPregunta.mensaje + '\n';
+  msg += titularSubPregunta(subPregunta.mensaje) + '\n';
   msg += '───────────────\n';
   for (var i = 0; i < subPregunta.opciones.length; i++) {
     var op = subPregunta.opciones[i];
@@ -355,6 +370,7 @@ module.exports = {
   escaparXml,
   formatGrupoMsg,
   formatSubPreguntaMsg,
+  titularSubPregunta,
   // Normalización
   normalizarPlaca,
   normalizarEstado,
