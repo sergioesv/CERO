@@ -492,7 +492,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │       │   └── iniciadorFlujo.licencia.test.js
 │   │       └── preoperacional
 │   │           ├── cierre.pdf.test.js
-│   │           └── cierre.test.js
+│   │           ├── cierre.test.js
+│   │           └── subPregunta.test.js
 │   ├── rutas
 │   │   └── activos.test.js
 │   └── servicios
