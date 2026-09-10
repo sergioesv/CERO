@@ -1,4 +1,5 @@
-const { supabase } = require('../config/config');
+const config = require('../config/config');
+const { supabase } = config;
 
 const CANONICAL_ROLE_PERMISSIONS = {
   superadmin_plataforma: {
