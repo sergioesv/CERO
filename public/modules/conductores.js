@@ -110,10 +110,9 @@ window.ConductoresModule = (() => {
   // Stats cards
   // --------------------------------------------------------------------------
   function renderStats() {
-    const hoy = new Date();
     const activos   = conductores.filter(c => c.activo);
     const inactivos = conductores.filter(c => !c.activo);
-    const vencidos  = conductores.filter(c => c.licencia_vencimiento && new Date(c.licencia_vencimiento) < hoy);
+    const vencidos  = conductores.filter(c => licenciaVencida(c.licencia_vencimiento));
 
     const statsEl = document.getElementById('conductores-stats');
     if (!statsEl) return;
@@ -195,13 +194,32 @@ window.ConductoresModule = (() => {
   // --------------------------------------------------------------------------
   // Estado licencia
   // --------------------------------------------------------------------------
+  // Una fecha 'YYYY-MM-DD' es un dia calendario, no un instante. new Date(str)
+  // la interpreta como medianoche UTC y al renderizarla en America/Bogota (UTC-5)
+  // retrocede un dia: el panel mostraba 25/08 donde la BD y el PDF dicen 26/08.
+  // Se construye como fecha local para que el dia sea el mismo en todas partes.
+  function fechaLocalDesdeYmd(fechaStr) {
+    const p = String(fechaStr).split('T')[0].split('-');
+    if (p.length !== 3) return null;
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function licenciaVencida(fechaStr) {
+    const fecha = fechaStr ? fechaLocalDesdeYmd(fechaStr) : null;
+    if (!fecha) return false;
+    const hoy = new Date();
+    return fecha < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  }
+
   function calcularEstadoLicencia(fechaStr) {
     if (!fechaStr) return { texto: 'Sin registro', clase: 'text-muted' };
-    const hoy   = new Date();
-    const fecha = new Date(fechaStr);
-    const dias  = Math.ceil((fecha - hoy) / 86400000);
+    const fecha = fechaLocalDesdeYmd(fechaStr);
+    if (!fecha) return { texto: 'Sin registro', clase: 'text-muted' };
+    const ahora = new Date();
+    const hoy   = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const dias  = Math.round((fecha - hoy) / 86400000);
     const textoFecha = fecha.toLocaleDateString('es-CO', {
-      timeZone: 'America/Bogota',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -228,7 +246,7 @@ window.ConductoresModule = (() => {
       let matchFiltro = true;
       if      (filtro === 'activos')   matchFiltro = c.activo;
       else if (filtro === 'inactivos') matchFiltro = !c.activo;
-      else if (filtro === 'vencidos')  matchFiltro = c.licencia_vencimiento && new Date(c.licencia_vencimiento) < hoy;
+      else if (filtro === 'vencidos')  matchFiltro = licenciaVencida(c.licencia_vencimiento);
 
       return matchTexto && matchFiltro;
     });
