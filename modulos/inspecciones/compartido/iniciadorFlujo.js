@@ -21,6 +21,45 @@ function crearResultadoPlaca(ok, code, userMessage, payload) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// VIGENCIA DE LICENCIA DE CONDUCCION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Dia de hoy en Colombia como 'YYYY-MM-DD'. */
+function hoyBogotaYmd() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+}
+
+/**
+ * Una licencia esta vencida si su fecha de vencimiento es ANTERIOR al dia de
+ * hoy en Colombia. El dia del vencimiento la licencia todavia es valida.
+ * Se comparan cadenas 'YYYY-MM-DD', que ordenan igual que las fechas y no
+ * dependen de la zona horaria del servidor.
+ * Sin fecha registrada no se bloquea: falta de dato no es lo mismo que vencida.
+ */
+function licenciaVencida(fechaVencimiento) {
+  if (!fechaVencimiento) return false;
+  var venc = String(fechaVencimiento).split('T')[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(venc)) return false;
+  return venc < hoyBogotaYmd();
+}
+
+/** '2026-08-26' -> '26/08/2026' */
+function formatearYmd(fecha) {
+  var p = String(fecha).split('T')[0].split('-');
+  return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(fecha);
+}
+
+/**
+ * El posoperacional NO exige licencia vigente: es el cierre de una jornada que
+ * ya ocurrio, y bloquearlo dejaria al conductor sin poder registrar el estado
+ * en que entrega el vehiculo. Preoperacional y tanqueo si la exigen, porque
+ * autorizan ponerse en marcha.
+ */
+function flujoExigeLicenciaVigente(tipoFlujo) {
+  return tipoFlujo !== 'posoperacional';
+}
+
 function normalizarResultadoPlaca(resultado) {
   if (resultado && typeof resultado === 'object' && typeof resultado.userMessage === 'string') {
     return crearResultadoPlaca(resultado.ok, resultado.code, resultado.userMessage, resultado.payload);
@@ -116,6 +155,29 @@ function crearManejadorPlaca(opciones) {
         'PLATE_DRIVER_NOT_FOUND',
         '\u26A0\uFE0F Tu número no está registrado como conductor.\n\nContacta al administrador.',
         { placa: placa }
+      );
+    }
+
+    // 5b. Validar licencia de conduccion vigente
+    // Se devuelve PLATE_BLOCKED a proposito: es el unico code de fallo que los
+    // tres caminos de placa (foto, sugerida y manual) propagan tal cual al
+    // conductor. Un code nuevo caeria en el mensaje generico de "no se pudo
+    // validar la placa", que aqui seria enganoso.
+    if (flujoExigeLicenciaVigente(tipoFlujo) && licenciaVencida(conductor.licencia_vencimiento)) {
+      console.log('[iniciadorFlujo] Licencia vencida: ' + conductor.nombre + ' (' + conductor.licencia_vencimiento + ')');
+      return crearResultadoPlaca(
+        false,
+        'PLATE_BLOCKED',
+        '\uD83D\uDEAB No puedes iniciar la inspeccion.\n\n' +
+          'Tu licencia de conduccion esta *VENCIDA* desde el ' +
+          formatearYmd(conductor.licencia_vencimiento) + '.\n\n' +
+          'Contacta al supervisor para regularizarla.',
+        {
+          placa: placa,
+          vehiculoId: vehiculo.id,
+          motivo: 'licencia_vencida',
+          licenciaVencimiento: conductor.licencia_vencimiento
+        }
       );
     }
 
@@ -274,6 +336,8 @@ function crearProcesadorFotoPlaca(opciones) {
 }
 
 module.exports = {
+  licenciaVencida: licenciaVencida,
+  flujoExigeLicenciaVigente: flujoExigeLicenciaVigente,
   crearManejadorPlaca,
   crearProcesadorFotoOdometro,
   crearProcesadorFotoPlaca
