@@ -606,8 +606,14 @@ async function refrescarMapaTipos(placas) {
   });
 }
 
+// La actividad reciente identifica el vehiculo por su PLACA: es lo unico que
+// distingue una linea de otra. Antes devolvia datos.tipo_vehiculo, con lo que
+// cinco inspecciones de vehiculos distintos aparecian las cinco como
+// "Camioneta" y la lista no decia nada. El tipo acompana cuando existe.
 function etiquetaVehiculo(placa) {
-  return mapaTipoVehiculo[placa] || 'Vehículo';
+  if (!placa) return 'Vehículo';
+  var tipo = mapaTipoVehiculo[placa];
+  return tipo ? (placa + ' · ' + tipo) : placa;
 }
 
 async function obtenerActividadReciente(sedeIds, limite) {

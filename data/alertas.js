@@ -146,6 +146,9 @@ async function bloquearActivo(activoIdOrPlaca, motivo) {
     .from(config.TABLES.activos)
     .update({
       bloqueado: true,
+      // `estado` tambien, o el panel sigue mostrando el vehiculo como operativo
+      // mientras WhatsApp ya lo rechaza. El historial ya registraba 'bloqueado'.
+      estado: 'bloqueado',
       motivo_bloqueo: motivo,
       updated_at: new Date().toISOString()
     })

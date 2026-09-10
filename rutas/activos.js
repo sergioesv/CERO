@@ -25,6 +25,8 @@ router.get('/', verificarToken, conScope, verificarPermiso('activos', 'ver'), as
       return {
         id: a.id,
         placa: a.placa,
+        nombre: a.nombre || null,
+        codigo: a.codigo || null,
         tipo: datos.tipo_vehiculo || datos.tipo || null,
         marca: datos.marca || null,
         modelo: datos.modelo || null,
@@ -191,10 +193,28 @@ router.put('/:placa', verificarToken, conScope, verificarPermiso('activos', 'edi
 
     // Campos directos
     var campos = {};
+    if (req.body.nombre !== undefined) campos.nombre = req.body.nombre;
+    if (req.body.codigo !== undefined) campos.codigo = req.body.codigo;
     if (req.body.bloqueado !== undefined) campos.bloqueado = req.body.bloqueado;
     if (req.body.motivo_bloqueo !== undefined) campos.motivo_bloqueo = req.body.motivo_bloqueo;
     if (req.body.estado !== undefined) campos.estado = req.body.estado;
     if (req.body.kilometraje !== undefined) campos.kilometraje = req.body.kilometraje;
+
+    // Coherencia estado <-> bloqueado.
+    // Los dos campos describen lo mismo desde dos sitios distintos: el panel
+    // filtra y pinta por `estado`, y el canal de WhatsApp autoriza por
+    // `bloqueado` (iniciadorFlujo). Cuando se desincronizan, el panel muestra
+    // un vehiculo operativo en verde que WhatsApp rechaza — o al reves.
+    // Mientras existan los dos campos, toda escritura los deja de acuerdo:
+    // solo 'operativo' habilita salir; taller, retirado y bloqueado no.
+    if (campos.estado !== undefined) {
+      campos.bloqueado = campos.estado !== 'operativo';
+      if (campos.estado === 'operativo' && req.body.motivo_bloqueo === undefined) {
+        campos.motivo_bloqueo = null;
+      }
+    } else if (campos.bloqueado !== undefined) {
+      campos.estado = campos.bloqueado ? 'bloqueado' : 'operativo';
+    }
 
     // Merge datos JSONB
     var datosNuevos = Object.assign({}, datosActuales);
