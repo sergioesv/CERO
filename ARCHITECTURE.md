@@ -286,7 +286,7 @@ El orquestador pasa las reglas de dominio a los subagentes según el área tocad
 Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo commit del cambio.
 
 <!-- AUTO-GENERATED START — no editar manualmente -->
-<!-- Última actualización: 2026-07-05 -->
+<!-- Última actualización: 2026-09-10 -->
 
 ## Folder structure
 
@@ -433,11 +433,14 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   ├── usuarios.js
 │   └── usuariosRoles.js
 ├── scripts
+│   ├── diagnostico-demo.js
 │   ├── inspect_db.js
 │   ├── seed-templates.js
 │   ├── test-flujos.js
 │   ├── test-pdf.js
-│   └── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
+│   ├── update-architecture.js  # Auto-genera folder structure y dependencias en ARCHITECTURE.md
+│   ├── verificar-arquitectura.js
+│   └── verificar-demo.js
 ├── servicios
 │   ├── pdf
 │   │   ├── entrega.js  # Entrega de PDFs — subida a Storage + envio WhatsApp
@@ -471,7 +474,12 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   ├── permisos.test.js
 │   │   ├── plantillas.scope.test.js
 │   │   └── tanqueos.test.js
+│   ├── e2e
+│   │   └── preoperacional.e2e.test.js
 │   ├── helpers
+│   │   ├── entornoWhatsapp.js
+│   │   ├── fakeSupabase.js
+│   │   ├── seedDemo.js
 │   │   └── twilio.js
 │   ├── modulos
 │   │   ├── inscripcion
@@ -480,7 +488,8 @@ Decisiones arquitectónicas: `docs/DECISION_LOG.md` — actualizar en el mismo c
 │   │   │   └── validaciones.test.js
 │   │   └── inspecciones
 │   │       ├── compartido
-│   │       │   └── baseFlujo.test.js
+│   │       │   ├── baseFlujo.test.js
+│   │       │   └── iniciadorFlujo.licencia.test.js
 │   │       └── preoperacional
 │   │           ├── cierre.pdf.test.js
 │   │           └── cierre.test.js
