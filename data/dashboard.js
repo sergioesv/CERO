@@ -1318,9 +1318,26 @@ async function obtenerDatosActivos(sedeIds, periodo, tipoFiltro) {
  * Resumen general del dashboard — 4 KPIs en paralelo.
  * Usado por el widget de resumen en la cabecera del panel.
  */
-async function obtenerResumenGeneral() {
+async function obtenerResumenGeneral(sedeIds) {
   var supabase = require('../config/config').supabase;
   var hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' })).toISOString().split('T')[0];
+
+  // Fail-closed: sin sedes resueltas no se cuenta nada. Evita que el resumen
+  // del dashboard reporte activos y conductores de otras sedes o empresas.
+  if (!Array.isArray(sedeIds) || !sedeIds.length) {
+    return {
+      vehiculos: { total: 0, activos: 0, bloqueados: 0 },
+      conductores: 0,
+      inspeccionesHoy: 0
+    };
+  }
+
+  var activoIds = await obtenerActivoIdsSede(sedeIds);
+
+  var qInspecciones = activoIds.length
+    ? supabase.from('preoperacionales').select('*', { count: 'exact', head: true })
+        .in('activo_id', activoIds).gte('created_at', hoy)
+    : Promise.resolve({ count: 0, error: null });
 
   var [
     resActivos,
@@ -1328,10 +1345,10 @@ async function obtenerResumenGeneral() {
     resConductores,
     resInspecciones
   ] = await Promise.all([
-    supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null),
-    supabase.from('activos').select('*', { count: 'exact', head: true }).eq('activo', true).not('placa', 'is', null).eq('bloqueado', true),
-    supabase.from('conductores').select('*', { count: 'exact', head: true }).eq('activo', true),
-    supabase.from('preoperacionales').select('*', { count: 'exact', head: true }).gte('created_at', hoy)
+    supabase.from('activos').select('*', { count: 'exact', head: true }).in('sede_id', sedeIds).eq('activo', true).not('placa', 'is', null),
+    supabase.from('activos').select('*', { count: 'exact', head: true }).in('sede_id', sedeIds).eq('activo', true).not('placa', 'is', null).eq('bloqueado', true),
+    supabase.from('conductores').select('*', { count: 'exact', head: true }).in('sede_id', sedeIds).eq('activo', true),
+    qInspecciones
   ]);
 
   var errorDb = resActivos.error || resBloqueados.error || resConductores.error || resInspecciones.error;

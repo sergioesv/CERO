@@ -76,7 +76,8 @@ router.get('/api/dashboard/indice', verificarToken, async function (req, res) {
  */
 router.get('/api/dashboard/resumen', verificarToken, async function (req, res) {
   try {
-    var resumen = await dashboardData.obtenerResumenGeneral();
+    var sedeIds = await dashboardData.resolverSedeIds(req.usuario);
+    var resumen = await dashboardData.obtenerResumenGeneral(sedeIds);
     res.json({ ok: true, ...resumen });
   } catch (error) {
     console.error('Error obteniendo resumen dashboard:', error);
