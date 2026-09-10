@@ -287,7 +287,9 @@ async function main() {
     });
     var salida = (r.stdout || '') + (r.stderr || '');
     // Quitar códigos de color para que se pueda pegar limpio
-    console.log(salida.replace(/\x1b\[[0-9;]*m/g, '').split('\n').map(function (l) { return l; }).join('\n'));
+    // eslint-disable-next-line no-control-regex -- ESC es justo el caracter que hay que quitar
+    var SECUENCIA_ANSI = /\u001b\[[0-9;]*m/g;
+    console.log(salida.replace(SECUENCIA_ANSI, ''));
     if (r.status !== 0) problemas.push('verificar-demo.js reportó problemas bloqueantes (ver arriba)');
   }
 
