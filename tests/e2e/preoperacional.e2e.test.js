@@ -90,14 +90,25 @@ describe('E2E — preoperacional por WhatsApp', function () {
 
     var preop = preops[0];
     expect(preop.kilometraje).toBe(125150);
-    expect(preop.conductor_id).toBe('cond-0001');
-    expect(preop.activo_id).toBe('activo-0001');
+    expect(preop.conductor_id).toBe('66666666-6666-4666-8666-666666666666');
+    expect(preop.activo_id).toBe('55555555-5555-4555-8555-555555555555');
     expect(preop.clasificacion).toBe('BLOQUEO');
     expect(preop.firma_operario).toBe(true);
 
     // El kilometraje del activo se actualizó
     var activo = env.supabase._volcar('activos')[0];
     expect(activo.kilometraje).toBe(125150);
+
+    // La novedad de severidad "bloqueo" debe dejar el vehículo bloqueado
+    // y abrir una autorización pendiente para el supervisor.
+    expect(activo.bloqueado).toBe(true);
+    expect(env.supabase._volcar('autorizaciones_novedad')).toHaveLength(1);
+
+    // Y el conductor debe recibir el aviso de bloqueo por WhatsApp
+    var avisoBloqueo = env.mensajesTwilio.find(function (m) {
+      return /bloquead/i.test(m.body || '');
+    });
+    expect(avisoBloqueo).toBeDefined();
 
     // Se generó y envió el PDF
     expect(env.pdfsGenerados).toHaveLength(1);

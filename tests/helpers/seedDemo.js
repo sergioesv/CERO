@@ -8,11 +8,11 @@
  * que la demo funcione. Si algo de aquí falta en producción, el flujo se cae.
  */
 
-var EMPRESA_ID = 'emp-0001';
-var SEDE_ID = 'sede-0001';
-var TIPO_ACTIVO_ID = 'tipo-vehiculo';
-var PLANTILLA_ID = 'plantilla-preop-vehiculo';
-var ACTIVO_ID = 'activo-0001';
+var EMPRESA_ID = '11111111-1111-4111-8111-111111111111';
+var SEDE_ID = '22222222-2222-4222-8222-222222222222';
+var TIPO_ACTIVO_ID = '33333333-3333-4333-8333-333333333333';
+var PLANTILLA_ID = '44444444-4444-4444-8444-444444444444';
+var ACTIVO_ID = '55555555-5555-4555-8555-555555555555';
 
 var PLACA_DEMO = 'IDL354';
 var TELEFONO_DEMO = 'whatsapp:+573001112233';
@@ -53,7 +53,7 @@ function construirSeed(overrides) {
 
     conductores: [
       {
-        id: 'cond-0001',
+        id: '66666666-6666-4666-8666-666666666666',
         nombre: 'Juan Pérez',
         cedula: '10203040',
         telefono: '+573001112233',
@@ -79,17 +79,17 @@ function construirSeed(overrides) {
     ],
 
     plantilla_grupos: [
-      { id: 'grupo-1', plantilla_id: PLANTILLA_ID, nombre: 'MOTOR Y NIVELES', abreviado: 'Aceite, refrigerante, fugas', orden: 1, solo_panel: false },
-      { id: 'grupo-2', plantilla_id: PLANTILLA_ID, nombre: 'FRENOS Y DIRECCION', abreviado: 'Freno de servicio, parqueo, dirección', orden: 2, solo_panel: false },
-      { id: 'grupo-3', plantilla_id: PLANTILLA_ID, nombre: 'LUCES', abreviado: 'Altas, bajas, direccionales, stop', orden: 3, solo_panel: false }
+      { id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', plantilla_id: PLANTILLA_ID, nombre: 'MOTOR Y NIVELES', abreviado: 'Aceite, refrigerante, fugas', orden: 1, solo_panel: false },
+      { id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', plantilla_id: PLANTILLA_ID, nombre: 'FRENOS Y DIRECCION', abreviado: 'Freno de servicio, parqueo, dirección', orden: 2, solo_panel: false },
+      { id: 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa', plantilla_id: PLANTILLA_ID, nombre: 'LUCES', abreviado: 'Altas, bajas, direccionales, stop', orden: 3, solo_panel: false }
     ],
 
     plantilla_items: [
-      { id: 'item-1', grupo_id: 'grupo-1', nombre: 'Nivel de aceite', orden: 1, critico: false, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
-      { id: 'item-2', grupo_id: 'grupo-1', nombre: 'Nivel de refrigerante', orden: 2, critico: false, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
+      { id: 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Nivel de aceite', orden: 1, critico: false, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
+      { id: 'bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Nivel de refrigerante', orden: 2, critico: false, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
 
       {
-        id: 'item-3', grupo_id: 'grupo-2', nombre: 'Freno de servicio', orden: 1,
+        id: 'bbbbbbb3-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Freno de servicio', orden: 1,
         critico: true, sin_foto: false, sin_validacion: false, nunca_bloquea: false,
         sub_pregunta: {
           mensaje: '¿Cómo está el freno de servicio?',
@@ -99,10 +99,10 @@ function construirSeed(overrides) {
           ]
         }
       },
-      { id: 'item-4', grupo_id: 'grupo-2', nombre: 'Freno de parqueo', orden: 2, critico: true, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
+      { id: 'bbbbbbb4-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Freno de parqueo', orden: 2, critico: true, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
 
-      { id: 'item-5', grupo_id: 'grupo-3', nombre: 'Luces bajas', orden: 1, critico: true, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
-      { id: 'item-6', grupo_id: 'grupo-3', nombre: 'Direccionales', orden: 2, critico: false, sin_foto: true, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null }
+      { id: 'bbbbbbb5-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Luces bajas', orden: 1, critico: true, sin_foto: false, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null },
+      { id: 'bbbbbbb6-bbbb-4bbb-8bbb-bbbbbbbbbbbb', grupo_id: 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nombre: 'Direccionales', orden: 2, critico: false, sin_foto: true, sin_validacion: false, nunca_bloquea: false, sub_pregunta: null }
     ],
 
     preoperacionales: [],
